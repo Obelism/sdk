@@ -28,6 +28,12 @@ npm run changeset      # Before publishing
     `src/scopes/visualEditor/VisualEditor.tsx` in the CMS; the prompt
     itself runs in the CMS (`src/server/content/promptEdit.ts`,
     docs/adr/0008 there).
+  - `./site`: `createSiteEditing` (the `/cms/*` handler: login, callback,
+    logout and the bridge's `/cms/api/…`, forwarded with the site token in
+    an httpOnly cookie) and `readSiteToken`; editing on the site outside the
+    visual editor (the CMS's docs/site-editing.md, docs/adr/0010). The
+    browser half is `bridge/siteBridge.ts`, which `getContentBridge` starts
+    when the editing cookie is set
   - `./prompt`: `createPromptHandler` / `verifyPromptRequest`, for a
     customer's own model behind the space's prompt endpoint
   - bin `content`: `content model pull|plan|apply` (management API), moved

@@ -5,7 +5,7 @@ export type {
 	RequestOptions,
 } from './client'
 export { DEFAULT_URL } from './config'
-export { editable, UID_ATTRIBUTE } from './editable'
+export { editable, ENTRY_ATTRIBUTE, UID_ATTRIBUTE } from './editable'
 export { ContentApiError } from './errors'
 export { imageSrcSet, imageUrl } from './images'
 export type { ImageTransform } from './images'

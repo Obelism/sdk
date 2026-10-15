@@ -38,8 +38,9 @@ export type BridgeListener<E extends BridgeEvent> = (
 ) => void
 
 export type BridgeState = {
-	// What the editor offers this site, e.g. 'prompt' (editing by prompt, for
-	// people who may edit content). Empty until the editor says.
+	// What the editor offers this site: 'prompt' (editing by prompt, for
+	// people who may edit content), and when editing on the site itself
+	// also 'save' and 'publish'. Empty until the editor says.
 	features: readonly string[]
 	// The block selected on the page or in the editor, null for none.
 	selectedUid: string | null
@@ -47,14 +48,25 @@ export type BridgeState = {
 	prompting: boolean
 	// The editor can undo the last prompt.
 	canUndo: boolean
+	// Editing on the site: prompts changed content that isn't saved yet.
+	unsaved: boolean
+	// Editing on the site: a save or publish is running.
+	saving: boolean
+	publishing: boolean
+	// Editing on the site: clicking a block selects it instead of following
+	// it (while the prompt box is open). Always true in the visual editor.
+	selecting: boolean
 }
 
 export type PromptResult = { summary: string }
 
 export type ContentBridge = {
-	// True inside the visual editor.
+	// True inside the visual editor, and on a site signed in to edit.
 	readonly isEditing: boolean
-	// The entry being edited.
+	// Where: inside the visual editor's iframe, or on the site itself after
+	// signing in through its `/cms/login` (@obelism/content/site).
+	readonly mode: 'editor' | 'site' | null
+	// The entry being edited (on the site: the page's, see `editable`).
 	readonly entryId: string | null
 	readonly environment: string | null
 	// Returns a function that removes the listener. While no `update` listener
@@ -72,6 +84,15 @@ export type ContentBridge = {
 	): Promise<PromptResult>
 	// Undoes the last prompt in the editor.
 	undo(): void
+	// Editing on the site: stores the changed content as drafts…
+	save(): Promise<void>
+	// …and publishes the page (and anything else changed here).
+	publish(): Promise<void>
+	// Editing on the site: signs out and turns draft mode off.
+	signOut(): void
+	// Editing on the site: whether clicks select blocks. The prompt box turns
+	// it on while open.
+	setSelecting(selecting: boolean): void
 	// Selects a block, or nothing, on the page and in the editor.
 	select(uid: string | null): void
 	// Removes everything the bridge added to the page.
@@ -80,16 +101,21 @@ export type ContentBridge = {
 
 const OUTLINE = '#d58a1f'
 
-const STYLE =
-	`[${UID_ATTRIBUTE}]{cursor:pointer;transition:outline-color .15s}` +
-	`[${UID_ATTRIBUTE}]:hover{outline:2px dashed ${OUTLINE};outline-offset:2px}` +
-	`[${UID_ATTRIBUTE}][data-cms-selected]{outline:2px solid ${OUTLINE};outline-offset:2px}`
+// Outlines on blocks; `scope` limits them to e.g. `html[data-cms-selecting] `.
+export const selectionStyle = (scope = '') =>
+	`${scope}[${UID_ATTRIBUTE}]{cursor:pointer;transition:outline-color .15s}` +
+	`${scope}[${UID_ATTRIBUTE}]:hover{outline:2px dashed ${OUTLINE};outline-offset:2px}` +
+	`${scope}[${UID_ATTRIBUTE}][data-cms-selected]{outline:2px solid ${OUTLINE};outline-offset:2px}`
 
 export const INITIAL_STATE: BridgeState = {
 	features: [],
 	selectedUid: null,
 	prompting: false,
 	canUndo: false,
+	unsaved: false,
+	saving: false,
+	publishing: false,
+	selecting: false,
 }
 
 type Listeners = { [E in BridgeEvent]: Set<BridgeListener<E>> }
@@ -124,6 +150,24 @@ export const createEmitter = () => {
 const inertPrompt = () =>
 	Promise.reject(new Error('Prompts only work inside the visual editor'))
 
+const onlyOnSite = () =>
+	Promise.reject(new Error('Save and publish in the visual editor itself'))
+
+// What every bridge without a feature does for it.
+export const INERT_METHODS = {
+	prompt: inertPrompt,
+	undo: () => {},
+	save: onlyOnSite,
+	publish: onlyOnSite,
+	signOut: () => {},
+	select: () => {},
+	setSelecting: () => {},
+} satisfies Partial<ContentBridge>
+
+// The selector of the element marked with a block's uid.
+export const blockSelector = (uid: string) =>
+	`[${UID_ATTRIBUTE}="${uid.replace(/["\\]/g, '\\$&')}"]`
+
 // `cmsOrigin` is the only origin messages are accepted from and sent to.
 export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 	const params = new URLSearchParams(win.location.search)
@@ -131,7 +175,7 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 	const emitter = createEmitter()
 	const cleanup: (() => void)[] = []
 
-	let state = INITIAL_STATE
+	let state: BridgeState = { ...INITIAL_STATE, selecting: true }
 	const setState = (next: Partial<BridgeState>) => {
 		state = { ...state, ...next }
 		emitter.emit('change', state)
@@ -139,13 +183,12 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 
 	const bridge: ContentBridge = {
 		isEditing,
+		mode: isEditing ? 'editor' : null,
 		entryId: params.get(PREVIEW_PARAMS.entry),
 		environment: params.get(PREVIEW_PARAMS.environment),
 		on: emitter.on,
 		getState: () => state,
-		prompt: inertPrompt,
-		undo: () => {},
-		select: () => {},
+		...INERT_METHODS,
 		destroy: () => {
 			cleanup.splice(0).forEach((undo) => undo())
 		},
@@ -159,7 +202,7 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 	}
 
 	const style = doc.createElement('style')
-	style.textContent = STYLE
+	style.textContent = selectionStyle()
 	doc.head.appendChild(style)
 	cleanup.push(() => style.remove())
 
@@ -171,9 +214,7 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 			setState({ selectedUid: uid ?? null })
 		}
 		if (!uid) return
-		const element = doc.querySelector(
-			`[${UID_ATTRIBUTE}="${uid.replace(/["\\]/g, '\\$&')}"]`,
-		)
+		const element = doc.querySelector(blockSelector(uid))
 		if (!element) return
 		element.setAttribute('data-cms-selected', '')
 		if (scroll) element.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -334,6 +375,7 @@ export const wrapScriptBridge = (
 	let forwardingUpdates = false
 	return {
 		isEditing: script.isEditing,
+		mode: script.isEditing ? 'editor' : null,
 		entryId: script.entryId,
 		environment: params.get(PREVIEW_PARAMS.environment),
 		on: (event, listener) => {
@@ -347,9 +389,7 @@ export const wrapScriptBridge = (
 			return emitter.on(event, listener)
 		},
 		getState: () => INITIAL_STATE,
-		prompt: inertPrompt,
-		undo: () => {},
-		select: () => {},
+		...INERT_METHODS,
 		destroy: () => {},
 	}
 }

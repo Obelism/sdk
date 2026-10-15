@@ -20,13 +20,15 @@ export type PageEntry = Entry<
 	'page'
 >
 
-// A client component, so the visual editor's unsaved changes show as they
-// are typed. Outside the editor `useLiveEntry` just returns `entry`.
+// A client component, so unsaved changes show as they are typed in the visual
+// editor, or as prompts change them on the site. Otherwise `useLiveEntry`
+// just returns `entry`. `editable(entry)` tells editing on the site which
+// entry this page is.
 export const Page = ({ entry }: { entry: PageEntry }) => {
 	const { fields } = useLiveEntry(entry)
 
 	return (
-		<main>
+		<main {...editable(entry)}>
 			<h1>{fields.title}</h1>
 			{fields.body?.map((block) => {
 				switch (block._type) {

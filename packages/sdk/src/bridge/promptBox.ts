@@ -1,11 +1,13 @@
 import type { BridgeState, ContentBridge } from './createBridge'
 
 // The prompt box: a small bar at the bottom of the page, inside the visual
-// editor only, where an editor types what to change ("make the hero shorter,
-// and friendlier"). Plain DOM in a shadow root, so it works on any site and
-// the site's CSS can't reach it (nor its CSS the site). It shows once the
-// editor offers prompts (people who may edit content), acts on the selected
-// block or the whole entry, and offers undo.
+// editor or on a site signed in to edit, where an editor types what to
+// change ("make the hero shorter, and friendlier"). Plain DOM in a shadow
+// root, so it works on any site and the site's CSS can't reach it (nor its
+// CSS the site). It shows once prompts are offered (people who may edit
+// content), acts on the selected block or the whole entry, and offers undo.
+// On the site it also saves, publishes and signs out; in the visual editor
+// the editor around the site does that.
 
 export type PromptLabels = {
 	open: string
@@ -17,6 +19,16 @@ export type PromptLabels = {
 	scopeBlock: string
 	clearBlock: string
 	working: string
+	save: string
+	publish: string
+	saving: string
+	publishing: string
+	saved: string
+	published: string
+	unsaved: string
+	signOut: string
+	viewingDrafts: string
+	selectHint: string
 }
 
 export const DEFAULT_PROMPT_LABELS: PromptLabels = {
@@ -29,6 +41,16 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 	scopeBlock: 'Selected block',
 	clearBlock: 'Edit the whole page instead',
 	working: 'Working on it…',
+	save: 'Save',
+	publish: 'Publish',
+	saving: 'Saving…',
+	publishing: 'Publishing…',
+	saved: 'Saved as a draft',
+	published: 'Published',
+	unsaved: 'Unsaved changes',
+	signOut: 'Exit editing',
+	viewingDrafts: 'Viewing drafts',
+	selectHint: 'Click a block to change only that block',
 }
 
 export type PromptBoxOptions = {
@@ -72,6 +94,10 @@ button:disabled { opacity: .5; cursor: default; }
 .close { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 6px; }
 .status { font-size: 13px; color: var(--muted); flex: 1; min-width: 0; }
 .status.error { color: var(--error); }
+.bar { display: flex; justify-content: center; gap: 8px; }
+.row > .link { margin-right: auto; }
+.link { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 12px; text-decoration: underline; padding: 0; }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: ${ACCENT}; margin-right: 6px; vertical-align: 1px; }
 [hidden] { display: none !important; }
 `
 
@@ -105,11 +131,26 @@ export const mountPromptBox = (
 	host.setAttribute('data-obelism-content-prompt', '')
 	const shadow = host.attachShadow({ mode: 'open' })
 
+	const site = bridge.mode === 'site'
 	const pill = element(doc, 'button', {
 		className: 'pill',
 		type: 'button',
 		textContent: `✨ ${labels.open}`,
 	})
+	// Someone signed in who may only read: a note that drafts show, and a
+	// way out.
+	const viewing = element(
+		doc,
+		'span',
+		{ className: 'pill' },
+		`${labels.viewingDrafts} · `,
+	)
+	const pillSignOut = element(doc, 'button', {
+		className: 'link',
+		type: 'button',
+		textContent: labels.signOut,
+	})
+	viewing.appendChild(pillSignOut)
 	const scopeText = element(doc, 'span')
 	const clearBlock = element(doc, 'button', {
 		type: 'button',
@@ -147,6 +188,24 @@ export const mountPromptBox = (
 		type: 'submit',
 		textContent: labels.send,
 	})
+	const save = element(doc, 'button', {
+		className: 'action',
+		type: 'button',
+		textContent: labels.save,
+	})
+	const publish = element(doc, 'button', {
+		className: 'action',
+		type: 'button',
+		textContent: labels.publish,
+	})
+	const signOut = element(doc, 'button', {
+		className: 'link',
+		type: 'button',
+		textContent: labels.signOut,
+	})
+	const unsaved = element(doc, 'span', { className: 'scope' })
+	unsaved.appendChild(element(doc, 'span', { className: 'dot' }))
+	unsaved.appendChild(doc.createTextNode(labels.unsaved))
 	const panel = element(
 		doc,
 		'form',
@@ -154,8 +213,15 @@ export const mountPromptBox = (
 		element(doc, 'div', { className: 'row' }, scope, close),
 		input,
 		element(doc, 'div', { className: 'row' }, status, undo, send),
+		element(doc, 'div', { className: 'row' }, unsaved, signOut, save, publish),
 	)
-	const root = element(doc, 'div', { className: 'root' }, pill, panel)
+	const root = element(
+		doc,
+		'div',
+		{ className: 'root' },
+		element(doc, 'div', { className: 'bar' }, pill, viewing),
+		panel,
+	)
 	shadow.append(element(doc, 'style', { textContent: CSS }), root)
 
 	let open = false
@@ -163,20 +229,33 @@ export const mountPromptBox = (
 
 	const render = (state: BridgeState) => {
 		const available = state.features.includes('prompt')
-		root.hidden = !available
-		pill.hidden = open
-		panel.hidden = !open
+		const storing = state.saving || state.publishing
+		const busy = state.prompting || storing
+		root.hidden = !available && !site
+		pill.hidden = open || !available
+		viewing.hidden = available || !site
+		panel.hidden = !open || !available
 		scopeText.textContent = state.selectedUid
 			? labels.scopeBlock
 			: labels.scopeEntry
 		clearBlock.hidden = !state.selectedUid
 		undo.hidden = !state.canUndo
-		undo.disabled = state.prompting
-		send.disabled = state.prompting || input.value.trim() === ''
-		input.disabled = state.prompting
-		const text = state.prompting ? labels.working : (message?.text ?? '')
+		undo.disabled = busy
+		send.disabled = busy || input.value.trim() === ''
+		input.disabled = busy
+		save.hidden = !state.features.includes('save')
+		save.disabled = busy || !state.unsaved
+		save.textContent = state.saving ? labels.saving : labels.save
+		publish.hidden = !state.features.includes('publish')
+		publish.disabled = busy
+		publish.textContent = state.publishing ? labels.publishing : labels.publish
+		signOut.hidden = !site
+		unsaved.hidden = !state.unsaved
+		const text = state.prompting
+			? labels.working
+			: (message?.text ?? (site && !state.selectedUid ? labels.selectHint : ''))
 		status.textContent = text
-		status.className = `status${!state.prompting && message?.error ? ' error' : ''}`
+		status.className = `status${!busy && message?.error ? ' error' : ''}`
 	}
 	const refresh = () => render(bridge.getState())
 
@@ -204,15 +283,38 @@ export const mountPromptBox = (
 		input.focus()
 	}
 
-	pill.addEventListener('click', () => {
-		open = true
+	const setOpen = (next: boolean) => {
+		open = next
+		if (site) bridge.setSelecting(open)
 		refresh()
+	}
+
+	const store = async (action: 'save' | 'publish') => {
+		message = null
+		try {
+			await bridge[action]()
+			message = {
+				text: action === 'save' ? labels.saved : labels.published,
+				error: false,
+			}
+		} catch (error) {
+			message = {
+				text: error instanceof Error ? error.message : String(error),
+				error: true,
+			}
+		}
+		refresh()
+	}
+
+	pill.addEventListener('click', () => {
+		setOpen(true)
 		input.focus()
 	})
-	close.addEventListener('click', () => {
-		open = false
-		refresh()
-	})
+	close.addEventListener('click', () => setOpen(false))
+	save.addEventListener('click', () => void store('save'))
+	publish.addEventListener('click', () => void store('publish'))
+	signOut.addEventListener('click', () => bridge.signOut())
+	pillSignOut.addEventListener('click', () => bridge.signOut())
 	clearBlock.addEventListener('click', () => bridge.select(null))
 	undo.addEventListener('click', () => {
 		message = null
@@ -231,8 +333,7 @@ export const mountPromptBox = (
 			event.preventDefault()
 			void submit()
 		} else if (event.key === 'Escape') {
-			open = false
-			refresh()
+			setOpen(false)
 		}
 	})
 

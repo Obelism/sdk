@@ -55,16 +55,18 @@ export const ContentBridge = ({ url, prompt }: ContentBridgeProps) => {
 
 export type ContentBridgeState = Pick<
 	Bridge,
-	'isEditing' | 'entryId' | 'environment'
+	'isEditing' | 'mode' | 'entryId' | 'environment'
 >
 
 const NOT_EDITING: ContentBridgeState = {
 	isEditing: false,
+	mode: null,
 	entryId: null,
 	environment: null,
 }
 
-// Whether the page is open in the visual editor, and on which entry. Always
+// Whether the page is open in the visual editor (or signed in to edit on the
+// site), and on which entry. Always
 // "not editing" during server rendering and hydration, so markup matches;
 // the real state follows right after.
 export const useContentBridge = ({
@@ -72,8 +74,8 @@ export const useContentBridge = ({
 }: BridgeOptions = {}): ContentBridgeState => {
 	const bridge = useBridge({ url })
 	if (!bridge?.isEditing) return NOT_EDITING
-	const { isEditing, entryId, environment } = bridge
-	return { isEditing, entryId, environment }
+	const { isEditing, mode, entryId, environment } = bridge
+	return { isEditing, mode, entryId, environment }
 }
 
 // Calls `listener` on a bridge event, e.g. to refetch server data once the
@@ -135,9 +137,10 @@ export function useLiveEntry<TEntry extends Entry>(
 }
 
 export type ContentPromptState = BridgeState & {
-	// The editor offers prompts here: inside the visual editor, for someone
-	// who may edit content.
+	// Prompts are offered here: inside the visual editor or on a site signed
+	// in to edit, for someone who may edit content.
 	available: boolean
+	mode: Bridge['mode']
 	// See ContentBridge['prompt'].
 	prompt: (
 		prompt: string,
@@ -145,10 +148,18 @@ export type ContentPromptState = BridgeState & {
 	) => Promise<PromptResult>
 	undo: () => void
 	select: (uid: string | null) => void
+	// Editing on the site (see ContentBridge): store the in-memory changes,
+	// publish, sign out, and whether clicks select blocks.
+	save: () => Promise<void>
+	publish: () => Promise<void>
+	signOut: () => void
+	setSelecting: (selecting: boolean) => void
 }
 
 const notStarted = () =>
 	Promise.reject(new Error('Prompts only work inside the visual editor'))
+const notOnSite = () =>
+	Promise.reject(new Error('Only while signed in to edit on the site'))
 
 // For your own prompt UI instead of the built-in box (render
 // `<ContentBridge prompt={false} />`):
@@ -173,8 +184,13 @@ export const useContentPrompt = ({
 	return {
 		...state,
 		available: state.features.includes('prompt'),
+		mode: bridge?.mode ?? null,
 		prompt: bridge ? bridge.prompt : notStarted,
 		undo: bridge ? bridge.undo : noop,
 		select: bridge ? bridge.select : noop,
+		save: bridge ? bridge.save : notOnSite,
+		publish: bridge ? bridge.publish : notOnSite,
+		signOut: bridge ? bridge.signOut : noop,
+		setSelecting: bridge ? bridge.setSelecting : noop,
 	}
 }

@@ -5,12 +5,13 @@ import { type BridgeState, createEmitter, INITIAL_STATE } from './createBridge'
 import { mountPromptBox } from './promptBox'
 
 // A bridge whose state and answers the test controls.
-const fakeBridge = () => {
+const fakeBridge = (mode: 'editor' | 'site' = 'editor') => {
 	const emitter = createEmitter()
 	let state: BridgeState = INITIAL_STATE
 	let answer: (value: { summary: string } | Error) => void = () => {}
 	const bridge = {
 		isEditing: true,
+		mode,
 		entryId: 'entry_1',
 		environment: 'develop',
 		on: emitter.on,
@@ -27,7 +28,13 @@ const fakeBridge = () => {
 				}),
 		),
 		undo: vi.fn(),
+		save: vi.fn(async () => {}),
+		publish: vi.fn(async () => {
+			throw new Error('title: Required')
+		}),
+		signOut: vi.fn(),
 		select: vi.fn(),
+		setSelecting: vi.fn(),
 		destroy: () => {},
 	}
 	const setState = (next: Partial<BridgeState>) => {
@@ -108,5 +115,56 @@ describe('mountPromptBox', () => {
 		const { bridge } = fakeBridge()
 		mountPromptBox(document, bridge)()
 		expect(document.querySelector('[data-obelism-content-prompt]')).toBeNull()
+	})
+
+	it('leaves saving and publishing to the visual editor', () => {
+		const { bridge, setState } = fakeBridge()
+		unmount = mountPromptBox(document, bridge)
+		setState({ features: ['prompt'] })
+		$<HTMLButtonElement>('.pill').click()
+		const buttons = [...shadow().querySelectorAll('button')]
+		const visible = buttons
+			.filter((button) => !button.closest('[hidden]'))
+			.map((button) => button.textContent)
+		expect(visible).not.toContain('Save')
+		expect(visible).not.toContain('Exit editing')
+	})
+
+	it('saves, publishes and signs out on the site', async () => {
+		const { bridge, setState } = fakeBridge('site')
+		unmount = mountPromptBox(document, bridge)
+		setState({ features: ['prompt', 'save', 'publish'] })
+		$<HTMLButtonElement>('.pill').click()
+		expect(bridge.setSelecting).toHaveBeenCalledWith(true)
+
+		const button = (text: string) =>
+			[...shadow().querySelectorAll('button')].find(
+				(button) => button.textContent === text,
+			)!
+		expect(button('Save').disabled).toBe(true)
+		setState({ unsaved: true })
+		expect(button('Save').disabled).toBe(false)
+		expect($<HTMLElement>('.dot').parentElement!.hidden).toBe(false)
+
+		button('Save').click()
+		await vi.waitFor(() =>
+			expect($('.status').textContent).toBe('Saved as a draft'),
+		)
+		button('Publish').click()
+		await vi.waitFor(() =>
+			expect($('.status').textContent).toBe('title: Required'),
+		)
+		expect($('.status').className).toContain('error')
+
+		button('Exit editing').click()
+		expect(bridge.signOut).toHaveBeenCalled()
+	})
+
+	it('shows readers on the site that drafts show, and a way out', () => {
+		const { bridge } = fakeBridge('site')
+		unmount = mountPromptBox(document, bridge)
+		expect($<HTMLElement>('.root').hidden).toBe(false)
+		expect($<HTMLElement>('button.pill').hidden).toBe(true)
+		expect($('span.pill').textContent).toContain('Viewing drafts')
 	})
 })

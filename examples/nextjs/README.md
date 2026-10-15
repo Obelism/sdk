@@ -14,7 +14,13 @@ npm run dev
 - `src/components/Page.tsx` — renders the entry with `useLiveEntry`, so edits
   in the visual editor show while they are typed; `editable(block)` lets
   editors click a block to select it.
-- `src/app/layout.tsx` — `<ContentBridge />` starts the editor bridge.
+- `src/app/layout.tsx` — `<ContentBridge />` starts the editor bridge (and,
+  signed in on the site, the prompt bar).
+- `src/app/cms/[...path]/route.ts` — editing on the site itself: open
+  `/cms/login` (optionally `?return_to=/a/page`), sign in to Obelism
+  Content, and you're back in draft mode with the prompt bar, Save and
+  Publish. `/cms/logout` ends it. `src/lib/content.ts` reads drafts with the
+  session's token while draft mode is on.
 - `next.config.ts` — allows the CMS to frame the site.
 - `src/app/api/content-prompt/route.ts` — optional: Claude as the model for
   prompt editing, instead of the CMS's default (Workers AI).

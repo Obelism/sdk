@@ -4,6 +4,7 @@ import {
 	wrapScriptBridge,
 } from './bridge/createBridge'
 import { mountPromptBox, type PromptBoxOptions } from './bridge/promptBox'
+import { createSiteBridge, readSiteEditing } from './bridge/siteBridge'
 import { DEFAULT_URL, normalizeUrl } from './config'
 
 export type {
@@ -23,8 +24,9 @@ export type BridgeOptions = {
 	// Default: https://content.obelism.studio
 	url?: string | undefined
 	// The prompt box editors change the page with (shown only inside the
-	// visual editor, to people who may edit). `false` leaves it out, e.g. to
-	// build your own with `bridge.prompt()`. Default: shown.
+	// visual editor or on a site signed in to edit, to people who may edit).
+	// `false` leaves it out, e.g. to build your own with `bridge.prompt()`.
+	// Default: shown.
 	prompt?: boolean | PromptBoxOptions | undefined
 }
 
@@ -48,8 +50,9 @@ const SERVER_BRIDGE: ContentBridge = wrapScriptBridge(
 export const peekContentBridge = (): ContentBridge | null =>
 	typeof window === 'undefined' ? null : ((window as BridgeWindow)[KEY] ?? null)
 
-// The page's bridge to the visual editor, started on first use. Call it in
-// the browser (on the server it returns an inert bridge):
+// The page's bridge to the visual editor — or, on a site signed in to edit,
+// its stand-in — started on first use. Call it in the browser (on the server
+// it returns an inert bridge):
 //
 //   const bridge = getContentBridge()
 //   if (bridge.isEditing) bridge.on('update', ({ entry }) => render(entry))
@@ -71,6 +74,13 @@ export const getContentBridge = ({
 		)
 	} else {
 		bridge = createBridge(win, normalizeUrl(url || DEFAULT_URL))
+		// Not in the visual editor, but signed in to edit through the site's
+		// own `/cms/login` (@obelism/content/site).
+		const sitePath =
+			bridge.isEditing || win.parent !== win
+				? null
+				: readSiteEditing(win.document)
+		if (sitePath) bridge = createSiteBridge(win, sitePath)
 		if (bridge.isEditing && prompt) {
 			const unmount = mountPromptBox(
 				win.document,

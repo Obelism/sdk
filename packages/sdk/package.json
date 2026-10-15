@@ -1,6 +1,6 @@
 {
 	"name": "@obelism/content",
-	"description": "Obelism Content SDK: the delivery API client, the visual editor bridge with prompt editing, and the content model CLI",
+	"description": "Obelism Content SDK: the delivery API client, the visual editor bridge with prompt editing, editing on your own site, and the content model CLI",
 	"version": "0.0.0",
 	"keywords": [
 		"cms",
@@ -41,6 +41,16 @@
 			"require": {
 				"types": "./dist/bridge.d.ts",
 				"default": "./dist/bridge.js"
+			}
+		},
+		"./site": {
+			"import": {
+				"types": "./dist/site.d.mts",
+				"default": "./dist/site.mjs"
+			},
+			"require": {
+				"types": "./dist/site.d.ts",
+				"default": "./dist/site.js"
 			}
 		},
 		"./prompt": {
