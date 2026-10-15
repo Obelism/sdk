@@ -2,13 +2,13 @@ import type { Asset } from './types'
 
 export type ImageTransform = {
 	// Pixels, up to 1920.
-	w?: number
-	h?: number
-	fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad'
+	w?: number | undefined
+	h?: number | undefined
+	fit?: 'scale-down' | 'contain' | 'cover' | 'crop' | 'pad' | undefined
 	// `auto` (the API's default) picks AVIF or WebP when the browser takes them.
-	format?: 'auto' | 'avif' | 'webp' | 'jpeg' | 'png'
+	format?: 'auto' | 'avif' | 'webp' | 'jpeg' | 'png' | undefined
 	// Quality, 1–100 (the API's default is 80).
-	q?: number
+	q?: number | undefined
 }
 
 const KEYS = ['w', 'h', 'fit', 'format', 'q'] as const

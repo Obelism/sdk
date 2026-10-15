@@ -12,38 +12,38 @@ export type ContentClientOptions = {
 	// (`cms_p_…`, drafts too). Keep preview tokens server-side.
 	token: string
 	// The CMS. Default: https://content.obelism.studio
-	url?: string
+	url?: string | undefined
 	// Defaults for every request; each can be overridden per call.
-	locale?: string
-	depth?: number
-	richText?: RichTextFormat
+	locale?: string | undefined
+	depth?: number | undefined
+	richText?: RichTextFormat | undefined
 	// Milliseconds before a request is aborted. Default: 10000.
-	timeout?: number
+	timeout?: number | undefined
 	// Passed to every fetch, e.g. `{ next: { revalidate: 60 } }` in Next.js.
-	init?: RequestInit
+	init?: RequestInit | undefined
 	// A fetch implementation, for runtimes or tests that need their own.
-	fetch?: typeof fetch
+	fetch?: typeof fetch | undefined
 }
 
 export type RequestOptions = {
 	// A locale code, `*` for every locale (localized fields become
 	// `{ [locale]: value }`), or the space's default when left out.
-	locale?: string
+	locale?: string | undefined
 	// Levels of references to inline, 0–5 (the API's default is 1).
-	depth?: number
+	depth?: number | undefined
 	// Rich text as ProseMirror JSON (default) or rendered HTML strings.
-	richText?: RichTextFormat
+	richText?: RichTextFormat | undefined
 	// Merged over the client's `init` for this request.
-	init?: RequestInit
+	init?: RequestInit | undefined
 }
 
 export type EntriesQuery = RequestOptions & {
-	contentType?: string
+	contentType?: string | undefined
 	// Only direct children of the entry at this path; '' for the root.
-	parentPath?: string
+	parentPath?: string | undefined
 	// 1–100, the API's default is 20.
-	limit?: number
-	skip?: number
+	limit?: number | undefined
+	skip?: number | undefined
 }
 
 const trimSlashes = (path: string) => path.replace(/^\/+|\/+$/g, '')

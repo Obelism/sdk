@@ -21,11 +21,11 @@ export type { PromptBoxOptions, PromptLabels } from './bridge/promptBox'
 export type BridgeOptions = {
 	// The CMS the editor runs on; the only origin the bridge talks to.
 	// Default: https://content.obelism.studio
-	url?: string
+	url?: string | undefined
 	// The prompt box editors change the page with (shown only inside the
 	// visual editor, to people who may edit). `false` leaves it out, e.g. to
 	// build your own with `bridge.prompt()`. Default: shown.
-	prompt?: boolean | PromptBoxOptions
+	prompt?: boolean | PromptBoxOptions | undefined
 }
 
 // Kept on the window, so two copies of this package on one page still share
@@ -41,6 +41,12 @@ const SERVER_BRIDGE: ContentBridge = wrapScriptBridge(
 	{ isEditing: false, entryId: null, on: () => {} },
 	new URLSearchParams(),
 )
+
+// The page's bridge if something already started it, else null. Never
+// starts one: for code that has to stay side-effect free, like a React
+// store's snapshot.
+export const peekContentBridge = (): ContentBridge | null =>
+	typeof window === 'undefined' ? null : ((window as BridgeWindow)[KEY] ?? null)
 
 // The page's bridge to the visual editor, started on first use. Call it in
 // the browser (on the server it returns an inert bridge):

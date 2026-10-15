@@ -32,7 +32,7 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 }
 
 export type PromptBoxOptions = {
-	labels?: Partial<PromptLabels>
+	labels?: Partial<PromptLabels> | undefined
 }
 
 const ACCENT = '#d58a1f'
@@ -81,8 +81,15 @@ const element = <K extends keyof HTMLElementTagNameMap>(
 	props: Record<string, string | number | boolean> = {},
 	...children: (Node | string)[]
 ): HTMLElementTagNameMap[K] => {
-	const node = Object.assign(doc.createElement(tag), props)
-	node.append(...children)
+	const node = doc.createElement(tag)
+	Object.assign(node, props)
+	// appendChild, not append: Workers types redefine Element.append, and a
+	// site's server code may well have them loaded.
+	for (const child of children) {
+		node.appendChild(
+			typeof child === 'string' ? doc.createTextNode(child) : child,
+		)
+	}
 	return node
 }
 

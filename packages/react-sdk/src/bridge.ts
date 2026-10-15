@@ -16,11 +16,31 @@ import {
 	type ContentBridge as Bridge,
 	getContentBridge,
 	INITIAL_STATE,
+	peekContentBridge,
 	type PromptResult,
 } from '@obelism/content/bridge'
 import type { Entry } from '@obelism/content'
 
 export type ContentBridgeProps = BridgeOptions
+
+const noop = () => {}
+
+// The page's bridge, as a React external store: subscribing starts it (after
+// mount, never during render), so it is null on the server, while hydrating,
+// and until then.
+const useBridge = (options: BridgeOptions): Bridge | null => {
+	const startWith = useRef(options)
+	const { url } = options
+	const subscribe = useCallback(
+		(onChange: () => void) => {
+			getContentBridge({ ...startWith.current, url })
+			onChange()
+			return noop
+		},
+		[url],
+	)
+	return useSyncExternalStore(subscribe, peekContentBridge, () => null)
+}
 
 // Starts the visual editor bridge. Put it in the root layout, so clicking a
 // block selects it in the editor on every page, also those without
@@ -29,10 +49,7 @@ export type ContentBridgeProps = BridgeOptions
 // apply when it is the first to start the bridge, which in a root layout it
 // is.
 export const ContentBridge = ({ url, prompt }: ContentBridgeProps) => {
-	const options = useRef({ url, prompt })
-	useEffect(() => {
-		getContentBridge({ ...options.current, url })
-	}, [url])
+	useBridge({ url, prompt })
 	return null
 }
 
@@ -53,12 +70,10 @@ const NOT_EDITING: ContentBridgeState = {
 export const useContentBridge = ({
 	url,
 }: BridgeOptions = {}): ContentBridgeState => {
-	const [state, setState] = useState(NOT_EDITING)
-	useEffect(() => {
-		const { isEditing, entryId, environment } = getContentBridge({ url })
-		if (isEditing) setState({ isEditing, entryId, environment })
-	}, [url])
-	return state
+	const bridge = useBridge({ url })
+	if (!bridge?.isEditing) return NOT_EDITING
+	const { isEditing, entryId, environment } = bridge
+	return { isEditing, entryId, environment }
 }
 
 // Calls `listener` on a bridge event, e.g. to refetch server data once the
@@ -71,14 +86,14 @@ export const useContentBridgeEvent = <E extends BridgeEvent>(
 	listener: BridgeListener<E>,
 	{ url }: BridgeOptions = {},
 ) => {
+	const bridge = useBridge({ url })
 	const latest = useRef(listener)
 	useEffect(() => {
 		latest.current = listener
 	})
 	useEffect(
-		() =>
-			getContentBridge({ url }).on(event, (payload) => latest.current(payload)),
-		[event, url],
+		() => bridge?.on(event, (payload) => latest.current(payload)),
+		[bridge, event],
 	)
 }
 
@@ -103,15 +118,16 @@ export function useLiveEntry<TEntry extends Entry>(
 	entry: TEntry | null | undefined,
 	{ url }: BridgeOptions = {},
 ): TEntry | null {
+	const bridge = useBridge({ url })
 	const [live, setLive] = useState<TEntry | null>(null)
 	const id = entry?.id
 
 	useEffect(() => {
-		if (!id) return
-		return getContentBridge({ url }).on('update', ({ entry: next }) => {
+		if (!id || !bridge) return
+		return bridge.on('update', ({ entry: next }) => {
 			if (next.id === id) setLive(next as TEntry)
 		})
-	}, [id, url])
+	}, [bridge, id])
 
 	// A live version only stands in for the entry it was sent for.
 	if (live && live.id === id) return live
@@ -143,14 +159,9 @@ const notStarted = () =>
 export const useContentPrompt = ({
 	url,
 }: Pick<BridgeOptions, 'url'> = {}): ContentPromptState => {
-	const [bridge, setBridge] = useState<Bridge | null>(null)
-	useEffect(() => {
-		setBridge(getContentBridge({ url }))
-	}, [url])
-
+	const bridge = useBridge({ url })
 	const subscribe = useCallback(
-		(onChange: () => void) =>
-			bridge ? bridge.on('change', onChange) : () => {},
+		(onChange: () => void) => (bridge ? bridge.on('change', onChange) : noop),
 		[bridge],
 	)
 	const state = useSyncExternalStore(
@@ -163,7 +174,7 @@ export const useContentPrompt = ({
 		...state,
 		available: state.features.includes('prompt'),
 		prompt: bridge ? bridge.prompt : notStarted,
-		undo: bridge ? bridge.undo : () => {},
-		select: bridge ? bridge.select : () => {},
+		undo: bridge ? bridge.undo : noop,
+		select: bridge ? bridge.select : noop,
 	}
 }

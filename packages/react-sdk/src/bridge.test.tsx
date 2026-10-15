@@ -45,7 +45,8 @@ let emitter: ReturnType<typeof createEmitter>
 let isEditing: boolean
 let state: BridgeState
 const prompt = vi.fn(async () => ({ summary: 'Done' }))
-const getContentBridge = vi.fn(() => ({
+type FakeBridge = ReturnType<typeof makeBridge>
+const makeBridge = () => ({
 	isEditing,
 	entryId: 'entry_1',
 	environment: 'develop',
@@ -55,10 +56,16 @@ const getContentBridge = vi.fn(() => ({
 	undo: () => {},
 	select: () => {},
 	destroy: () => {},
-}))
+})
+// One bridge per page, as the real one: started by the first call.
+let started: FakeBridge | null = null
+const getContentBridge = vi.fn(
+	(_options?: unknown) => (started ??= makeBridge()),
+)
 vi.mock('@obelism/content/bridge', async (importOriginal) => ({
 	...(await importOriginal<object>()),
-	getContentBridge: (...args: unknown[]) => getContentBridge(...(args as [])),
+	getContentBridge: (options: unknown) => getContentBridge(options),
+	peekContentBridge: () => started,
 }))
 
 const entry = (id: string, title: string): Entry<{ title: string }> => ({
@@ -82,6 +89,7 @@ beforeEach(() => {
 	emitter = createEmitter()
 	isEditing = true
 	state = INITIAL_STATE
+	started = null
 	getContentBridge.mockClear()
 })
 afterEach(cleanup)
@@ -140,6 +148,7 @@ describe('useContentBridge', () => {
 		expect(getContentBridge).toHaveBeenCalledWith({
 			url: 'https://cms.example.com',
 		})
+		expect(getContentBridge).toHaveBeenCalledTimes(1)
 	})
 
 	it('reports nothing outside the editor', () => {
