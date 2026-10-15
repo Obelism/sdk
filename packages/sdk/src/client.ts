@@ -1,0 +1,213 @@
+import {
+	DEFAULT_TIMEOUT,
+	DEFAULT_URL,
+	DELIVERY_PATH,
+	normalizeUrl,
+} from './config'
+import { ContentApiError } from './errors'
+import type { Entry, EntryList, ModelFile, RichTextFormat } from './types'
+
+export type ContentClientOptions = {
+	// A delivery token (`cms_d_…`, published content) or preview token
+	// (`cms_p_…`, drafts too). Keep preview tokens server-side.
+	token: string
+	// The CMS. Default: https://content.obelism.studio
+	url?: string
+	// Defaults for every request; each can be overridden per call.
+	locale?: string
+	depth?: number
+	richText?: RichTextFormat
+	// Milliseconds before a request is aborted. Default: 10000.
+	timeout?: number
+	// Passed to every fetch, e.g. `{ next: { revalidate: 60 } }` in Next.js.
+	init?: RequestInit
+	// A fetch implementation, for runtimes or tests that need their own.
+	fetch?: typeof fetch
+}
+
+export type RequestOptions = {
+	// A locale code, `*` for every locale (localized fields become
+	// `{ [locale]: value }`), or the space's default when left out.
+	locale?: string
+	// Levels of references to inline, 0–5 (the API's default is 1).
+	depth?: number
+	// Rich text as ProseMirror JSON (default) or rendered HTML strings.
+	richText?: RichTextFormat
+	// Merged over the client's `init` for this request.
+	init?: RequestInit
+}
+
+export type EntriesQuery = RequestOptions & {
+	contentType?: string
+	// Only direct children of the entry at this path; '' for the root.
+	parentPath?: string
+	// 1–100, the API's default is 20.
+	limit?: number
+	skip?: number
+}
+
+const trimSlashes = (path: string) => path.replace(/^\/+|\/+$/g, '')
+
+// Reads one space environment's content through the delivery API. The token
+// decides the space, the environment and whether drafts are visible.
+//
+//   const content = new ContentClient({ token: process.env.CONTENT_TOKEN })
+//   const page = await content.getPage('blog/hello', { locale: 'nl' })
+export class ContentClient {
+	readonly url: string
+	#token: string
+	#defaults: Pick<RequestOptions, 'locale' | 'depth' | 'richText'>
+	#timeout: number
+	#init: RequestInit | undefined
+	#fetch: typeof fetch
+
+	constructor({
+		token,
+		url,
+		locale,
+		depth,
+		richText,
+		timeout,
+		init,
+		fetch: fetchImpl,
+	}: ContentClientOptions) {
+		this.url = normalizeUrl(url || DEFAULT_URL)
+		this.#token = token
+		this.#defaults = { locale, depth, richText }
+		this.#timeout = timeout ?? DEFAULT_TIMEOUT
+		this.#init = init
+		this.#fetch = fetchImpl ?? ((...args) => fetch(...args))
+	}
+
+	// The page at a path (`blog/hello`), or null when there is none. A site's
+	// catch-all route asks for this.
+	getPage = async <TEntry extends Entry = Entry>(
+		path: string,
+		options: RequestOptions = {},
+	): Promise<TEntry | null> => {
+		const trimmed = trimSlashes(path)
+		if (!trimmed) throw new Error('getPage needs a path')
+		const result = await this.#request<{ entry: TEntry }>(
+			'/pages',
+			{ path: trimmed },
+			options,
+			{ notFound: true },
+		)
+		return result?.entry ?? null
+	}
+
+	// An entry by id, or null when there is none (or it isn't published, for a
+	// delivery token).
+	getEntry = async <TEntry extends Entry = Entry>(
+		id: string,
+		options: RequestOptions = {},
+	): Promise<TEntry | null> => {
+		const result = await this.#request<{ entry: TEntry }>(
+			`/entries/${encodeURIComponent(id)}`,
+			{},
+			options,
+			{ notFound: true },
+		)
+		return result?.entry ?? null
+	}
+
+	// One page of entries, ordered as in the space's tree.
+	getEntries = <TEntry extends Entry = Entry>({
+		contentType,
+		parentPath,
+		limit,
+		skip,
+		...options
+	}: EntriesQuery = {}): Promise<EntryList<TEntry>> =>
+		this.#request<EntryList<TEntry>>(
+			'/entries',
+			{
+				contentType,
+				parentPath:
+					parentPath === undefined ? undefined : trimSlashes(parentPath),
+				limit,
+				skip,
+			},
+			options,
+		) as Promise<EntryList<TEntry>>
+
+	// Every entry matching the query, fetching pages of `limit` (default 100)
+	// as it goes.
+	//
+	//   for await (const post of content.getAllEntries({ contentType: 'post' }))
+	async *getAllEntries<TEntry extends Entry = Entry>(
+		query: Omit<EntriesQuery, 'skip'> = {},
+	): AsyncGenerator<TEntry, void, undefined> {
+		const limit = query.limit ?? 100
+		let skip = 0
+		while (true) {
+			const page = await this.getEntries<TEntry>({ ...query, limit, skip })
+			yield* page.items
+			skip += page.items.length
+			if (page.items.length === 0 || skip >= page.total) return
+		}
+	}
+
+	// The environment's content model, e.g. to generate types in a build.
+	getContentModel = (options: Pick<RequestOptions, 'init'> = {}) =>
+		this.#request<ModelFile>('/content-model', {}, options, {
+			defaults: false,
+		}) as Promise<ModelFile>
+
+	// null for a 404 when `notFound` is set; throws ContentApiError otherwise.
+	async #request<T>(
+		path: string,
+		query: Record<string, string | number | undefined>,
+		{ init, ...options }: RequestOptions,
+		{ notFound = false, defaults = true } = {},
+	): Promise<T | null> {
+		// Checked here rather than in the constructor, so a module creating a
+		// client still loads (and a build still runs) without the variable.
+		if (!this.#token) throw new Error('ContentClient needs a token')
+		const { locale, depth, richText } = {
+			...(defaults && this.#defaults),
+			...withoutUndefined(options),
+		}
+		const params = new URLSearchParams()
+		const values = { ...query, locale, depth, richtext: richText }
+		for (const [key, value] of Object.entries(values)) {
+			if (value !== undefined) params.set(key, String(value))
+		}
+		const search = params.size > 0 ? `?${params}` : ''
+		const url = `${this.url}${DELIVERY_PATH}${path}${search}`
+
+		const merged = { ...this.#init, ...init }
+		const timeout = AbortSignal.timeout(this.#timeout)
+		const response = await this.#fetch(url, {
+			...merged,
+			headers: {
+				...headersToObject(merged.headers),
+				Accept: 'application/json',
+				Authorization: `Bearer ${this.#token}`,
+			},
+			signal: merged.signal
+				? AbortSignal.any([merged.signal, timeout])
+				: timeout,
+		})
+
+		if (notFound && response.status === 404) return null
+
+		const text = await response.text()
+		let body: unknown = text
+		try {
+			body = JSON.parse(text)
+		} catch {
+			// Not JSON: keep the text for the error.
+		}
+		if (!response.ok) throw new ContentApiError(response.status, url, body)
+		return body as T
+	}
+}
+
+const withoutUndefined = <T extends Record<string, unknown>>(value: T) =>
+	Object.fromEntries(
+		Object.entries(value).filter(([, entry]) => entry !== undefined),
+	) as Partial<T>
+
+const headersToObject = (headers: HeadersInit | undefined) =>
+	headers ? Object.fromEntries(new Headers(headers)) : {}
