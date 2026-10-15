@@ -3,7 +3,7 @@
 ## Project Overview
 
 Obelism Content SDK — the TypeScript monorepo for the SDKs of Obelism
-Content, the visual headless CMS in `../db-visual-cms` (its `docs/` describe
+Content, the visual headless CMS in `../obelism/apps/content` (its `docs/` describe
 the APIs these packages call). Structured like `../improve-sdk`.
 
 ## Commands
