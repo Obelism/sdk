@@ -1,5 +1,16 @@
 # @obelism/content-react
 
+## 0.2.0
+
+### Minor Changes
+
+- 419d17d: New page from the prompt box: on a site signed in to edit, editors with the `create` feature give a path and a prompt, the CMS writes the page as a draft (`POST /api/site/v1/entries`, now forwarded by `createSiteEditing`), and the bridge opens it. On a page with no `editable(entry)`, the box only offers New page (and hides Save and Publish). Adds `bridge.createPage()`, the `pagePath` option and `createPage` in `useContentPrompt()`.
+
+### Patch Changes
+
+- Updated dependencies [419d17d]
+  - @obelism/content@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes
