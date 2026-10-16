@@ -18,8 +18,8 @@ export default async function CatchAll({ params, searchParams }: Props) {
 	const entry = await content
 		.getPage<PageEntry>(path, { depth: 2 })
 		.catch((error: unknown) => {
-			// A site token that expired or was revoked: show what's published
-			// until the editor signs in again.
+			// A visual editor or site token that expired or was revoked: show
+			// what's published until the editor opens the page again.
 			if (error instanceof ContentApiError && error.status === 401) {
 				return delivery.getPage<PageEntry>(path, { depth: 2 })
 			}

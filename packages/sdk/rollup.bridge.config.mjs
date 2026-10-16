@@ -10,7 +10,7 @@ export default {
 		file: 'dist/bridge.global.js',
 		format: 'iife',
 		banner:
-			'/*! Obelism Content bridge (@obelism/content), MIT. https://content.obelism.studio/docs/visual-editor */',
+			'/*! Obelism Content bridge (@obelism/content), MIT. https://content.obelism.studio/docs/guides/visual-editor */',
 	},
 	plugins: [
 		nodeResolve({ extensions: ['.ts', '.js'] }),

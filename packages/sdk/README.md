@@ -36,12 +36,31 @@ with generics: `content.getPage<Entry<{ title: string }>>('home')`.
 
 ## Preview
 
-The visual editor loads your site with `?cms_preview=1&cms_entry=…&cms_environment=…`.
+The visual editor loads your site with
+`?cms_preview=1&cms_entry=…&cms_environment=…&cms_token=…`. `cms_token` is
+made for the person editing and reads drafts for 8 hours; read the page with
+it, server-side. Never show drafts because `cms_preview` is there: anyone can
+add it to a URL.
 
 ```ts
-import { readPreviewParams } from '@obelism/content'
+import {
+	ContentApiError,
+	ContentClient,
+	readPreviewParams,
+} from '@obelism/content'
 
-const client = readPreviewParams(request.url) ? previewClient : deliveryClient
+const preview = readPreviewParams(request.url)
+const content = preview?.token
+	? new ContentClient({ token: preview.token, init: { cache: 'no-store' } })
+	: deliveryClient
+
+const page = await content.getPage(path).catch((error) => {
+	// A made-up or expired token: show what's published.
+	if (error instanceof ContentApiError && error.status === 401) {
+		return deliveryClient.getPage(path)
+	}
+	throw error
+})
 ```
 
 ## Visual editor bridge

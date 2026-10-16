@@ -211,7 +211,7 @@ export const runInitCommand = async ({
 		[
 			'',
 			'Next:',
-			'- Create a delivery token (and a preview token for drafts) in Space settings, and set CONTENT_DELIVERY_TOKEN and CONTENT_PREVIEW_TOKEN.',
+			'- Create a delivery token in Space settings and set CONTENT_DELIVERY_TOKEN (a preview token only if the site builds from drafts; the visual editor brings its own, as cms_token).',
 			'- Fetch content with ContentClient from @obelism/content; the examples show what each type looks like.',
 			...(improve.enabled
 				? [

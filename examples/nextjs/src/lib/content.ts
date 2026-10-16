@@ -14,24 +14,23 @@ export const delivery = new ContentClient({
 	init: { next: { revalidate: 60, tags: ['content'] } },
 })
 
-// Drafts, for the visual editor. Never cached, never sent to the browser.
-const preview = new ContentClient({
-	token: process.env.CONTENT_PREVIEW_TOKEN ?? '',
-	url,
-	init: { cache: 'no-store' },
-})
+// Drafts with a token of the person editing, never cached.
+const drafts = (token: string) =>
+	new ContentClient({ token, url, init: { cache: 'no-store' } })
 
-// The client for this request: drafts when the visual editor asks for them,
-// or in draft mode with the editor's own site token (/cms/login), which
-// stops working when they sign out or lose access.
+// The client for this request: drafts in the visual editor, with the token it
+// adds to the URL for the person editing (`cms_token`; `cms_preview` alone
+// proves nothing, anyone can add it), or in draft mode with the editor's own
+// site token (/cms/login). Both stop working when the person loses access or
+// the token expires; the page then falls back to `delivery`.
 export const getContent = async (
 	searchParams: Record<string, string | string[] | undefined>,
 ) => {
-	if (readPreviewParams(searchParams)) return preview
+	const preview = readPreviewParams(searchParams)
+	if (preview?.token) return drafts(preview.token)
 	if ((await draftMode()).isEnabled) {
 		const token = readSiteToken(await cookies())
-		if (token)
-			return new ContentClient({ token, url, init: { cache: 'no-store' } })
+		if (token) return drafts(token)
 	}
 	return delivery
 }

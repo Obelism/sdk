@@ -1,8 +1,8 @@
 import { DEFAULT_TIMEOUT, DEFAULT_URL, normalizeUrl } from './config'
 
-// Editing on your own site, outside the visual editor (the CMS's
-// docs/site-editing.md). One handler serves everything under `/cms` (the
-// `basePath`) on your site:
+// Editing on your own site, outside the visual editor
+// (https://content.obelism.studio/docs/guides/site-editing). One handler
+// serves everything under `/cms` (the `basePath`) on your site:
 //
 // - `/cms/login?return_to=/pricing` — sends the browser to Obelism Content
 //   to sign in, with a PKCE challenge, and…

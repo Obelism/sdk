@@ -15,6 +15,6 @@ The official [Obelism Content](https://content.obelism.studio) SDK
 
 ## Quick links
 
-- [Delivery API](https://content.obelism.studio/docs/delivery-api)
-- [Visual editor](https://content.obelism.studio/docs/visual-editor)
-- [The content model in Git](https://content.obelism.studio/docs/model-in-git)
+- [Delivery API](https://content.obelism.studio/docs/api/delivery)
+- [Visual editor](https://content.obelism.studio/docs/guides/visual-editor)
+- [The content model in Git](https://content.obelism.studio/docs/guides/model-in-git)

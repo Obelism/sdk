@@ -4,12 +4,13 @@ A Next.js (App Router) site reading pages from Obelism Content, with live
 preview in the visual editor.
 
 ```sh
-cp .env.example .env.local   # add a delivery and a preview token
+cp .env.example .env.local   # add a delivery token
 npm run dev
 ```
 
-- `src/lib/content.ts` — a delivery client (published, cached) and a preview
-  client (drafts, uncached), picked per request by `readPreviewParams`.
+- `src/lib/content.ts` — a delivery client (published, cached), and drafts
+  (uncached) with the token of the person editing: the visual editor's
+  `cms_token` (from `readPreviewParams`) or the site token in draft mode.
 - `src/app/[[...slug]]/page.tsx` — every page entry by path.
 - `src/components/Page.tsx` — renders the entry with `useLiveEntry`, so edits
   in the visual editor show while they are typed; `editable(block)` lets

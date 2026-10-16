@@ -3,7 +3,7 @@
 ## Project Overview
 
 Obelism Content SDK — the TypeScript monorepo for the SDKs of Obelism
-Content, the visual headless CMS in `../obelism/apps/content` (its `docs/` describe
+Content, the visual headless CMS in `../obelism/apps/content` (its `content/docs/` describe
 the APIs these packages call). Structured like `../improve-sdk`.
 
 ## Commands
@@ -19,7 +19,9 @@ npm run changeset      # Before publishing
 ## Packages
 
 - `packages/sdk` → `@obelism/content`
-  - `.`: `ContentClient` (delivery API `/api/delivery/v1`), `readPreviewParams`,
+  - `.`: `ContentClient` (delivery API `/api/delivery/v1`), `readPreviewParams`
+    (the visual editor's parameters, `cms_token` among them: the token sites
+    read drafts with, never `cms_preview` alone),
     `editable`, rich text and image helpers, types
   - `./bridge`: `getContentBridge()`, plus prompt editing
     (`bridge.prompt()`, and the prompt box in `bridge/promptBox.ts`, plain
@@ -34,7 +36,7 @@ npm run changeset      # Before publishing
   - `./site`: `createSiteEditing` (the `/cms/*` handler: login, callback,
     logout and the bridge's `/cms/api/…`, forwarded with the site token in
     an httpOnly cookie) and `readSiteToken`; editing on the site outside the
-    visual editor (the CMS's docs/site-editing.md, docs/adr/0010). The
+    visual editor (the CMS's content/docs/guides/site-editing.mdx, docs/adr/0010). The
     browser half is `bridge/siteBridge.ts`, which `getContentBridge` starts
     when the editing cookie is set
   - `./prompt`: `createPromptHandler` / `verifyPromptRequest`, for a

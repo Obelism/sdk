@@ -1,5 +1,5 @@
 // The shapes the Obelism Content delivery API answers with
-// (https://content.obelism.studio/docs/delivery-api). Field values are typed
+// (https://content.obelism.studio/docs/api/delivery). Field values are typed
 // loosely by default; pass your own field types as generics, e.g.
 // `Entry<{ title: string; body: Block[] }>`.
 
