@@ -21,9 +21,12 @@ npm run changeset      # Before publishing
 - `packages/sdk` → `@obelism/content`
   - `.`: `ContentClient` (delivery API `/api/delivery/v1`), `readPreviewParams`,
     `editable`, rich text and image helpers, types
-  - `./bridge`: `getContentBridge()`, the module port of the CMS's
-    `public/bridge.js`, plus prompt editing (`bridge.prompt()`, and the
-    prompt box in `bridge/promptBox.ts`: plain DOM in a shadow root). The
+  - `./bridge`: `getContentBridge()`, plus prompt editing
+    (`bridge.prompt()`, and the prompt box in `bridge/promptBox.ts`, plain
+    DOM in a shadow root, exported as `mountPromptBox`). Also built as one
+    script tag, `dist/bridge.global.js` (`src/bridgeScript.ts` →
+    `bridge/script.ts`, `rollup.bridge.config.mjs`): the CMS serves it as its
+    `public/bridge.js` (`npm run bridge:update` there after a release). The
     postMessage protocol must stay in step with
     `src/scopes/visualEditor/VisualEditor.tsx` in the CMS; the prompt
     itself runs in the CMS (`src/server/content/promptEdit.ts`,

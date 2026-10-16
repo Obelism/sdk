@@ -55,11 +55,34 @@ bridge.on('update', ({ entry }) => render(entry)) // unsaved edits, as typed
 
 Mark blocks so editors can click them: `<section {...editable(block)}>`
 (adds `data-cms-uid`). Without an `update` listener the page reloads after
-each save. It replaces the `<script src=".../bridge.js">` tag; when a page has
-both, it wraps the script's bridge instead of starting a second one. React
-sites use `@obelism/content-react`.
+each save. React sites use `@obelism/content-react`.
+
+Without a bundler, the same bridge (prompt box included) is one script tag:
+
+```html
+<script src="https://content.obelism.studio/bridge.js"></script>
+<script>
+	ObelismBridge.on('update', ({ entry }) => render(entry))
+</script>
+```
+
+The CMS serves this package's `dist/bridge.global.js` there; npm CDNs serve
+it too (then add `data-url` if your CMS isn't content.obelism.studio).
+`data-prompt="false"` leaves the prompt box out. The tag puts the bridge on
+`window.ObelismBridge` and `getContentBridge` / `mountPromptBox` on
+`window.ObelismContent`; a bundled copy on the same page shares its bridge.
 
 ## Prompt editing
+
+The prompt box is plain DOM in a shadow root, no framework. Start the
+bridge with `prompt: false` to leave it out, and mount it yourself later:
+
+```ts
+import { getContentBridge, mountPromptBox } from '@obelism/content/bridge'
+
+const bridge = getContentBridge({ prompt: false })
+const unmount = mountPromptBox(document, bridge, { labels: { open: 'Ask' } })
+```
 
 Inside the visual editor, people who may edit get a prompt box at the bottom
 of the page: they type what to change and it shows on the page right away,

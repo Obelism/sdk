@@ -17,7 +17,7 @@ export type {
 	PromptResult,
 } from './bridge/createBridge'
 export { INITIAL_STATE } from './bridge/createBridge'
-export { DEFAULT_PROMPT_LABELS } from './bridge/promptBox'
+export { DEFAULT_PROMPT_LABELS, mountPromptBox } from './bridge/promptBox'
 export type { PromptBoxOptions, PromptLabels } from './bridge/promptBox'
 
 export type BridgeOptions = {
