@@ -57,6 +57,20 @@ export type Block<
 	_type: TType
 } & TFields
 
+// The built-in A/B test or feature flag block, which any blocks field can
+// hold: one list of blocks per option of an improve test or flag, by slug.
+// Ask improve's SDK for the visitor's option (getTestValue(slug) for a test,
+// getFlagValue(slug) for a flag) and render that variant; pickImproveVariant
+// does the lookup.
+export type ImproveBlock<TBlock extends Block = Block> = Block<
+	{
+		kind: 'test' | 'flag'
+		slug: string
+		variants: Record<string, TBlock[]>
+	},
+	'_improve'
+>
+
 export type RichTextMark = {
 	type: 'bold' | 'italic' | 'underline' | 'strike' | 'code' | 'link' | string
 	attrs?: Record<string, unknown>

@@ -10,7 +10,7 @@ The official [Obelism Content](https://content.obelism.studio) SDK
 
 ### Packages
 
-- `sdk` (`@obelism/content`): the delivery API client, the visual editor bridge, rich text / image helpers and the `content model` CLI
+- `sdk` (`@obelism/content`): the delivery API client, the visual editor bridge, rich text / image helpers, the improve block helper and the `content init` / `content model` CLI
 - `react-sdk` (`@obelism/content-react`): live preview hooks for the visual editor and a `<RichText>` component
 
 ## Quick links

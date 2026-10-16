@@ -2,17 +2,24 @@
 import { parseArgs } from 'node:util'
 
 import { DEFAULT_URL, normalizeUrl } from '../config'
+import { runInitCommand } from '../cli/init'
 import { CliError, runModelCommand } from '../cli/model'
 
-const USAGE = `Usage: content model <pull|plan|apply> [--file path] [--url origin] [--prune]
+const USAGE = `Usage: content init [--dir content] [--url origin] [--skip-install]
+       content model <pull|plan|apply> [--file path] [--url origin] [--prune]
 
-  pull    write the environment's model to the file
-  plan    show what applying the file would change, and what stands in the way
-  apply   apply the file in one transaction, or change nothing
+  init          start a site's repository on the token's environment: the
+                model file, an example per content type, the SDK installed
+                and the token variables in .env.example
+  model pull    write the environment's model to the file
+  model plan    show what applying the file would change, and what stands in the way
+  model apply   apply the file in one transaction, or change nothing
 
-  --file   the model file (default content/content-model.json)
-  --url    the CMS (default $CONTENT_URL, else ${DEFAULT_URL})
-  --prune  plan and apply also delete content types the file leaves out
+  --dir           where init writes content-model.json and examples/ (default content)
+  --skip-install  init leaves dependencies alone
+  --file          the model file (default content/content-model.json)
+  --url           the CMS (default $CONTENT_URL, else ${DEFAULT_URL})
+  --prune         plan and apply also delete content types the file leaves out
 
 Needs CONTENT_MANAGEMENT_TOKEN: a management token from Space settings.`
 
@@ -25,6 +32,8 @@ const main = async () => {
 				file: { type: 'string', default: 'content/content-model.json' },
 				url: { type: 'string' },
 				prune: { type: 'boolean', default: false },
+				dir: { type: 'string', default: 'content' },
+				'skip-install': { type: 'boolean', default: false },
 				help: { type: 'boolean', short: 'h', default: false },
 			},
 		})
@@ -38,22 +47,33 @@ const main = async () => {
 		console.log(USAGE)
 		return 0
 	}
-	if (
-		group !== 'model' ||
-		(command !== 'pull' && command !== 'plan' && command !== 'apply')
-	) {
-		throw new CliError(USAGE, 2)
-	}
+	const isInit = group === 'init' && command === undefined
+	const modelCommand =
+		group === 'model' &&
+		(command === 'pull' || command === 'plan' || command === 'apply')
+			? command
+			: null
+	if (!isInit && !modelCommand) throw new CliError(USAGE, 2)
 
 	const token = process.env.CONTENT_MANAGEMENT_TOKEN
 	if (!token) {
 		throw new CliError(`CONTENT_MANAGEMENT_TOKEN is not set.\n\n${USAGE}`, 2)
 	}
+	const url = normalizeUrl(values.url ?? process.env.CONTENT_URL ?? DEFAULT_URL)
+
+	if (!modelCommand) {
+		return runInitCommand({
+			url,
+			token,
+			dir: values.dir,
+			install: !values['skip-install'],
+		})
+	}
 
 	return runModelCommand({
-		command,
+		command: modelCommand,
 		file: values.file,
-		url: normalizeUrl(values.url ?? process.env.CONTENT_URL ?? DEFAULT_URL),
+		url,
 		token,
 		prune: values.prune,
 		summaryFile: process.env.GITHUB_STEP_SUMMARY || undefined,

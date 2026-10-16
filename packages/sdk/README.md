@@ -109,12 +109,50 @@ export const POST = createPromptHandler({
 - `richTextToHtml(doc, { renderEntry?, renderAsset? })`, `richTextToPlainText(doc)`
 - `imageUrl(asset, { w, h, fit, format, q })`, `imageSrcSet(asset, [480, 960])`
 
+## A/B tests and feature flags
+
+Any blocks field can hold the built-in improve block (`ImproveBlock`,
+`_type: '_improve'`): one list of blocks per option of an improve test or
+flag. Ask improve's SDK for the visitor's option and render that variant:
+
+```ts
+import { isImproveBlock, pickImproveVariant } from '@obelism/content'
+
+// `improve` is improve's SDK (@obelism/improve-sdk), set up for the visitor.
+const blocks = layout.flatMap((block) => {
+	if (!isImproveBlock(block)) return [block]
+	const option =
+		block.kind === 'flag'
+			? improve.getFlagValue(block.slug)
+			: improve.getTestValue(block.slug)
+	return pickImproveVariant(block, option)
+})
+```
+
+`pickImproveVariant(block, option, fallback?)` falls back to `fallback`'s
+variant, else the first one, when the option is `null` (the test isn't
+active or the visitor isn't in it) or has no variant.
+
 ## CLI
 
-Keeps a content model file in Git in step with an environment.
+Start a site's repository on a space, in its root:
 
 ```bash
-export CONTENT_MANAGEMENT_TOKEN=cms_m_…
+export CONTENT_MANAGEMENT_TOKEN=cms_m_…   # a management token, Space settings
+npx @obelism/content init
+```
+
+It writes the model file (`content/content-model.json`), an example of what
+the delivery API answers for every content type (`content/examples/`, with
+the A/B test or flag block while your organization has improve on),
+installs `@obelism/content` with your package manager, and adds the token variables to
+`.env.example`. Options: `--dir` (default `content`), `--url`,
+`--skip-install`. Agents get the same steps from the CMS's
+`getProjectSetup` MCP tool.
+
+Then keep the model file in Git in step with an environment:
+
+```bash
 npx @obelism/content model pull    # write content/content-model.json
 npx @obelism/content model plan    # what applying would change
 npx @obelism/content model apply   # apply it, all or nothing

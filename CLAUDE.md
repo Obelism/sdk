@@ -36,8 +36,14 @@ npm run changeset      # Before publishing
     when the editing cookie is set
   - `./prompt`: `createPromptHandler` / `verifyPromptRequest`, for a
     customer's own model behind the space's prompt endpoint
-  - bin `content`: `content model pull|plan|apply` (management API), moved
-    from the CMS's `cli/`
+  - bin `content`: `content init` (`cli/init.ts`: pulls the model, writes
+    an example per content type from it, `cli/examples.ts`, plus the
+    improve block while the organization has improve on, from the
+    management API's `/improve`; installs the SDK; `.env.example`) and
+    `content model pull|plan|apply` (management API), moved from the CMS's
+    `cli/`. The CMS's `getProjectSetup` MCP tool tells agents to run `init`
+  - `pickImproveVariant` / `isImproveBlock` (`improve.ts`): the built-in
+    `_improve` block (the CMS's docs/adr/0012)
 - `packages/react-sdk` → `@obelism/content-react`: `ContentBridge`,
   `useLiveEntry`, `useContentBridge`, `useContentBridgeEvent`,
   `useContentPrompt` (the only
