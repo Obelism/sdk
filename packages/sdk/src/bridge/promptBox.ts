@@ -6,8 +6,9 @@ import type { BridgeState, ContentBridge } from './createBridge'
 // root, so it works on any site and the site's CSS can't reach it (nor its
 // CSS the site). It shows once prompts are offered (people who may edit
 // content), acts on the selected block or the whole entry, and offers undo.
-// On the site it also saves, publishes and signs out; in the visual editor
-// the editor around the site does that.
+// On the site it also saves, publishes and signs out, and can add a page
+// ("New page": a path and what the page is for); in the visual editor the
+// editor around the site does that.
 
 export type PromptLabels = {
 	open: string
@@ -29,6 +30,13 @@ export type PromptLabels = {
 	signOut: string
 	viewingDrafts: string
 	selectHint: string
+	newPage: string
+	newPageCancel: string
+	newPagePlaceholder: string
+	path: string
+	pathPlaceholder: string
+	creating: string
+	created: string
 }
 
 export const DEFAULT_PROMPT_LABELS: PromptLabels = {
@@ -51,6 +59,14 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 	signOut: 'Exit editing',
 	viewingDrafts: 'Viewing drafts',
 	selectHint: 'Click a block to change only that block',
+	newPage: 'New page',
+	newPageCancel: 'Edit this page instead',
+	newPagePlaceholder:
+		'Describe the new page, e.g. “a pricing page for agencies”',
+	path: 'Path',
+	pathPlaceholder: '/pricing',
+	creating: 'Writing the page…',
+	created: 'Opening the new page…',
 }
 
 export type PromptBoxOptions = {
@@ -60,6 +76,8 @@ export type PromptBoxOptions = {
 // Icons (Lucide), drawn in the text colour.
 const ICONS = {
 	page: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+	newPage:
+		'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/>',
 	block:
 		'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 8h10"/><path d="M7 12h6"/>',
 	undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
@@ -166,6 +184,20 @@ textarea {
 	font-size: 16px; line-height: 1.6; color: rgb(var(--theme-foreground-rgb));
 }
 textarea::placeholder { color: rgb(var(--theme-foreground-muted-rgb)); }
+/* New page: where it goes, above what it is for. */
+.path {
+	display: flex; align-items: center; gap: 10px; padding: 16px 22px 0;
+	color: rgb(var(--theme-foreground-muted-rgb));
+}
+.path input {
+	flex: 1; min-width: 0; height: 34px; padding: 0 14px; outline: 0;
+	border: 1px solid rgb(var(--theme-border-rgb) / .25); border-radius: var(--border-radius-pill);
+	background: rgb(var(--theme-background-actions-rgb) / .45); color: rgb(var(--theme-foreground-rgb));
+	transition: border-color .25s var(--ease-roll);
+}
+.path input:focus-visible { border-color: rgb(var(--theme-accent-rgb)); }
+.path input::placeholder { color: rgb(var(--theme-foreground-muted-rgb)); }
+.path input:disabled { opacity: .5; }
 textarea:disabled { opacity: .5; }
 .toolbar { display: flex; align-items: center; gap: 6px; padding: 8px 12px 12px; }
 .spacer { flex: 1; }
@@ -252,11 +284,12 @@ export const mountPromptBox = (
 	const shadow = host.attachShadow({ mode: 'open' })
 
 	const site = bridge.mode === 'site'
+	const pillText = element(doc, 'span', { textContent: labels.open })
 	const pill = element(
 		doc,
 		'button',
 		{ className: 'pill', type: 'button' },
-		element(doc, 'span', { textContent: labels.open }),
+		pillText,
 		// The Obelism mark.
 		element(doc, 'span', { className: 'mark', textContent: '⁜' }),
 	)
@@ -309,6 +342,43 @@ export const mountPromptBox = (
 		{ className: 'action chip', type: 'button' },
 		icon(doc, 'undo'),
 		labels.undo,
+	)
+
+	// New page (on the site, for people who may add pages): the scope becomes
+	// the new page, with a way back, and a path field shows above the prompt.
+	const newPage = element(
+		doc,
+		'button',
+		{ className: 'action chip', type: 'button' },
+		icon(doc, 'newPage'),
+		labels.newPage,
+	)
+	const cancelNew = element(doc, 'button', {
+		type: 'button',
+		title: labels.newPageCancel,
+	})
+	cancelNew.setAttribute('aria-label', labels.newPageCancel)
+	cancelNew.appendChild(icon(doc, 'close'))
+	const newScope = element(
+		doc,
+		'span',
+		{ className: 'chip scope' },
+		icon(doc, 'newPage'),
+		element(doc, 'span', { textContent: labels.newPage }),
+		cancelNew,
+	)
+	const pathInput = element(doc, 'input', {
+		type: 'text',
+		placeholder: labels.pathPlaceholder,
+		autocomplete: 'off',
+		spellcheck: false,
+	})
+	const pathRow = element(
+		doc,
+		'label',
+		{ className: 'path' },
+		element(doc, 'span', { textContent: labels.path }),
+		pathInput,
 	)
 	const close = element(
 		doc,
@@ -363,13 +433,16 @@ export const mountPromptBox = (
 		'form',
 		{ className: 'panel' },
 		status,
+		pathRow,
 		input,
 		element(
 			doc,
 			'div',
 			{ className: 'toolbar' },
 			scope,
+			newScope,
 			undo,
+			newPage,
 			element(doc, 'span', { className: 'spacer' }),
 			close,
 			element(doc, 'span', { className: 'divider' }),
@@ -387,6 +460,7 @@ export const mountPromptBox = (
 	shadow.append(element(doc, 'style', { textContent: CSS }), root)
 
 	let open = false
+	let creating = false
 	let message: { text: string; error: boolean } | null = null
 
 	const render = (state: BridgeState) => {
@@ -397,28 +471,52 @@ export const mountPromptBox = (
 		pill.hidden = open || !available
 		viewing.hidden = available || !site
 		panel.hidden = !open || !available
+		const canCreate = site && state.features.includes('create')
+		// A page of the site that isn't an entry (no `editable(entry)`, like a
+		// hand-written /about) has nothing to edit: only New page.
+		const pageless = site && bridge.entryId === null
+		const onlyNew = pageless && canCreate
+		if (!canCreate) creating = false
+		if (onlyNew) creating = true
+		pillText.textContent = onlyNew ? labels.newPage : labels.open
+		cancelNew.hidden = onlyNew
+		scope.hidden = creating
+		newScope.hidden = !creating
+		newPage.hidden = creating || !canCreate
+		newPage.disabled = busy
+		pathRow.hidden = !creating
+		pathInput.disabled = busy
+		input.placeholder = creating
+			? labels.newPagePlaceholder
+			: labels.placeholder
 		scopeText.textContent = state.selectedUid
 			? labels.scopeBlock
 			: labels.scopeEntry
 		clearBlock.hidden = !state.selectedUid
 		pageIcon.hidden = !!state.selectedUid
 		blockIcon.hidden = !state.selectedUid
-		undo.hidden = !state.canUndo
+		undo.hidden = creating || !state.canUndo
 		undo.disabled = busy
-		send.disabled = busy || input.value.trim() === ''
+		send.disabled =
+			busy ||
+			input.value.trim() === '' ||
+			(creating && pathInput.value.trim() === '')
 		input.disabled = busy
-		save.hidden = !state.features.includes('save')
+		save.hidden = !state.features.includes('save') || pageless
 		save.disabled = busy || !state.unsaved
 		save.textContent = state.saving ? labels.saving : labels.save
-		publish.hidden = !state.features.includes('publish')
+		publish.hidden = !state.features.includes('publish') || pageless
 		publish.disabled = busy
 		publish.textContent = state.publishing ? labels.publishing : labels.publish
 		signOut.hidden = !site
 		footer.hidden = !site
 		unsaved.hidden = !state.unsaved
 		const text = state.prompting
-			? labels.working
-			: (message?.text ?? (site && !state.selectedUid ? labels.selectHint : ''))
+			? creating
+				? labels.creating
+				: labels.working
+			: (message?.text ??
+				(site && !creating && !state.selectedUid ? labels.selectHint : ''))
 		status.textContent = text
 		status.hidden = !text
 		status.className = `status${state.prompting ? ' working' : ''}${!busy && message?.error ? ' error' : ''}`
@@ -435,8 +533,16 @@ export const mountPromptBox = (
 		if (!prompt || bridge.getState().prompting) return
 		message = null
 		try {
-			const { summary } = await bridge.prompt(prompt)
-			message = { text: summary, error: false }
+			if (creating) {
+				const path = pathInput.value.trim()
+				if (!path) return pathInput.focus()
+				// The bridge opens the new page; this shows until it does.
+				await bridge.createPage(path, prompt)
+				message = { text: labels.created, error: false }
+			} else {
+				const { summary } = await bridge.prompt(prompt)
+				message = { text: summary, error: false }
+			}
 			input.value = ''
 			grow()
 		} catch (error) {
@@ -451,8 +557,17 @@ export const mountPromptBox = (
 
 	const setOpen = (next: boolean) => {
 		open = next
-		if (site) bridge.setSelecting(open)
 		refresh()
+		if (site) bridge.setSelecting(open && !creating)
+	}
+
+	const setCreating = (next: boolean) => {
+		creating = next
+		message = null
+		bridge.setSelecting(open && !creating)
+		if (creating) bridge.select(null)
+		refresh()
+		;(creating ? pathInput : input).focus()
 	}
 
 	const store = async (action: 'save' | 'publish') => {
@@ -474,7 +589,7 @@ export const mountPromptBox = (
 
 	pill.addEventListener('click', () => {
 		setOpen(true)
-		input.focus()
+		;(creating ? pathInput : input).focus()
 	})
 	close.addEventListener('click', () => setOpen(false))
 	save.addEventListener('click', () => void store('save'))
@@ -482,6 +597,17 @@ export const mountPromptBox = (
 	signOut.addEventListener('click', () => bridge.signOut())
 	pillSignOut.addEventListener('click', () => bridge.signOut())
 	clearBlock.addEventListener('click', () => bridge.select(null))
+	newPage.addEventListener('click', () => setCreating(true))
+	cancelNew.addEventListener('click', () => setCreating(false))
+	pathInput.addEventListener('input', refresh)
+	pathInput.addEventListener('keydown', (event) => {
+		if (event.key === 'Enter' && !event.isComposing) {
+			event.preventDefault()
+			input.focus()
+		} else if (event.key === 'Escape') {
+			setOpen(false)
+		}
+	})
 	undo.addEventListener('click', () => {
 		message = null
 		bridge.undo()

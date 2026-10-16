@@ -77,6 +77,17 @@ const { summary } = await bridge.prompt('Make the heading shorter')
 bridge.undo()
 ```
 
+On a site signed in to edit (`@obelism/content/site`), the box also has **New
+page**: a path (`/pricing`, or under an existing page) and what the page is
+for. The CMS writes the page like the one the editor is on and stores it as a
+draft, and the bridge opens it at `/` + its path. When your routes put CMS
+pages elsewhere, say where:
+
+```ts
+getContentBridge({ pagePath: (path) => `/en/${path}` })
+await bridge.createPage('/pricing', 'Our plans, for agencies') // or your own UI
+```
+
 The CMS runs prompts on Workers AI. To use your own model, set a prompt
 endpoint under Space settings → Prompt editing and answer it with
 `createPromptHandler` (it verifies the signed request; you call the model):

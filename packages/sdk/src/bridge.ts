@@ -13,6 +13,7 @@ export type {
 	BridgeListener,
 	BridgeState,
 	ContentBridge,
+	CreatePageResult,
 	PromptResult,
 } from './bridge/createBridge'
 export { INITIAL_STATE } from './bridge/createBridge'
@@ -28,6 +29,9 @@ export type BridgeOptions = {
 	// `false` leaves it out, e.g. to build your own with `bridge.prompt()`.
 	// Default: shown.
 	prompt?: boolean | PromptBoxOptions | undefined
+	// Editing on the site: where a CMS path (`solutions/agencies`) is on the
+	// site, to open a page made with "New page". Default: `/` + path.
+	pagePath?: ((path: string) => string) | undefined
 }
 
 // Kept on the window, so two copies of this package on one page still share
@@ -61,6 +65,7 @@ export const peekContentBridge = (): ContentBridge | null =>
 export const getContentBridge = ({
 	url,
 	prompt = true,
+	pagePath,
 }: BridgeOptions = {}): ContentBridge => {
 	if (typeof window === 'undefined') return SERVER_BRIDGE
 	const win = window as BridgeWindow
@@ -80,7 +85,7 @@ export const getContentBridge = ({
 			bridge.isEditing || win.parent !== win
 				? null
 				: readSiteEditing(win.document)
-		if (sitePath) bridge = createSiteBridge(win, sitePath)
+		if (sitePath) bridge = createSiteBridge(win, sitePath, { pagePath })
 		if (bridge.isEditing && prompt) {
 			const unmount = mountPromptBox(
 				win.document,

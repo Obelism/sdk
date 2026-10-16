@@ -17,6 +17,7 @@ import {
 	getContentBridge,
 	INITIAL_STATE,
 	peekContentBridge,
+	type CreatePageResult,
 	type PromptResult,
 } from '@obelism/content/bridge'
 import type { Entry } from '@obelism/content'
@@ -48,8 +49,12 @@ const useBridge = (options: BridgeOptions): Bridge | null => {
 // out). Renders nothing, and does nothing outside the editor. Its options
 // apply when it is the first to start the bridge, which in a root layout it
 // is.
-export const ContentBridge = ({ url, prompt }: ContentBridgeProps) => {
-	useBridge({ url, prompt })
+export const ContentBridge = ({
+	url,
+	prompt,
+	pagePath,
+}: ContentBridgeProps) => {
+	useBridge({ url, prompt, pagePath })
 	return null
 }
 
@@ -146,6 +151,8 @@ export type ContentPromptState = BridgeState & {
 		prompt: string,
 		options?: { uid?: string | null },
 	) => Promise<PromptResult>
+	// See ContentBridge['createPage']: editing on the site, with 'create'.
+	createPage: (path: string, prompt: string) => Promise<CreatePageResult>
 	undo: () => void
 	select: (uid: string | null) => void
 	// Editing on the site (see ContentBridge): store the in-memory changes,
@@ -186,6 +193,7 @@ export const useContentPrompt = ({
 		available: state.features.includes('prompt'),
 		mode: bridge?.mode ?? null,
 		prompt: bridge ? bridge.prompt : notStarted,
+		createPage: bridge ? bridge.createPage : notOnSite,
 		undo: bridge ? bridge.undo : noop,
 		select: bridge ? bridge.select : noop,
 		save: bridge ? bridge.save : notOnSite,

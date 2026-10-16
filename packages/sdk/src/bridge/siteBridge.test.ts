@@ -10,6 +10,7 @@ type Call = { path: string; body: any; headers: Record<string, string> }
 const site = (answers: Record<string, (body: any) => unknown> = {}) => {
 	const calls: Call[] = []
 	const reload = vi.fn()
+	const assign = vi.fn()
 	const fetch = vi.fn(async (url: string, init: RequestInit = {}) => {
 		const path = url.replace(/^\/cms\/api\//, '')
 		const body = init.body ? JSON.parse(init.body as string) : undefined
@@ -27,14 +28,14 @@ const site = (answers: Record<string, (body: any) => unknown> = {}) => {
 	const win = {
 		document,
 		fetch,
-		location: { pathname: '/home', search: '', href: '', reload },
+		location: { pathname: '/home', search: '', href: '', reload, assign },
 		addEventListener: (type: string, listener: (event: unknown) => void) =>
 			listeners.set(type, listener),
 		removeEventListener: () => {},
 		requestAnimationFrame: (callback: () => void) => callback(),
 		confirm: () => true,
 	}
-	return { win: win as unknown as Window, calls, reload, listeners }
+	return { win: win as unknown as Window, calls, reload, assign, listeners }
 }
 
 const SESSION = {
@@ -171,6 +172,81 @@ describe('createSiteBridge', () => {
 		await bridge.prompt('Change it')
 		await expect(bridge.save()).rejects.toThrow(/someone else/)
 		expect(bridge.getState()).toMatchObject({ unsaved: true, saving: false })
+	})
+
+	it('makes a page like this one and opens it', async () => {
+		const { win, calls, assign } = site({
+			session: () => ({
+				...SESSION,
+				features: [...SESSION.features, 'create'],
+			}),
+			entries: () => ({
+				entryId: 'entry_new',
+				path: 'solutions/agencies',
+				summary: 'A page for agencies',
+			}),
+		})
+		const bridge = createSiteBridge(win, '/cms', {
+			pagePath: (path) => `/en/${path}`,
+		})
+		await vi.waitFor(() =>
+			expect(bridge.getState().features).toContain('create'),
+		)
+
+		const result = await bridge.createPage(
+			'/solutions/agencies',
+			' For agencies ',
+		)
+		expect(result).toEqual({
+			summary: 'A page for agencies',
+			entryId: 'entry_new',
+			path: 'solutions/agencies',
+			url: '/en/solutions/agencies',
+		})
+		const create = calls.find(({ path }) => path === 'entries')!
+		expect(create.body).toEqual({
+			path: '/solutions/agencies',
+			prompt: 'For agencies',
+			locale: 'nl',
+			from: 'entry_page',
+		})
+		expect(create.headers['x-obelism-content']).toBe('1')
+		expect(assign).toHaveBeenCalledWith('/en/solutions/agencies')
+		expect(bridge.getState().prompting).toBe(false)
+	})
+
+	it('only makes pages with the feature, and without unsaved changes', async () => {
+		const reader = createSiteBridge(
+			site({ session: () => SESSION }).win,
+			'/cms',
+		)
+		await vi.waitFor(() =>
+			expect(reader.getState().features).toContain('prompt'),
+		)
+		await expect(reader.createPage('about', 'x')).rejects.toThrow(
+			'You may not add pages here',
+		)
+
+		const { win, calls } = site({
+			session: () => ({
+				...SESSION,
+				features: [...SESSION.features, 'create'],
+			}),
+			'entries/entry_page': () => ({ content: {}, draftRevision: 1 }),
+			'entries/entry_page/prompt': () => ({ content: { a: 1 }, summary: '' }),
+		})
+		const bridge = createSiteBridge(win, '/cms')
+		await vi.waitFor(() =>
+			expect(bridge.getState().features).toContain('create'),
+		)
+		await expect(bridge.createPage(' ', 'x')).rejects.toThrow(
+			'Say where the page goes',
+		)
+		await bridge.prompt('Change it')
+		await expect(bridge.createPage('about', 'x')).rejects.toThrow(
+			'Save or undo your changes',
+		)
+		expect(calls.some(({ path }) => path === 'entries')).toBe(false)
 	})
 
 	it('signs out through the site’s logout', () => {

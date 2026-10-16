@@ -153,6 +153,7 @@ const normalizeBasePath = (basePath: string) =>
 const PROXY_ROUTES: { method: string; pattern: RegExp }[] = [
 	{ method: 'GET', pattern: /^session$/ },
 	{ method: 'GET', pattern: /^entries\/[\w-]+$/ },
+	{ method: 'POST', pattern: /^entries$/ },
 	{
 		method: 'POST',
 		pattern: /^entries\/[\w-]+\/(preview|prompt|save|publish)$/,

@@ -5,6 +5,7 @@ import {
 	blockSelector,
 	type BridgeState,
 	type ContentBridge,
+	type CreatePageResult,
 	createEmitter,
 	INITIAL_STATE,
 	type PromptResult,
@@ -52,9 +53,15 @@ type Working = {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
+export type SiteBridgeOptions = {
+	// Where a CMS path (`solutions/agencies`) is on the site. Default: `/` + path.
+	pagePath?: ((path: string) => string) | undefined
+}
+
 export const createSiteBridge = (
 	win: Window,
 	basePath: string,
+	{ pagePath = (path) => `/${path}` }: SiteBridgeOptions = {},
 ): ContentBridge => {
 	const doc = win.document
 	const emitter = createEmitter()
@@ -228,6 +235,41 @@ export const createSiteBridge = (
 				refreshUnsaved()
 				await render(entryId)
 				return { summary: result.summary }
+			} finally {
+				setState({ prompting: false })
+			}
+		},
+
+		async createPage(path, prompt): Promise<CreatePageResult> {
+			const text = prompt.trim()
+			if (!text) throw new Error('Say what the page is for')
+			if (!path.trim())
+				throw new Error('Say where the page goes, like /pricing')
+			if (!has('create')) throw new Error('You may not add pages here')
+			// Opening the new page would lose them.
+			if (state.unsaved) {
+				throw new Error('Save or undo your changes before adding a page')
+			}
+			setState({ prompting: true })
+			try {
+				const created = await api<{
+					entryId: string
+					path: string
+					summary: string
+				}>('entries', {
+					path,
+					prompt: text,
+					locale: locale(),
+					from: pageEntryId(),
+				})
+				const url = pagePath(created.path)
+				win.location.assign(url)
+				return {
+					summary: created.summary,
+					entryId: created.entryId,
+					path: created.path,
+					url,
+				}
 			} finally {
 				setState({ prompting: false })
 			}

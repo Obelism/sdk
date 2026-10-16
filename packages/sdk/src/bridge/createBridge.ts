@@ -40,11 +40,12 @@ export type BridgeListener<E extends BridgeEvent> = (
 export type BridgeState = {
 	// What the editor offers this site: 'prompt' (editing by prompt, for
 	// people who may edit content), and when editing on the site itself
-	// also 'save' and 'publish'. Empty until the editor says.
+	// also 'create' (new pages), 'save' and 'publish'. Empty until the editor
+	// says.
 	features: readonly string[]
 	// The block selected on the page or in the editor, null for none.
 	selectedUid: string | null
-	// A prompt is running.
+	// A prompt (or a new page) is running.
 	prompting: boolean
 	// The editor can undo the last prompt.
 	canUndo: boolean
@@ -59,6 +60,15 @@ export type BridgeState = {
 }
 
 export type PromptResult = { summary: string }
+
+export type CreatePageResult = {
+	summary: string
+	// The new page's entry and CMS path (`solutions/agencies`)…
+	entryId: string
+	path: string
+	// …and where it is on the site, which the bridge opens.
+	url: string
+}
 
 export type ContentBridge = {
 	// True inside the visual editor, and on a site signed in to edit.
@@ -82,6 +92,10 @@ export type ContentBridge = {
 		prompt: string,
 		options?: { uid?: string | null },
 	): Promise<PromptResult>
+	// Editing on the site: a new page at `path` (`/pricing`, or under an
+	// existing page), written from `prompt` like the page it is on, and
+	// stored as a draft straight away. Then opens it.
+	createPage(path: string, prompt: string): Promise<CreatePageResult>
 	// Undoes the last prompt in the editor.
 	undo(): void
 	// Editing on the site: stores the changed content as drafts…
@@ -156,6 +170,8 @@ const onlyOnSite = () =>
 // What every bridge without a feature does for it.
 export const INERT_METHODS = {
 	prompt: inertPrompt,
+	createPage: () =>
+		Promise.reject(new Error('New pages are made on the site itself')),
 	undo: () => {},
 	save: onlyOnSite,
 	publish: onlyOnSite,

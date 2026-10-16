@@ -27,6 +27,17 @@ const fakeBridge = (mode: 'editor' | 'site' = 'editor') => {
 					}
 				}),
 		),
+		createPage: vi.fn(async () => {
+			setState({ prompting: true })
+			await Promise.resolve()
+			setState({ prompting: false })
+			return {
+				summary: 'A page',
+				entryId: 'entry_new',
+				path: 'pricing',
+				url: '/pricing',
+			}
+		}),
 		undo: vi.fn(),
 		save: vi.fn(async () => {}),
 		publish: vi.fn(async () => {
@@ -158,6 +169,71 @@ describe('mountPromptBox', () => {
 
 		button('Exit editing').click()
 		expect(bridge.signOut).toHaveBeenCalled()
+	})
+
+	it('makes a new page on the site, from a path and a prompt', async () => {
+		const { bridge, setState } = fakeBridge('site')
+		unmount = mountPromptBox(document, bridge)
+		setState({ features: ['prompt', 'save', 'publish'] })
+		$<HTMLButtonElement>('.pill').click()
+		const button = (text: string) =>
+			[...shadow().querySelectorAll('button')].find(
+				(button) => button.textContent === text,
+			)!
+		expect(button('New page').hidden).toBe(true)
+
+		setState({ features: ['prompt', 'create', 'save', 'publish'] })
+		expect(button('New page').hidden).toBe(false)
+		button('New page').click()
+		expect(bridge.select).toHaveBeenCalledWith(null)
+		expect(bridge.setSelecting).toHaveBeenLastCalledWith(false)
+		const path = $<HTMLInputElement>('.path input')
+		expect(path.closest('[hidden]')).toBeNull()
+		expect(shadow().activeElement).toBe(path)
+
+		const input = $<HTMLTextAreaElement>('textarea')
+		expect(input.placeholder).toContain('Describe the new page')
+		input.value = 'Our prices'
+		input.dispatchEvent(new Event('input'))
+		expect($<HTMLButtonElement>('.primary').disabled).toBe(true)
+		path.value = '/pricing'
+		path.dispatchEvent(new Event('input'))
+		expect($<HTMLButtonElement>('.primary').disabled).toBe(false)
+
+		input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+		expect(bridge.createPage).toHaveBeenCalledWith('/pricing', 'Our prices')
+		expect(bridge.prompt).not.toHaveBeenCalled()
+		await vi.waitFor(() =>
+			expect($('.status').textContent).toBe('Opening the new page…'),
+		)
+
+		$<HTMLButtonElement>('.scope:not([hidden]) button').click()
+		expect(path.closest('[hidden]')).not.toBeNull()
+		expect(bridge.setSelecting).toHaveBeenLastCalledWith(true)
+	})
+
+	it('only offers New page on a page that is no entry', () => {
+		const { bridge, setState } = fakeBridge('site')
+		const pageless = { ...bridge, entryId: null }
+		unmount = mountPromptBox(document, pageless)
+		setState({ features: ['prompt', 'create', 'save', 'publish'] })
+		expect($('.pill').textContent).toContain('New page')
+		$<HTMLButtonElement>('.pill').click()
+
+		const path = $<HTMLInputElement>('.path input')
+		expect(path.closest('[hidden]')).toBeNull()
+		expect(shadow().activeElement).toBe(path)
+		expect(bridge.setSelecting).toHaveBeenLastCalledWith(false)
+		const visible = [...shadow().querySelectorAll('button')]
+			.filter((button) => !button.closest('[hidden]') && !button.hidden)
+			.map((button) => button.textContent)
+		expect(visible).not.toContain('Save')
+		expect(visible).not.toContain('Publish')
+		expect(visible).toContain('Exit editing')
+		// No way back to editing a page that isn't there.
+		expect($<HTMLButtonElement>('.scope:not([hidden]) button').hidden).toBe(
+			true,
+		)
 	})
 
 	it('shows readers on the site that drafts show, and a way out', () => {
