@@ -57,47 +57,160 @@ export type PromptBoxOptions = {
 	labels?: Partial<PromptLabels> | undefined
 }
 
-const ACCENT = '#d58a1f'
+// Icons (Lucide), drawn in the text colour.
+const ICONS = {
+	page: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+	block:
+		'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 8h10"/><path d="M7 12h6"/>',
+	undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+	close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+	send: '<path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z"/><path d="M6 12h16"/>',
+}
 
+// Obelism's design tokens (obelism.studio/design.md), under their own names:
+// beige and near-black, one orange accent, Inter, pill buttons.
 const CSS = `
 :host { all: initial; }
-* { box-sizing: border-box; font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif; }
+* { box-sizing: border-box; font: inherit; color: inherit; margin: 0; }
 .root {
-	--bg: #fff; --fg: #1d1b19; --muted: #6b655e; --line: #e4ded6; --error: #b3261e;
-	position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
-	z-index: 2147483647; width: min(640px, calc(100vw - 32px)); color: var(--fg);
+	--color-white-rgb: 248 248 248; --color-beige-rgb: 238 236 233; --color-beige-off-rgb: 228 225 217;
+	--color-grey-light-rgb: 132 132 132; --color-grey-rgb: 108 108 108; --color-grey-mid-rgb: 100 100 100; --color-grey-dark-rgb: 40 40 40;
+	--color-black-off-rgb: 20 20 20; --color-black-rgb: 12 12 12;
+	--color-orange-rgb: 212 130 30; --color-red-rgb: 240 93 93;
+	--theme-foreground-rgb: var(--color-black-rgb);
+	--theme-background-alt-rgb: var(--color-white-rgb);
+	--theme-background-actions-rgb: var(--color-beige-off-rgb);
+	--theme-border-rgb: var(--color-grey-light-rgb);
+	--theme-accent-rgb: var(--color-orange-rgb);
+	--theme-foreground-muted-rgb: var(--color-grey-mid-rgb);
+	--theme-error: #b3261e;
+	--border-radius-medium: 20px; --border-radius-pill: 5em;
+	--ease-roll: cubic-bezier(0.65, 0, 0.35, 1);
+	--shadow: 0 18px 40px -16px rgb(var(--color-black-rgb) / .3), 0 2px 6px rgb(var(--color-black-rgb) / .05);
+	--font-inter: 'InterVariable', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+		Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+	position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+	z-index: 2147483647; width: min(640px, calc(100vw - 32px)); color-scheme: light dark;
+	font: 400 14px/1.4 var(--font-inter); color: rgb(var(--theme-foreground-rgb));
+	-webkit-font-smoothing: antialiased;
 }
 @media (prefers-color-scheme: dark) {
-	.root { --bg: #23201d; --fg: #f3efe9; --muted: #a9a198; --line: #3b3631; --error: #ff8a80; }
+	.root {
+		--theme-foreground-rgb: var(--color-white-rgb);
+		--theme-background-alt-rgb: var(--color-black-off-rgb);
+		--theme-background-actions-rgb: var(--color-grey-dark-rgb);
+		--theme-border-rgb: var(--color-grey-rgb);
+		--theme-foreground-muted-rgb: var(--color-grey-light-rgb);
+		--theme-error: rgb(var(--color-red-rgb));
+		--shadow: 0 18px 40px -14px rgb(0 0 0 / .7), 0 2px 6px rgb(0 0 0 / .3);
+	}
 }
-.pill, .panel { background: var(--bg); border: 1px solid var(--line); box-shadow: 0 8px 30px rgba(0,0,0,.18); }
+.icon { display: inline-flex; flex: none; }
+.icon svg {
+	width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75;
+	stroke-linecap: round; stroke-linejoin: round;
+}
+.visually-hidden {
+	position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+button:disabled { cursor: not-allowed; }
+button:focus-visible { outline: 2px solid rgb(var(--theme-accent-rgb)); outline-offset: 2px; }
+
+/* Closed: one floating pill that reads like an empty field, with the mark. */
+.bar { display: flex; justify-content: center; }
 .pill {
-	display: block; margin: 0 auto; border-radius: 999px; padding: 8px 16px; cursor: pointer;
-	color: var(--fg);
+	display: flex; align-items: center; gap: 12px; width: min(560px, 100%); height: 56px;
+	padding: 0 22px 0 26px; border-radius: var(--border-radius-pill);
+	background: rgb(var(--theme-background-alt-rgb));
+	border: 1px solid rgb(var(--theme-border-rgb) / .25); box-shadow: var(--shadow);
+	color: rgb(var(--theme-foreground-muted-rgb)); font-size: 16px; text-align: left;
+	transition: transform .25s var(--ease-roll), color .25s var(--ease-roll);
 }
-.pill:hover { border-color: ${ACCENT}; }
-.panel { border-radius: 14px; padding: 10px; display: grid; gap: 8px; }
-.row { display: flex; align-items: center; gap: 8px; }
-.scope { color: var(--muted); font-size: 12px; flex: 1; min-width: 0; }
-.scope button { color: inherit; font-size: 12px; text-decoration: underline; background: none; border: 0; padding: 0 0 0 6px; cursor: pointer; }
+button.pill:hover { color: rgb(var(--theme-foreground-rgb)); transform: translateY(-2px); }
+.pill > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mark { color: rgb(var(--theme-accent-rgb)); font-size: 22px; line-height: 1; }
+.pill.compact { width: auto; height: 40px; padding: 0 18px; font-size: 14px; gap: 4px; }
+
+/* Open: a floating card, the text on top and a row of pill buttons below. */
+.panel {
+	display: grid; background: rgb(var(--theme-background-alt-rgb));
+	border: 1px solid rgb(var(--theme-border-rgb) / .25); border-radius: var(--border-radius-medium);
+	box-shadow: var(--shadow); overflow: hidden;
+	transition: border-color .25s var(--ease-roll), box-shadow .25s var(--ease-roll);
+	animation: rise .25s var(--ease-roll);
+}
+.panel:focus-within {
+	border-color: rgb(var(--theme-accent-rgb) / .6);
+	box-shadow: 0 0 0 3px rgb(var(--theme-accent-rgb) / .18), var(--shadow);
+}
+@keyframes rise { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+@keyframes spin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) {
+	.panel { animation: none; }
+	.pill { transition: none; }
+}
+.status {
+	padding: 16px 22px 0; font-size: 14px; color: rgb(var(--theme-foreground-muted-rgb));
+	display: flex; align-items: center; gap: 8px;
+}
+.status.working::before {
+	content: ''; width: 12px; height: 12px; flex: none; border-radius: 50%;
+	border: 2px solid rgb(var(--theme-border-rgb) / .3); border-top-color: rgb(var(--theme-accent-rgb));
+	animation: spin .7s linear infinite;
+}
+.status.error { color: var(--theme-error); }
 textarea {
-	width: 100%; resize: none; min-height: 44px; max-height: 160px; padding: 8px 10px;
-	border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--fg);
+	display: block; width: 100%; resize: none; min-height: 76px; max-height: 200px;
+	padding: 16px 22px 6px; border: 0; outline: 0; background: transparent;
+	font-size: 16px; line-height: 1.6; color: rgb(var(--theme-foreground-rgb));
 }
-textarea:focus { outline: 2px solid ${ACCENT}; outline-offset: -1px; }
-button.action {
-	border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--fg);
-	padding: 6px 12px; cursor: pointer;
+textarea::placeholder { color: rgb(var(--theme-foreground-muted-rgb)); }
+textarea:disabled { opacity: .5; }
+.toolbar { display: flex; align-items: center; gap: 6px; padding: 8px 12px 12px; }
+.spacer { flex: 1; }
+.chip {
+	display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: .4em 1.1em .4em .9em;
+	border: 1px solid rgb(var(--theme-border-rgb) / .2); border-radius: var(--border-radius-pill);
+	background: rgb(var(--theme-background-actions-rgb) / .6); white-space: nowrap;
+	transition: background-color .25s var(--ease-roll);
 }
-button.primary { background: ${ACCENT}; border-color: ${ACCENT}; color: #fff; }
-button:disabled { opacity: .5; cursor: default; }
-.close { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 6px; }
-.status { font-size: 13px; color: var(--muted); flex: 1; min-width: 0; }
-.status.error { color: var(--error); }
-.bar { display: flex; justify-content: center; gap: 8px; }
-.row > .link { margin-right: auto; }
-.link { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 12px; text-decoration: underline; padding: 0; }
-.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: ${ACCENT}; margin-right: 6px; vertical-align: 1px; }
+button.chip:hover:not(:disabled) { background: rgb(var(--theme-background-actions-rgb)); }
+button.chip:disabled { opacity: .5; }
+.scope { min-width: 0; background: transparent; }
+.scope > span:not(.icon) { overflow: hidden; text-overflow: ellipsis; }
+.scope button {
+	display: inline-flex; margin-right: -6px; padding: 3px; border-radius: 50%;
+	color: rgb(var(--theme-foreground-muted-rgb));
+}
+.scope button:hover { background: rgb(var(--theme-background-actions-rgb)); color: rgb(var(--theme-foreground-rgb)); }
+.scope button svg { width: 14px; height: 14px; }
+.icon-button {
+	display: inline-flex; align-items: center; justify-content: center;
+	width: 34px; height: 34px; border-radius: 50%; color: rgb(var(--theme-foreground-muted-rgb));
+	transition: background-color .25s var(--ease-roll), color .25s var(--ease-roll), opacity .25s var(--ease-roll);
+}
+.icon-button:hover:not(:disabled) { background: rgb(var(--theme-background-actions-rgb)); color: rgb(var(--theme-foreground-rgb)); }
+/* The one call to action: white on orange. */
+.icon-button.primary { background: rgb(var(--theme-accent-rgb)); color: #fff; }
+.icon-button.primary:hover:not(:disabled) { background: rgb(var(--theme-accent-rgb)); color: #fff; opacity: .88; }
+.icon-button.primary:disabled { opacity: .35; }
+.divider { width: 1px; height: 20px; background: rgb(var(--theme-border-rgb) / .3); margin: 0 4px; }
+
+/* On the site: storing the draft, and the way out. */
+.footer {
+	display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 22px;
+	border-top: 1px solid rgb(var(--theme-border-rgb) / .2);
+	background: rgb(var(--theme-background-actions-rgb) / .45);
+}
+.footer .chip { height: 30px; padding: .4em 1.2em; background: rgb(var(--theme-background-alt-rgb)); }
+.unsaved { color: rgb(var(--theme-foreground-muted-rgb)); display: inline-flex; align-items: center; }
+.link { color: rgb(var(--theme-foreground-muted-rgb)); text-decoration: underline; text-underline-offset: 3px; padding: 0 6px; }
+.link:hover { color: rgb(var(--theme-foreground-rgb)); }
+.dot {
+	display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+	background: rgb(var(--theme-accent-rgb)); margin-right: 8px;
+}
 [hidden] { display: none !important; }
 `
 
@@ -119,6 +232,13 @@ const element = <K extends keyof HTMLElementTagNameMap>(
 	return node
 }
 
+const icon = (doc: Document, name: keyof typeof ICONS) => {
+	const span = element(doc, 'span', { className: 'icon' })
+	span.setAttribute('aria-hidden', 'true')
+	span.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[name]}</svg>`
+	return span
+}
+
 // Mounts the box on the page; returns a function that removes it.
 export const mountPromptBox = (
 	doc: Document,
@@ -132,17 +252,20 @@ export const mountPromptBox = (
 	const shadow = host.attachShadow({ mode: 'open' })
 
 	const site = bridge.mode === 'site'
-	const pill = element(doc, 'button', {
-		className: 'pill',
-		type: 'button',
-		textContent: `✨ ${labels.open}`,
-	})
+	const pill = element(
+		doc,
+		'button',
+		{ className: 'pill', type: 'button' },
+		element(doc, 'span', { textContent: labels.open }),
+		// The Obelism mark.
+		element(doc, 'span', { className: 'mark', textContent: '⁜' }),
+	)
 	// Someone signed in who may only read: a note that drafts show, and a
 	// way out.
 	const viewing = element(
 		doc,
 		'span',
-		{ className: 'pill' },
+		{ className: 'pill compact' },
 		`${labels.viewingDrafts} · `,
 	)
 	const pillSignOut = element(doc, 'button', {
@@ -151,69 +274,108 @@ export const mountPromptBox = (
 		textContent: labels.signOut,
 	})
 	viewing.appendChild(pillSignOut)
-	const scopeText = element(doc, 'span')
-	const clearBlock = element(doc, 'button', {
-		type: 'button',
-		textContent: labels.clearBlock,
-	})
-	const scope = element(
-		doc,
-		'div',
-		{ className: 'scope' },
-		'✨ ',
-		scopeText,
-		clearBlock,
-	)
-	const close = element(doc, 'button', {
-		className: 'close',
-		type: 'button',
-		textContent: '×',
-		title: labels.close,
-	})
-	close.setAttribute('aria-label', labels.close)
+
+	const status = element(doc, 'p', { className: 'status' })
+	status.setAttribute('role', 'status')
 	const input = element(doc, 'textarea', {
 		placeholder: labels.placeholder,
 		rows: 1,
 	})
 	input.setAttribute('aria-label', labels.open)
-	const status = element(doc, 'div', { className: 'status' })
-	status.setAttribute('role', 'status')
-	const undo = element(doc, 'button', {
-		className: 'action',
+
+	// What the prompt acts on: the whole page, or the selected block with a
+	// way back to the page.
+	const pageIcon = icon(doc, 'page')
+	const blockIcon = icon(doc, 'block')
+	const scopeText = element(doc, 'span')
+	const clearBlock = element(doc, 'button', {
 		type: 'button',
-		textContent: labels.undo,
+		title: labels.clearBlock,
 	})
-	const send = element(doc, 'button', {
-		className: 'action primary',
-		type: 'submit',
-		textContent: labels.send,
-	})
-	const save = element(doc, 'button', {
-		className: 'action',
-		type: 'button',
-		textContent: labels.save,
-	})
-	const publish = element(doc, 'button', {
-		className: 'action',
-		type: 'button',
-		textContent: labels.publish,
-	})
+	clearBlock.setAttribute('aria-label', labels.clearBlock)
+	clearBlock.appendChild(icon(doc, 'close'))
+	const scope = element(
+		doc,
+		'span',
+		{ className: 'chip scope' },
+		pageIcon,
+		blockIcon,
+		scopeText,
+		clearBlock,
+	)
+	const undo = element(
+		doc,
+		'button',
+		{ className: 'action chip', type: 'button' },
+		icon(doc, 'undo'),
+		labels.undo,
+	)
+	const close = element(
+		doc,
+		'button',
+		{ className: 'close icon-button', type: 'button', title: labels.close },
+		icon(doc, 'close'),
+	)
+	close.setAttribute('aria-label', labels.close)
+	const send = element(
+		doc,
+		'button',
+		{ className: 'action primary icon-button', type: 'submit' },
+		element(doc, 'span', {
+			className: 'visually-hidden',
+			textContent: labels.send,
+		}),
+		icon(doc, 'send'),
+	)
+	send.title = labels.send
+
+	const unsaved = element(doc, 'span', { className: 'unsaved' })
+	unsaved.appendChild(element(doc, 'span', { className: 'dot' }))
+	unsaved.appendChild(doc.createTextNode(labels.unsaved))
 	const signOut = element(doc, 'button', {
 		className: 'link',
 		type: 'button',
 		textContent: labels.signOut,
 	})
-	const unsaved = element(doc, 'span', { className: 'scope' })
-	unsaved.appendChild(element(doc, 'span', { className: 'dot' }))
-	unsaved.appendChild(doc.createTextNode(labels.unsaved))
+	const save = element(doc, 'button', {
+		className: 'action chip',
+		type: 'button',
+		textContent: labels.save,
+	})
+	const publish = element(doc, 'button', {
+		className: 'action chip',
+		type: 'button',
+		textContent: labels.publish,
+	})
+	const footer = element(
+		doc,
+		'div',
+		{ className: 'footer' },
+		unsaved,
+		element(doc, 'span', { className: 'spacer' }),
+		signOut,
+		save,
+		publish,
+	)
+
 	const panel = element(
 		doc,
 		'form',
 		{ className: 'panel' },
-		element(doc, 'div', { className: 'row' }, scope, close),
+		status,
 		input,
-		element(doc, 'div', { className: 'row' }, status, undo, send),
-		element(doc, 'div', { className: 'row' }, unsaved, signOut, save, publish),
+		element(
+			doc,
+			'div',
+			{ className: 'toolbar' },
+			scope,
+			undo,
+			element(doc, 'span', { className: 'spacer' }),
+			close,
+			element(doc, 'span', { className: 'divider' }),
+			send,
+		),
+		footer,
 	)
 	const root = element(
 		doc,
@@ -239,6 +401,8 @@ export const mountPromptBox = (
 			? labels.scopeBlock
 			: labels.scopeEntry
 		clearBlock.hidden = !state.selectedUid
+		pageIcon.hidden = !!state.selectedUid
+		blockIcon.hidden = !state.selectedUid
 		undo.hidden = !state.canUndo
 		undo.disabled = busy
 		send.disabled = busy || input.value.trim() === ''
@@ -250,12 +414,14 @@ export const mountPromptBox = (
 		publish.disabled = busy
 		publish.textContent = state.publishing ? labels.publishing : labels.publish
 		signOut.hidden = !site
+		footer.hidden = !site
 		unsaved.hidden = !state.unsaved
 		const text = state.prompting
 			? labels.working
 			: (message?.text ?? (site && !state.selectedUid ? labels.selectHint : ''))
 		status.textContent = text
-		status.className = `status${!busy && message?.error ? ' error' : ''}`
+		status.hidden = !text
+		status.className = `status${state.prompting ? ' working' : ''}${!busy && message?.error ? ' error' : ''}`
 	}
 	const refresh = () => render(bridge.getState())
 
