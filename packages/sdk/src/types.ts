@@ -31,9 +31,15 @@ export type Entry<
 	id: string
 	contentType: TContentType
 	name: string
-	// Only page entries have a slug and path.
+	// Only pages have a slug and path. `slug` is the default locale's;
+	// `path` is the path in the requested locale (the default's for `*`).
 	slug: string | null
 	path: string | null
+	// The path in every locale of the space, `{ [locale]: path }`: for
+	// hreflang links, language switchers and sitemaps. Empty for data
+	// entries. The locale itself is never part of a path; where it goes in
+	// your URLs is up to your site.
+	paths: Record<string, string>
 	publishedAt: string | null
 	firstPublishedAt: string | null
 	updatedAt: string
@@ -90,6 +96,21 @@ export type RichTextDocument = RichTextNode & { type: 'doc' }
 
 export type EntryList<TEntry extends Entry = Entry> = {
 	items: TEntry[]
+	total: number
+	limit: number
+	skip: number
+}
+
+// A path a page moved away from in a locale, and where it is in that locale
+// now.
+export type Redirect = {
+	locale: string
+	from: string
+	to: string
+}
+
+export type RedirectList = {
+	items: Redirect[]
 	total: number
 	limit: number
 	skip: number

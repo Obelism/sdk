@@ -74,6 +74,7 @@ const entry = (id: string, title: string): Entry<{ title: string }> => ({
 	name: title,
 	slug: null,
 	path: null,
+	paths: {},
 	publishedAt: null,
 	firstPublishedAt: null,
 	updatedAt: '2026-10-15T00:00:00.000Z',

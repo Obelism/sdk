@@ -28,7 +28,7 @@ export const Page = ({ entry }) => {
 - `useContentBridge()`: `{ isEditing, entryId, environment }`, after hydration.
 - `useContentBridgeEvent('saved' | 'published' | 'update', listener)`, e.g.
   `router.refresh()` on publish.
-- `<ContentBridge url? prompt? pagePath? />`: pass `url` only when not on content.obelism.studio; `pagePath` maps a CMS path to the site's URL for pages made with New page (default `/` + path).
+- `<ContentBridge url? prompt? pagePath? />`: pass `url` only when not on content.obelism.studio; `pagePath(path, locale)` maps a CMS path in a locale to the site's URL for pages made with New page (default `/` + path).
 
 ## Prompt editing
 

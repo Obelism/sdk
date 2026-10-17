@@ -9,6 +9,7 @@ const entry = {
 	name: 'Hello',
 	slug: 'hello',
 	path: 'blog/hello',
+	paths: { en: 'blog/hello', nl: 'blog/hallo' },
 	publishedAt: null,
 	firstPublishedAt: null,
 	updatedAt: '2026-10-12T19:35:12.419Z',
@@ -88,6 +89,71 @@ describe('ContentClient', () => {
 		})
 		await expect(content.getPage('nope')).resolves.toBeNull()
 		await expect(content.getEntry('nope')).resolves.toBeNull()
+	})
+
+	it('finds a page, or where a moved page is now', async () => {
+		const found = respond({ entry })
+		await expect(
+			new ContentClient({ token: 't', fetch: found }).findPage('blog/hallo', {
+				locale: 'nl',
+			}),
+		).resolves.toEqual({ entry })
+		expect(requested(found).url.searchParams.get('locale')).toBe('nl')
+
+		const moved = new ContentClient({
+			token: 't',
+			fetch: respond(
+				{
+					error: 'Entry not found: it moved',
+					redirect: { path: 'blog/new' },
+				},
+				404,
+			),
+		})
+		await expect(moved.findPage('blog/old')).resolves.toEqual({
+			redirect: { path: 'blog/new' },
+		})
+		await expect(moved.getPage('blog/old')).resolves.toBeNull()
+
+		const missing = new ContentClient({
+			token: 't',
+			fetch: respond({ error: 'Entry not found' }, 404),
+		})
+		await expect(missing.findPage('nope')).resolves.toBeNull()
+	})
+
+	it('lists redirects, a page at a time or all of them', async () => {
+		const page = (skip: number) => ({
+			items: [{ locale: 'nl', from: `old-${skip}`, to: 'new' }],
+			total: 2,
+			limit: 1,
+			skip,
+		})
+		const fetchMock = vi.fn<typeof fetch>(async (url) => {
+			const skip = Number(new URL(String(url)).searchParams.get('skip'))
+			return new Response(JSON.stringify(page(skip)))
+		})
+		const content = new ContentClient({
+			token: 't',
+			// Not sent: redirects take only their own locale.
+			depth: 3,
+			fetch: fetchMock,
+		})
+		const all = []
+		for await (const redirect of content.getAllRedirects({
+			locale: 'nl',
+			limit: 1,
+		})) {
+			all.push(redirect.from)
+		}
+		expect(all).toEqual(['old-0', 'old-1'])
+		const { url } = requested(fetchMock)
+		expect(url.pathname).toBe('/api/delivery/v1/redirects')
+		expect(Object.fromEntries(url.searchParams)).toEqual({
+			locale: 'nl',
+			limit: '1',
+			skip: '0',
+		})
 	})
 
 	it('throws the API error for anything else', async () => {

@@ -22,6 +22,7 @@ const event: WebhookEvent = {
 			contentType: 'page',
 			name: 'Hello',
 			path: 'blog/hello',
+			paths: { en: 'blog/hello', nl: 'blog/hallo' },
 		},
 	},
 }

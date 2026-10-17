@@ -35,9 +35,10 @@ export type BridgeOptions = {
 	// `false` leaves it out, e.g. to build your own with `bridge.prompt()`.
 	// Default: shown.
 	prompt?: boolean | PromptBoxOptions | undefined
-	// Editing on the site: where a CMS path (`solutions/agencies`) is on the
-	// site, to open a page made with "New page". Default: `/` + path.
-	pagePath?: ((path: string) => string) | undefined
+	// Editing on the site: where a CMS path (`solutions/agencies`) in a
+	// locale is on the site, to open a page made with "New page" (the path
+	// is the one in that locale). Default: `/` + path.
+	pagePath?: ((path: string, locale: string) => string) | undefined
 }
 
 // Kept on the window, so two copies of this package on one page still share

@@ -22,6 +22,11 @@ const content = new ContentClient({
 })
 
 await content.getPage('blog/hello') //       Entry | null
+await content.getPage('blog/hallo', { locale: 'nl' }) // looked up in nl's paths
+await content.findPage('blog/old') //        { entry } | { redirect: { path } } | null
+await content.getRedirects({ locale: 'nl' }) // { items: [{ locale, from, to }], total, limit, skip }
+for await (const redirect of content.getAllRedirects()) {
+}
 await content.getEntry('entry_…') //         Entry | null
 await content.getEntries({ contentType: 'post', limit: 20, skip: 0 }) // { items, total, limit, skip }
 for await (const post of content.getAllEntries({ contentType: 'post' })) {
@@ -39,7 +44,17 @@ await content.getContentModel() //          the model file
 ```
 
 Each method takes `{ locale, depth, richText, init }` to override the
-defaults. Missing pages and entries are `null`; any other failure throws a
+defaults.
+
+Pages and folders can have a slug per locale. `getPage` looks the path up
+in the requested locale's paths, `entry.path` is the path in that locale and
+`entry.paths` the path in every locale (`{ en: 'about-us', nl: 'over-ons' }`),
+for hreflang links and language switchers. The locale is never part of a
+path: whether it is `/nl/over-ons` or `nl.example.com/over-ons` is your
+routing. A page that moved keeps its old path as a redirect in each locale:
+`findPage` answers it with `{ redirect: { path } }`, so your route can send
+a `301` instead of a 404, and `getAllRedirects` lists them for redirect rules
+built ahead of time. Missing pages and entries are `null`; any other failure throws a
 `ContentApiError` with `status` and the API's `message`. Type your content
 with generics: `content.getPage<Entry<{ title: string }>>('home')`.
 
@@ -131,11 +146,12 @@ bridge.undo()
 On a site signed in to edit (`@obelism/content/site`), the box also has **New
 page**: a path (`/pricing`, or under an existing page) and what the page is
 for. The CMS writes the page like the one the editor is on and stores it as a
-draft, and the bridge opens it at `/` + its path. When your routes put CMS
-pages elsewhere, say where:
+draft, and the bridge opens it at `/` + its path. The path is the one in
+the page's language (`<html lang>`). When your routes put CMS pages
+elsewhere, say where:
 
 ```ts
-getContentBridge({ pagePath: (path) => `/en/${path}` })
+getContentBridge({ pagePath: (path, locale) => `/${locale}/${path}` })
 await bridge.createPage('/pricing', 'Our plans, for agencies') // or your own UI
 ```
 
@@ -196,7 +212,7 @@ const event = await verifyWebhook(request, process.env.CONTENT_WEBHOOK_SECRET!)
 
 `WebhookEvent` is a union on `type`: `entry.published`, `entry.unpublished`,
 `entry.deleted` and `entry.moved` (`data.entry`: `{ id, contentType, name,
-path }`, plus `previousPath` when moved), `asset.updated` (`data.asset`,
+path, paths }`, plus `previousPath` and `previousPaths` when moved), `asset.updated` (`data.asset`,
 `data.entries`), `model.changed` (`data.contentTypes`: `{ apiId, action }`),
 `locales.changed` (`data.defaultLocale`, `data.locales`) and `webhook.test`.
 

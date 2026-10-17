@@ -2,6 +2,8 @@ export { ContentClient } from './client'
 export type {
 	ContentClientOptions,
 	EntriesQuery,
+	PageLookup,
+	RedirectsQuery,
 	RequestOptions,
 } from './client'
 export { DEFAULT_URL } from './config'

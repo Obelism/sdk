@@ -54,8 +54,9 @@ type Working = {
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
 export type SiteBridgeOptions = {
-	// Where a CMS path (`solutions/agencies`) is on the site. Default: `/` + path.
-	pagePath?: ((path: string) => string) | undefined
+	// Where a CMS path (`solutions/agencies`) is on the site, in a locale.
+	// Default: `/` + path.
+	pagePath?: ((path: string, locale: string) => string) | undefined
 }
 
 export const createSiteBridge = (
@@ -262,7 +263,7 @@ export const createSiteBridge = (
 					locale: locale(),
 					from: pageEntryId(),
 				})
-				const url = pagePath(created.path)
+				const url = pagePath(created.path, locale() ?? '')
 				win.location.assign(url)
 				return {
 					summary: created.summary,

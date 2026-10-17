@@ -23,13 +23,15 @@ import {
 import type { Environment } from './types'
 
 // The entry an event is about: enough to know what to revalidate, never its
-// content (fetch that from the delivery API). `path` is null for data
+// content (fetch that from the delivery API). `path` is the default
+// locale's and `paths` the path in every locale; null and `{}` for data
 // entries.
 export type WebhookEntry = {
 	id: string
 	contentType: string
 	name: string
 	path: string | null
+	paths: Record<string, string>
 }
 
 type WebhookEventOf<TType extends string, TData> = {
@@ -59,11 +61,15 @@ export type EntryDeletedEvent = WebhookEventOf<
 	{ entry: WebhookEntry }
 >
 
-// An entry's parent, slug or position changes; everything below
-// `previousPath` moved with it.
+// An entry's parent, slug (in any locale) or position changes; everything
+// below `previousPath` (per locale: `previousPaths`) moved with it.
 export type EntryMovedEvent = WebhookEventOf<
 	'entry.moved',
-	{ entry: WebhookEntry; previousPath: string | null }
+	{
+		entry: WebhookEntry
+		previousPath: string | null
+		previousPaths: Record<string, string>
+	}
 >
 
 // An asset's alt text or title changes, sent to each environment whose

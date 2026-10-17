@@ -5,7 +5,14 @@ import {
 	normalizeUrl,
 } from './config'
 import { ContentApiError } from './errors'
-import type { Entry, EntryList, ModelFile, RichTextFormat } from './types'
+import type {
+	Entry,
+	EntryList,
+	ModelFile,
+	Redirect,
+	RedirectList,
+	RichTextFormat,
+} from './types'
 
 export type ContentClientOptions = {
 	// A delivery token (`cms_d_…`, published content) or preview token
@@ -67,6 +74,20 @@ const fieldParams = (fields: EntriesQuery['fields']) =>
 		}),
 	)
 
+export type RedirectsQuery = {
+	// Only this locale's redirects; every locale's when left out.
+	locale?: string | undefined
+	// 1–1000, the API's default is 1000.
+	limit?: number | undefined
+	skip?: number | undefined
+	init?: RequestInit | undefined
+}
+
+// What is at a path: the page, or where a page that moved from it is now.
+export type PageLookup<TEntry extends Entry = Entry> =
+	| { entry: TEntry; redirect?: undefined }
+	| { entry?: undefined; redirect: { path: string } }
+
 const trimSlashes = (path: string) => path.replace(/^\/+|\/+$/g, '')
 
 // Reads one space environment's content through the delivery API. The token
@@ -101,20 +122,62 @@ export class ContentClient {
 	}
 
 	// The page at a path (`blog/hello`), or null when there is none. A site's
-	// catch-all route asks for this.
+	// catch-all route asks for this. The path is looked up in `locale`'s
+	// paths (the default locale's when left out or `*`): pages can have a
+	// slug per locale.
 	getPage = async <TEntry extends Entry = Entry>(
 		path: string,
 		options: RequestOptions = {},
-	): Promise<TEntry | null> => {
+	): Promise<TEntry | null> =>
+		(await this.findPage<TEntry>(path, options))?.entry ?? null
+
+	// Like getPage, but a path a page moved away from answers where it is
+	// now, so the site can send a 301 there instead of a 404.
+	//
+	//   const found = await content.findPage(path, { locale })
+	//   if (found?.redirect) return redirect(`/${locale}/${found.redirect.path}`, 301)
+	//   if (!found) return notFound()
+	findPage = async <TEntry extends Entry = Entry>(
+		path: string,
+		options: RequestOptions = {},
+	): Promise<PageLookup<TEntry> | null> => {
 		const trimmed = trimSlashes(path)
 		if (!trimmed) throw new Error('getPage needs a path')
-		const result = await this.#request<{ entry: TEntry }>(
-			'/pages',
-			{ path: trimmed },
-			options,
-			{ notFound: true },
-		)
-		return result?.entry ?? null
+		const result = await this.#request<
+			{ entry: TEntry } | { redirect?: { path?: unknown } }
+		>('/pages', { path: trimmed }, options, { notFound: 'body' })
+		if (result && 'entry' in result) return { entry: result.entry }
+		const to = result?.redirect?.path
+		return typeof to === 'string' ? { redirect: { path: to } } : null
+	}
+
+	// One page of redirects: every path a page moved away from, per locale,
+	// with where it is now. For redirect rules built ahead of time.
+	getRedirects = ({
+		locale,
+		limit,
+		skip,
+		init,
+	}: RedirectsQuery = {}): Promise<RedirectList> =>
+		this.#request<RedirectList>(
+			'/redirects',
+			{ limit, skip },
+			{ locale, init },
+			{ defaults: false },
+		) as Promise<RedirectList>
+
+	// Every redirect, fetching pages of `limit` (default 1000) as it goes.
+	async *getAllRedirects(
+		query: Omit<RedirectsQuery, 'skip'> = {},
+	): AsyncGenerator<Redirect, void, undefined> {
+		const limit = query.limit ?? 1000
+		let skip = 0
+		while (true) {
+			const page = await this.getRedirects({ ...query, limit, skip })
+			yield* page.items
+			skip += page.items.length
+			if (page.items.length === 0 || skip >= page.total) return
+		}
 	}
 
 	// An entry by id, or null when there is none (or it isn't published, for a
@@ -188,12 +251,16 @@ export class ContentClient {
 			defaults: false,
 		}) as Promise<ModelFile>
 
-	// null for a 404 when `notFound` is set; throws ContentApiError otherwise.
+	// For a 404, null when `notFound` is set, or the body as is for 'body';
+	// throws ContentApiError otherwise.
 	async #request<T>(
 		path: string,
 		query: Record<string, string | number | undefined>,
 		{ init, ...options }: RequestOptions,
-		{ notFound = false, defaults = true } = {},
+		{
+			notFound = false,
+			defaults = true,
+		}: { notFound?: boolean | 'body'; defaults?: boolean } = {},
 	): Promise<T | null> {
 		// Checked here rather than in the constructor, so a module creating a
 		// client still loads (and a build still runs) without the variable.
@@ -224,7 +291,7 @@ export class ContentClient {
 				: timeout,
 		})
 
-		if (notFound && response.status === 404) return null
+		if (notFound === true && response.status === 404) return null
 
 		const text = await response.text()
 		let body: unknown = text
@@ -232,6 +299,9 @@ export class ContentClient {
 			body = JSON.parse(text)
 		} catch {
 			// Not JSON: keep the text for the error.
+		}
+		if (notFound === 'body' && response.status === 404) {
+			return typeof body === 'object' && body !== null ? (body as T) : null
 		}
 		if (!response.ok) throw new ContentApiError(response.status, url, body)
 		return body as T

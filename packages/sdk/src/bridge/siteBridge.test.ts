@@ -187,7 +187,7 @@ describe('createSiteBridge', () => {
 			}),
 		})
 		const bridge = createSiteBridge(win, '/cms', {
-			pagePath: (path) => `/en/${path}`,
+			pagePath: (path, locale) => `/${locale}/${path}`,
 		})
 		await vi.waitFor(() =>
 			expect(bridge.getState().features).toContain('create'),
@@ -201,7 +201,7 @@ describe('createSiteBridge', () => {
 			summary: 'A page for agencies',
 			entryId: 'entry_new',
 			path: 'solutions/agencies',
-			url: '/en/solutions/agencies',
+			url: '/nl/solutions/agencies',
 		})
 		const create = calls.find(({ path }) => path === 'entries')!
 		expect(create.body).toEqual({
@@ -211,7 +211,7 @@ describe('createSiteBridge', () => {
 			from: 'entry_page',
 		})
 		expect(create.headers['x-obelism-content']).toBe('1')
-		expect(assign).toHaveBeenCalledWith('/en/solutions/agencies')
+		expect(assign).toHaveBeenCalledWith('/nl/solutions/agencies')
 		expect(bridge.getState().prompting).toBe(false)
 	})
 
