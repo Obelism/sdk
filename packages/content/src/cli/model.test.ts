@@ -89,6 +89,45 @@ describe('runModelCommand', () => {
 		)
 	})
 
+	it('locks or unlocks the model with an apply', async () => {
+		const fetchMock = vi.fn<typeof fetch>(async () =>
+			Response.json({ changes: [], issues: [] }),
+		)
+		const logged: string[] = []
+		const opts = {
+			...options(fetchMock),
+			log: (line: string) => logged.push(line),
+		}
+		await writeFile(join(dir, 'model.json'), JSON.stringify(model))
+
+		for (const lock of [true, false]) {
+			await runModelCommand({
+				...opts,
+				file: join(dir, 'model.json'),
+				command: 'apply',
+				lock,
+			})
+		}
+		expect(
+			fetchMock.mock.calls.map(
+				([, init]) => JSON.parse(String(init!.body)).lock,
+			),
+		).toEqual([true, false])
+		expect(logged.join('\n')).toMatch(/managed in code/)
+		expect(logged.join('\n')).toMatch(/in the dashboard again/)
+
+		// Plans never send it.
+		await runModelCommand({
+			...opts,
+			file: join(dir, 'model.json'),
+			command: 'plan',
+			lock: true,
+		})
+		expect(
+			JSON.parse(String(fetchMock.mock.calls[2]![1]!.body)),
+		).not.toHaveProperty('lock')
+	})
+
 	it('says what went wrong', async () => {
 		const opts = options(
 			vi.fn<typeof fetch>(async () =>
