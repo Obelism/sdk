@@ -88,7 +88,7 @@ export const generateImproveNextMiddleware = (
 				(option) => option.value === testValue,
 			)
 
-			if (!testMatchOption) return NextResponse.next()
+			if (testValue == null || !testMatchOption) return NextResponse.next()
 
 			// Update the response with cookies response
 			let response: undefined | NextResponse<unknown>

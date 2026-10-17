@@ -27,10 +27,10 @@ test('Test: 50/50', () => {
 	for (let i = 0; i < 100; i++) {
 		const outcome = getRandomTestValue(options)
 		if (!outcome) continue
-		outcomeCount[outcome] = outcomeCount[outcome] + 1 || 1
+		outcomeCount[outcome] = (outcomeCount[outcome] ?? 0) + 1
 	}
 
-	const delta = diff(outcomeCount.control, outcomeCount.variation)
+	const delta = diff(outcomeCount.control ?? 0, outcomeCount.variation ?? 0)
 
 	expect(delta).toBeLessThanOrEqual(100)
 })
@@ -68,7 +68,7 @@ test('Test: 25/25/25/25', () => {
 	for (let i = 0; i < 4000; i++) {
 		const outcome = getRandomTestValue(options)
 		if (!outcome) continue
-		outcomeCount[outcome] = outcomeCount[outcome] + 1 || 1
+		outcomeCount[outcome] = (outcomeCount[outcome] ?? 0) + 1
 	}
 
 	Object.values(outcomeCount).forEach((count) => {

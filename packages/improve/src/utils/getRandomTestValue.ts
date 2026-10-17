@@ -5,8 +5,9 @@ import { ImproveTestOption } from '../types'
 // }
 
 export const getRandomTestValue = (options: ImproveTestOption[]) => {
-	if (options.length === 0) return null
-	if (options.length === 1) return options[0].slug
+	const [first] = options
+	if (!first) return null
+	if (options.length === 1) return first.slug
 
 	// Get a random number between 0 and 1
 	const sum = options.reduce((acc, { split }) => acc + split, 0)
@@ -16,7 +17,7 @@ export const getRandomTestValue = (options: ImproveTestOption[]) => {
 		options.find(({ split }) => {
 			value -= split
 			return value <= 0
-		}) || options[0]
+		}) || first
 
 	return match.slug
 }

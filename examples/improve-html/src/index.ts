@@ -10,5 +10,6 @@ improveClient.fetchConfig().then(() => {
 
 	const value = improveClient.getTestValue('startpage-visual')
 
-	document.querySelector('#output').textContent = value
+	const output = document.querySelector('#output')
+	if (output) output.textContent = value
 })

@@ -25,7 +25,7 @@ type ConfigFetch = {
 	url: string
 	timeout: number
 	retries: number
-	revalidate?: number
+	revalidate?: number | undefined
 }
 
 // Next.js augments RequestInit with a `next` field for its fetch cache.
@@ -36,7 +36,7 @@ type RequestInitWithNext = RequestInit & {
 export class BaseImproveSDK {
 	organizationId: string
 	environment: ImproveEnvironmentOption = 'develop'
-	state: ImproveTestState
+	state: ImproveTestState | undefined
 
 	#configFetch: ConfigFetch | null = null
 

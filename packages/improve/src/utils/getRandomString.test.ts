@@ -21,7 +21,7 @@ test('20 char size', () => {
 })
 
 test('Null', () => {
-	const outcome = getRandomString(null)
+	const outcome = getRandomString(null as unknown as number)
 	expect(typeof outcome).toBe('string')
 	expect(outcome.length).toBe(0)
 })

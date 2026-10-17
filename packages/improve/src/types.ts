@@ -7,10 +7,10 @@ export type ImproveTestState = 'draft' | 'active' | 'finished' | 'archived'
 export type ImproveSetupArgs = {
 	organizationId: string
 	environment: ImproveEnvironmentOption
-	state?: ImproveTestState
-	config?: ImproveConfiguration
-	baseUrl?: string
-	fetchTimeout?: number
+	state?: ImproveTestState | undefined
+	config?: ImproveConfiguration | undefined
+	baseUrl?: string | undefined
+	fetchTimeout?: number | undefined
 	/**
 	 * How many times to retry a failed config fetch before giving up. Only
 	 * transient failures are retried (network errors, timeouts, HTTP 5xx, and
@@ -19,7 +19,7 @@ export type ImproveSetupArgs = {
 	 * Defaults to 2. Set to 0 to disable retries (e.g. in latency-sensitive
 	 * middleware).
 	 */
-	configRetries?: number
+	configRetries?: number | undefined
 	/**
 	 * When set, forwarded to the config fetch as `next: { revalidate }`
 	 * (seconds), so Next.js / edge runtimes cache the config datafile between
@@ -29,19 +29,19 @@ export type ImproveSetupArgs = {
 	 * under load. No effect outside fetch implementations that honor
 	 * `next.revalidate`.
 	 */
-	configRevalidate?: number
+	configRevalidate?: number | undefined
 	/**
 	 * Mirror analytics onto the GTM dataLayer (window.dataLayer) with experiment
 	 * dimensions, so they can drive Google Tag Manager / Google Ads conversions.
 	 * Enabled by default; set to `false` to opt out. No effect server-side.
 	 */
-	dataLayer?: boolean
+	dataLayer?: boolean | undefined
 	/**
 	 * Silence all Improve development warnings (e.g. the nudge when an event name
 	 * isn't `snake_case`). Warnings are on by default to steer teams toward the
 	 * naming convention; set to `true` in production or to opt out entirely.
 	 */
-	disableWarnings?: boolean
+	disableWarnings?: boolean | undefined
 }
 
 export type ImproveFlagOption = {
