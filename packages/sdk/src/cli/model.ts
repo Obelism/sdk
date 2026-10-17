@@ -32,22 +32,10 @@ export type ModelCommandOptions = {
 
 type Call = { status: number; ok: boolean; json: Record<string, unknown> }
 
-// Exit code: 0 done, 1 problems in the plan.
-export const runModelCommand = async ({
-	command,
-	file,
-	url,
-	token,
-	prune,
-	log = console.log,
-	summaryFile,
-	fetch: fetchImpl = fetch,
-}: ModelCommandOptions): Promise<number> => {
-	const call = async (
-		method: string,
-		path: string,
-		body?: unknown,
-	): Promise<Call> => {
+// Calls the management API; anything but JSON back is a CliError.
+export const managementApi =
+	(url: string, token: string, fetchImpl: typeof fetch = fetch) =>
+	async (method: string, path: string, body?: unknown): Promise<Call> => {
 		const response = await fetchImpl(`${url}${MANAGEMENT_PATH}${path}`, {
 			method,
 			headers: {
@@ -71,6 +59,19 @@ export const runModelCommand = async ({
 			)
 		}
 	}
+
+// Exit code: 0 done, 1 problems in the plan.
+export const runModelCommand = async ({
+	command,
+	file,
+	url,
+	token,
+	prune,
+	log = console.log,
+	summaryFile,
+	fetch: fetchImpl = fetch,
+}: ModelCommandOptions): Promise<number> => {
+	const call = managementApi(url, token, fetchImpl)
 
 	if (command === 'pull') {
 		const { ok, json } = await call('GET', '/model')

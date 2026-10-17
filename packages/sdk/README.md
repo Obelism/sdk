@@ -155,6 +155,51 @@ export const POST = createPromptHandler({
 })
 ```
 
+## Webhooks
+
+A webhook tells your site that what the delivery API answers has changed
+(Space settings → Webhooks). Its requests are signed (Standard Webhooks);
+`createWebhookHandler` verifies them and hands you the typed event:
+
+```ts
+// app/api/revalidate/route.ts
+import { revalidatePath, revalidateTag } from 'next/cache'
+import { createWebhookHandler } from '@obelism/content/webhooks'
+
+export const POST = createWebhookHandler({
+	secret: process.env.CONTENT_WEBHOOK_SECRET!, // whsec_…, shown once
+	onEvent: (event, { id }) => {
+		if (event.type === 'entry.published' && event.data.entry.path) {
+			revalidatePath(`/${event.data.entry.path}`)
+		} else {
+			revalidateTag('content')
+		}
+	},
+})
+```
+
+It answers 401 to anything not signed with the secret or with a
+`webhook-timestamp` more than 5 minutes off (`tolerance`, in seconds), 204
+once `onEvent` is done, and 500 when it throws, so the CMS tries again. `id`
+is the delivery's `webhook-id`, the same on every retry.
+
+Elsewhere, `verifyWebhook(request, secret, { tolerance? })` returns the event
+or throws `WebhookVerificationError`. It takes a `Request`, or the raw body
+and headers (`{ body, headers }`; Node's `req.headers` work as they are), the
+body exactly as it was sent:
+
+```ts
+import { verifyWebhook } from '@obelism/content/webhooks'
+
+const event = await verifyWebhook(request, process.env.CONTENT_WEBHOOK_SECRET!)
+```
+
+`WebhookEvent` is a union on `type`: `entry.published`, `entry.unpublished`,
+`entry.deleted` and `entry.moved` (`data.entry`: `{ id, contentType, name,
+path }`, plus `previousPath` when moved), `asset.updated` (`data.asset`,
+`data.entries`), `model.changed` (`data.contentTypes`: `{ apiId, action }`),
+`locales.changed` (`data.defaultLocale`, `data.locales`) and `webhook.test`.
+
 ## Helpers
 
 - `richTextToHtml(doc, { renderEntry?, renderAsset? })`, `richTextToPlainText(doc)`
@@ -211,3 +256,40 @@ npx @obelism/content model apply   # apply it, all or nothing
 
 Options: `--file`, `--url` (or `$CONTENT_URL`), `--prune`. In GitHub Actions
 the plan is also written to the job summary.
+
+### Types
+
+Write a TypeScript type per content type to `content/content-types.ts`:
+
+```bash
+npx @obelism/content types                                    # from the environment
+npx @obelism/content types --file content/content-model.json  # from the model file, no token
+```
+
+Pages and data become `Entry<{ …fields }, 'apiId'>`, blocks
+`Block<{ …fields }, 'apiId'>`, named after the apiId (`blogPost` →
+`BlogPost`), with `ContentEntry` and `ContentBlock` as the unions of them.
+Each field is typed by what the delivery API answers with its defaults (one
+locale, rich text as a document), and `| null` when empty:
+
+| Field                    | Type                                                                 |
+| ------------------------ | -------------------------------------------------------------------- |
+| text, textarea, datetime | `string`                                                             |
+| number / boolean         | `number` / `boolean`                                                 |
+| select                   | the options' values, `'a' \| 'b'` (a list when multiple)             |
+| asset                    | `Asset` (a list when multiple)                                       |
+| reference                | the allowed entry types or their `EntryStub`s (a list when multiple) |
+| blocks                   | a list of the allowed block types and `ImproveBlock`                 |
+| richtext                 | `RichTextDocument`                                                   |
+| json                     | `unknown`                                                            |
+
+A localized field is the one locale's value. Pass the types to the client:
+
+```ts
+import type { BlogPost } from './content/content-types'
+
+const post = await client.getPage<BlogPost>('blog/hello')
+```
+
+Run it again after the model changes, e.g. after `model pull`. Options:
+`--dir` (default `content`), `--file`, `--url`.

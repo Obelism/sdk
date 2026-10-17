@@ -41,12 +41,17 @@ npm run changeset      # Before publishing
     when the editing cookie is set
   - `./prompt`: `createPromptHandler` / `verifyPromptRequest`, for a
     customer's own model behind the space's prompt endpoint
+  - `./webhooks`: `verifyWebhook` / `createWebhookHandler` and the
+    `WebhookEvent` union, typed after the CMS's `payloadFor` callers
+    (`src/server/content/webhooks.ts` there). The Standard Webhooks check is
+    shared with `./prompt` (`standardWebhooks.ts`)
   - bin `content`: `content init` (`cli/init.ts`: pulls the model, writes
     an example per content type from it, `cli/examples.ts`, plus the
     improve block while the organization has improve on, from the
     management API's `/improve`; installs the SDK; `.env.example`) and
     `content model pull|plan|apply` (management API), moved from the CMS's
-    `cli/`. The CMS's `getProjectSetup` MCP tool tells agents to run `init`
+    `cli/`, and `content types` (`cli/typegen.ts`: content-types.ts, a type
+    per content type, from the model). The CMS's `getProjectSetup` MCP tool tells agents to run `init`
   - `pickImproveVariant` / `isImproveBlock` (`improve.ts`): the built-in
     `_improve` block (the CMS's docs/adr/0012)
 - `packages/react-sdk` → `@obelism/content-react`: `ContentBridge`,

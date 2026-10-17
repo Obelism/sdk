@@ -4,9 +4,11 @@ import { parseArgs } from 'node:util'
 import { DEFAULT_URL, normalizeUrl } from '../config'
 import { runInitCommand } from '../cli/init'
 import { CliError, runModelCommand } from '../cli/model'
+import { runTypesCommand } from '../cli/typesCommand'
 
 const USAGE = `Usage: content init [--dir content] [--url origin] [--skip-install]
        content model <pull|plan|apply> [--file path] [--url origin] [--prune]
+       content types [--dir content] [--file path] [--url origin]
 
   init          start a site's repository on the token's environment: the
                 model file, an example per content type, the SDK installed
@@ -14,14 +16,19 @@ const USAGE = `Usage: content init [--dir content] [--url origin] [--skip-instal
   model pull    write the environment's model to the file
   model plan    show what applying the file would change, and what stands in the way
   model apply   apply the file in one transaction, or change nothing
+  types         write content-types.ts: a TypeScript type per content type,
+                from the environment's model (or the model file with --file)
 
-  --dir           where init writes content-model.json and examples/ (default content)
+  --dir           where init writes content-model.json and examples/, and types
+                  content-types.ts (default content)
   --skip-install  init leaves dependencies alone
-  --file          the model file (default content/content-model.json)
+  --file          the model file (default content/content-model.json); types
+                  reads it instead of pulling the model
   --url           the CMS (default $CONTENT_URL, else ${DEFAULT_URL})
   --prune         plan and apply also delete content types the file leaves out
 
-Needs CONTENT_MANAGEMENT_TOKEN: a management token from Space settings.`
+Needs CONTENT_MANAGEMENT_TOKEN: a management token from Space settings
+(not for types --file).`
 
 const main = async () => {
 	let parsed
@@ -29,7 +36,7 @@ const main = async () => {
 		parsed = parseArgs({
 			allowPositionals: true,
 			options: {
-				file: { type: 'string', default: 'content/content-model.json' },
+				file: { type: 'string' },
 				url: { type: 'string' },
 				prune: { type: 'boolean', default: false },
 				dir: { type: 'string', default: 'content' },
@@ -48,18 +55,25 @@ const main = async () => {
 		return 0
 	}
 	const isInit = group === 'init' && command === undefined
+	const isTypes = group === 'types' && command === undefined
 	const modelCommand =
 		group === 'model' &&
 		(command === 'pull' || command === 'plan' || command === 'apply')
 			? command
 			: null
-	if (!isInit && !modelCommand) throw new CliError(USAGE, 2)
+	if (!isInit && !isTypes && !modelCommand) throw new CliError(USAGE, 2)
 
 	const token = process.env.CONTENT_MANAGEMENT_TOKEN
+	const url = normalizeUrl(values.url ?? process.env.CONTENT_URL ?? DEFAULT_URL)
+
+	// With --file, types needs no token.
+	if (isTypes) {
+		return runTypesCommand({ dir: values.dir, file: values.file, url, token })
+	}
+
 	if (!token) {
 		throw new CliError(`CONTENT_MANAGEMENT_TOKEN is not set.\n\n${USAGE}`, 2)
 	}
-	const url = normalizeUrl(values.url ?? process.env.CONTENT_URL ?? DEFAULT_URL)
 
 	if (!modelCommand) {
 		return runInitCommand({
@@ -72,7 +86,7 @@ const main = async () => {
 
 	return runModelCommand({
 		command: modelCommand,
-		file: values.file,
+		file: values.file ?? 'content/content-model.json',
 		url,
 		token,
 		prune: values.prune,
