@@ -214,7 +214,11 @@ const event = await verifyWebhook(request, process.env.CONTENT_WEBHOOK_SECRET!)
 `entry.deleted` and `entry.moved` (`data.entry`: `{ id, contentType, name,
 path, paths }`, plus `previousPath` and `previousPaths` when moved), `asset.updated` (`data.asset`,
 `data.entries`), `model.changed` (`data.contentTypes`: `{ apiId, action }`),
-`locales.changed` (`data.defaultLocale`, `data.locales`) and `webhook.test`.
+`locales.changed` (`data.defaultLocale`, `data.locales`),
+`entry.review_requested` (`data.entry`, `data.revision`, `data.note`) and
+`entry.review_closed` (`data.outcome`: `approved` or `sent_back` with
+`data.reason`) for environments whose publishing is reviewed, and
+`webhook.test`.
 
 ## Click rates
 

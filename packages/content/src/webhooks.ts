@@ -96,6 +96,25 @@ export type LocalesChangedEvent = WebhookEventOf<
 	{ defaultLocale: string; locales: string[] }
 >
 
+// Someone asks for review of an entry's draft revision, in an environment
+// whose publishing is reviewed (only admins publish there).
+export type EntryReviewRequestedEvent = WebhookEventOf<
+	'entry.review_requested',
+	{ entry: WebhookEntry; revision: number; note: string | null }
+>
+
+// A review ends: `approved` (that revision is published) or `sent_back`
+// (with the admin's `reason`).
+export type EntryReviewClosedEvent = WebhookEventOf<
+	'entry.review_closed',
+	{
+		entry: WebhookEntry
+		outcome: 'approved' | 'sent_back'
+		revision: number
+		reason?: string
+	}
+>
+
 // **Send test** in Space settings.
 export type WebhookTestEvent = WebhookEventOf<
 	'webhook.test',
@@ -110,6 +129,8 @@ export type WebhookEvent =
 	| AssetUpdatedEvent
 	| ModelChangedEvent
 	| LocalesChangedEvent
+	| EntryReviewRequestedEvent
+	| EntryReviewClosedEvent
 	| WebhookTestEvent
 
 export type WebhookEventType = WebhookEvent['type']
