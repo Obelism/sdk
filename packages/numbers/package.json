@@ -1,7 +1,7 @@
 {
 	"name": "@obelism/numbers-sdk",
 	"description": "Obelism numbers SDK: page views, events and clicks on tagged elements, sent to numbers.obelism.studio",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"keywords": [
 		"analytics",
 		"events",
