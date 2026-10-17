@@ -1,7 +1,7 @@
 {
 	"name": "@obelism/improve-sdk-next",
 	"description": "Obelism Improve NextJS SDK",
-	"version": "1.1.1",
+	"version": "1.1.2",
 	"keywords": [
 		"ab-tests",
 		"feature-flags",
@@ -57,6 +57,6 @@
 		"vitest": "^5.0.4"
 	},
 	"dependencies": {
-		"@obelism/improve-sdk": "^3.0.0"
+		"@obelism/improve-sdk": "^3.1.1"
 	}
 }

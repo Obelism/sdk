@@ -1,5 +1,13 @@
 # @obelism/improve-sdk-next
 
+## 1.1.2
+
+### Patch Changes
+
+- 77494a2: Strict TypeScript for the improve packages, and what it found: `ImproveServerSDK.getFlagValue` threw for an empty user agent (it now returns the flag's first option, as `getTestValue` returns the default), and for a flag without options when there was no visitor id (now `null`). The middleware leaves a request alone when no test value resolves instead of setting a cookie without one. The setup options and `geo` accept an explicit `undefined` (`exactOptionalPropertyTypes`).
+- Updated dependencies [77494a2]
+  - @obelism/improve-sdk@3.1.1
+
 ## 1.1.1
 
 ### Patch Changes
