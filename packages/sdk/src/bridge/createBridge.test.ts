@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createBridge, wrapScriptBridge } from './createBridge'
+import { createBridge, readStats, wrapScriptBridge } from './createBridge'
 
 const CMS = 'https://content.obelism.studio'
 const entry = { id: 'entry_1', fields: { title: 'Live' } }
@@ -305,5 +305,82 @@ describe('prompts', () => {
 		)
 		expect(document.querySelector('[data-cms-selected]')).toBeNull()
 		bridge.destroy()
+	})
+})
+
+describe('click rates', () => {
+	const STATS = { b_1: { clicks: 37, clickers: 5, viewers: 21, rate: 0.24 } }
+	const overlay = () => document.querySelector('[data-obelism-stats]')
+	const labels = () =>
+		[...(overlay()?.shadowRoot?.querySelectorAll('.badge') ?? [])].map(
+			(badge) => badge.textContent,
+		)
+
+	beforeEach(() => {
+		document.querySelector('[data-cms-uid="b_1"]')!.getBoundingClientRect =
+			() =>
+				({ top: 10, bottom: 60, right: 300, width: 300, height: 50 }) as DOMRect
+	})
+
+	it('keeps the rates and the switch in its state, and shows them on the page', () => {
+		const { win, receive } = frame()
+		const bridge = createBridge(win, CMS)
+		const change = vi.fn()
+		bridge.on('change', change)
+
+		receive(fromEditor('stats', { stats: STATS, visible: true }))
+		expect(bridge.getState()).toMatchObject({
+			stats: STATS,
+			statsVisible: true,
+		})
+		expect(change).toHaveBeenCalled()
+		expect(labels()).toEqual(['24% clicked'])
+
+		receive(fromEditor('stats', { stats: STATS, visible: false }))
+		expect(bridge.getState().statsVisible).toBe(false)
+		expect(labels()).toEqual([])
+
+		bridge.destroy()
+		expect(overlay()).toBeNull()
+	})
+
+	it('shows rates from an editor that sends no switch', () => {
+		const { win, receive } = frame()
+		const bridge = createBridge(win, CMS)
+		receive(fromEditor('stats', { stats: STATS }))
+		expect(bridge.getState().statsVisible).toBe(true)
+		bridge.destroy()
+	})
+
+	it('adds nothing to a page without rates', () => {
+		const { win, receive } = frame()
+		const bridge = createBridge(win, CMS)
+		receive(fromEditor('stats', { stats: {}, visible: true }))
+		expect(overlay()).toBeNull()
+		bridge.destroy()
+	})
+
+	it('selects a block from its label', () => {
+		const { win, parent, receive } = frame()
+		const bridge = createBridge(win, CMS)
+		receive(fromEditor('stats', { stats: STATS, visible: true }))
+		;(overlay()!.shadowRoot!.querySelector('.badge') as HTMLElement).click()
+		expect(parent.postMessage).toHaveBeenCalledWith(
+			{ source: 'obelism-content-bridge', type: 'select', uid: 'b_1' },
+			CMS,
+		)
+		bridge.destroy()
+	})
+
+	it('keeps only well-formed rates', () => {
+		expect(
+			readStats({
+				b_1: STATS.b_1,
+				b_2: { clicks: '3', clickers: 1, viewers: 1, rate: 1 },
+				b_3: null,
+			}),
+		).toEqual(STATS)
+		expect(readStats('nope')).toEqual({})
+		expect(readStats([STATS])).toEqual({})
 	})
 })

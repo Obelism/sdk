@@ -32,7 +32,10 @@ npm run changeset      # Before publishing
     postMessage protocol must stay in step with
     `src/scopes/visualEditor/VisualEditor.tsx` in the CMS; the prompt
     itself runs in the CMS (`src/server/content/promptEdit.ts`,
-    docs/adr/0008 there).
+    docs/adr/0008 there). The click-rate labels (`bridge/statsOverlay.ts`,
+    also plain DOM in a shadow root) show the editor's `stats` message —
+    rates from Obelism numbers per block uid, and its "Show click rates"
+    switch (`visible`) — and are in the state as `stats` / `statsVisible`
   - `./site`: `createSiteEditing` (the `/cms/*` handler: login, callback,
     logout and the bridge's `/cms/api/…`, forwarded with the site token in
     an httpOnly cookie) and `readSiteToken`; editing on the site outside the

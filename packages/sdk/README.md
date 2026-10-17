@@ -200,6 +200,28 @@ path }`, plus `previousPath` when moved), `asset.updated` (`data.asset`,
 `data.entries`), `model.changed` (`data.contentTypes`: `{ apiId, action }`),
 `locales.changed` (`data.defaultLocale`, `data.locales`) and `webhook.test`.
 
+## Click rates
+
+The visual editor can show how often each block is clicked, on the page
+itself: a small label on every block with clicks ("24% clicked"), on or off
+with the editor's **Show click rates on the page** switch. Clicking a label selects its
+block. The rates come from Obelism numbers, so tag a block's clickable
+element with its uid and load numbers' script on the site (see the CMS's
+visual editor guide, "Click rates"):
+
+```tsx
+<a href={block.link} data-numbers-id={block._uid}>
+	{block.label}
+</a>
+```
+
+The bridge draws the labels itself; it needs nothing else from your site.
+For your own UI, the rates and the switch are in the bridge's state:
+
+```ts
+bridge.on('change', ({ stats, statsVisible }) => …) // stats[uid].rate, 0–1
+```
+
 ## Helpers
 
 - `richTextToHtml(doc, { renderEntry?, renderAsset? })`, `richTextToPlainText(doc)`

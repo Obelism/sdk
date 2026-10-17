@@ -18,6 +18,12 @@ export type {
 } from './bridge/createBridge'
 export { INITIAL_STATE } from './bridge/createBridge'
 export { DEFAULT_PROMPT_LABELS, mountPromptBox } from './bridge/promptBox'
+export { DEFAULT_STATS_LABELS, mountStatsOverlay } from './bridge/statsOverlay'
+export type {
+	BlockStats,
+	StatsLabels,
+	StatsOverlay,
+} from './bridge/statsOverlay'
 export type { PromptBoxOptions, PromptLabels } from './bridge/promptBox'
 
 export type BridgeOptions = {

@@ -1,6 +1,11 @@
 import { UID_ATTRIBUTE } from '../editable'
 import { PREVIEW_PARAMS } from '../preview'
 import type { Entry } from '../types'
+import {
+	type BlockStats,
+	mountStatsOverlay,
+	type StatsOverlay,
+} from './statsOverlay'
 
 // The site's half of the visual editor (the CMS's public/bridge.js, as a
 // module). Inside the editor's iframe it outlines blocks, tells the editor
@@ -13,7 +18,7 @@ import type { Entry } from '../types'
 //   'select' | 'prompt' | 'undo', uid?, id?, prompt? }
 // - editor → site: { source: 'obelism-content-editor', type: 'connect' |
 //   'update' | 'select' | 'saved' | 'published' | 'features' |
-//   'promptResult' | 'promptState', … }
+//   'promptResult' | 'promptState' | 'stats', … }
 
 export const BRIDGE_SOURCE = 'obelism-content-bridge'
 export const EDITOR_SOURCE = 'obelism-content-editor'
@@ -57,6 +62,11 @@ export type BridgeState = {
 	// Editing on the site: clicking a block selects it instead of following
 	// it (while the prompt box is open). Always true in the visual editor.
 	selecting: boolean
+	// In the visual editor: the blocks' click rates from Obelism numbers, by
+	// uid, and whether the editor's "Show click rates" switch is on. The
+	// bridge shows them on the page itself; a site can also use them.
+	stats: Readonly<Record<string, BlockStats>>
+	statsVisible: boolean
 }
 
 export type PromptResult = { summary: string }
@@ -130,6 +140,8 @@ export const INITIAL_STATE: BridgeState = {
 	saving: false,
 	publishing: false,
 	selecting: false,
+	stats: {},
+	statsVisible: false,
 }
 
 type Listeners = { [E in BridgeEvent]: Set<BridgeListener<E>> }
@@ -179,6 +191,29 @@ export const INERT_METHODS = {
 	select: () => {},
 	setSelecting: () => {},
 } satisfies Partial<ContentBridge>
+
+const isCount = (value: unknown): value is number =>
+	typeof value === 'number' && Number.isFinite(value) && value >= 0
+
+// The editor's `stats`, keeping only well-formed entries.
+export const readStats = (value: unknown): Record<string, BlockStats> => {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+	const stats: Record<string, BlockStats> = {}
+	for (const [uid, block] of Object.entries(value)) {
+		const { clicks, clickers, viewers, rate } = (block ?? {}) as Record<
+			string,
+			unknown
+		>
+		if (
+			isCount(clicks) &&
+			isCount(clickers) &&
+			isCount(viewers) &&
+			isCount(rate)
+		)
+			stats[uid] = { clicks, clickers, viewers, rate }
+	}
+	return stats
+}
 
 // The selector of the element marked with a block's uid.
 export const blockSelector = (uid: string) =>
@@ -294,6 +329,18 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 		highlight(uid, false)
 		send('select', { uid })
 	}
+
+	// Mounted with the first rates, so pages without numbers never get it.
+	let overlay: StatsOverlay | null = null
+	const showStats = () => {
+		if (!overlay && !Object.keys(state.stats).length) return
+		overlay ??= mountStatsOverlay(win, {
+			selector: blockSelector,
+			onSelect: (uid) => bridge.select(uid),
+		})
+		overlay.update(state.stats, state.statsVisible)
+	}
+	cleanup.push(() => overlay?.destroy())
 	cleanup.push(() => {
 		for (const id of pending.keys()) {
 			settle(id)?.reject(new Error('The bridge was destroyed'))
@@ -314,6 +361,8 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 			summary?: unknown
 			error?: unknown
 			canUndo?: unknown
+			stats?: unknown
+			visible?: unknown
 		} | null
 		if (!data || data.source !== EDITOR_SOURCE) return
 
@@ -328,6 +377,7 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 			})
 			// Re-apply the selection to whatever the site rendered.
 			win.requestAnimationFrame(() => highlight(data.selectedUid, false))
+			overlay?.refresh()
 		} else if (data.type === 'select') {
 			highlight(data.uid, true)
 		} else if (data.type === 'saved' || data.type === 'published') {
@@ -339,6 +389,13 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 					(feature): feature is string => typeof feature === 'string',
 				),
 			})
+		} else if (data.type === 'stats') {
+			// An editor from before the switch sends no `visible`: show them.
+			setState({
+				stats: readStats(data.stats),
+				statsVisible: data.visible !== false,
+			})
+			showStats()
 		} else if (data.type === 'promptState') {
 			setState({ canUndo: data.canUndo === true })
 		} else if (data.type === 'promptResult' && typeof data.id === 'string') {
