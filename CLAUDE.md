@@ -28,9 +28,10 @@ npx turbo run build lint test:ci --filter=@obelism/improve-sdk...   # one packag
 - `packages/content` → `@obelism/content`, `packages/content-react` →
   `@obelism/content-react`
 - `packages/typescript-config` (private): `base.json` and
-  `react-library.json`, strict, for numbers and Content; `improve.json` and
-  `improve-react-library.json` keep improve's old settings
-  (`strictNullChecks` off) until its code is made strict
+  `react-library.json`, strict (`noUncheckedIndexedAccess`,
+  `exactOptionalPropertyTypes`), for every package and example. Public option
+  types say `| undefined` on optional fields, so callers on
+  `exactOptionalPropertyTypes` can pass one through
 - `examples/improve-*` (each deployed by its own Vercel project, on `main`
   only, `vercel.json`) and `examples/content-nextjs`
 
@@ -147,7 +148,7 @@ numbers and Content also build one script tag each with Rollup.
 ## Code Style
 
 Prettier: single quotes, tabs, no semicolons, trailing commas. oxlint. Strict
-TypeScript (improve: see Layout).
+TypeScript everywhere.
 
 ## Versioning & Publishing
 

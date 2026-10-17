@@ -124,7 +124,7 @@ test('forwards configRevalidate as the Next.js next.revalidate option', async ()
 	const sdk = setup({ configRevalidate: 30 })
 	await sdk._fetchConfig()
 
-	const [, options] = fetchMock.mock.calls[0]
+	const [, options] = fetchMock.mock.calls[0]!
 	expect(options.next).toEqual({ revalidate: 30 })
 })
 
@@ -135,7 +135,7 @@ test('omits next when configRevalidate is not set', async () => {
 	const sdk = setup()
 	await sdk._fetchConfig()
 
-	const [, options] = fetchMock.mock.calls[0]
+	const [, options] = fetchMock.mock.calls[0]!
 	expect(options.next).toBeUndefined()
 })
 

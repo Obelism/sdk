@@ -6,10 +6,12 @@ import { ImproveConfiguration, ImproveSetupArgs } from './types'
 
 const DEFAULT_MAX_VISITORS = 10_000
 
+type Visitor = ParsedUserAgent & {
+	[testSlug: string]: string
+}
+
 type VisitorData = {
-	[userAgent: string]: ParsedUserAgent & {
-		[testSlug: string]: string
-	}
+	[userAgent: string]: Visitor
 }
 
 type ImproveServerSetupArgs =
@@ -48,7 +50,9 @@ export class ImproveServerSDK extends BaseImproveSDK {
 
 	getTestConfig = (testSlug: string) => this.config?.tests?.[testSlug]
 
-	#getVisitor = (visitorId: string, userAgent: string) => {
+	// The visitor as seen with this user agent, or null when it can't be
+	// parsed (an empty user agent), which gets the default like a holdout.
+	#getVisitor = (visitorId: string, userAgent: string): Visitor | null => {
 		let visitor = this.#visitors.get(visitorId)
 		if (visitor) {
 			// Move to end for LRU freshness
@@ -63,8 +67,10 @@ export class ImproveServerSDK extends BaseImproveSDK {
 			visitor = {}
 			this.#visitors.set(visitorId, visitor)
 		}
-		visitor[userAgent] = visitor[userAgent] || parseUserAgent(userAgent)
-		return visitor
+		const parsed = visitor[userAgent] || parseUserAgent(userAgent)
+		if (!parsed) return null
+		visitor[userAgent] = parsed
+		return parsed
 	}
 
 	getFlagValue = (
@@ -73,34 +79,34 @@ export class ImproveServerSDK extends BaseImproveSDK {
 		userAgent: string,
 		// Coarse geo from the request (SSR/middleware), so audiences can target by
 		// country. The browser can't determine this, so it's passed in here.
-		geo?: { country?: string },
+		geo?: { country?: string | undefined },
 	) => {
 		const flagConfig = this.getFlagConfig(flagSlug)
 
 		if (!flagConfig || !this.config) return null
-		if (!visitorId) return flagConfig.options[0].slug
+
+		const defaultValue = flagConfig.options[0]?.slug ?? null
+		if (!visitorId) return defaultValue
 
 		const visitor = this.#getVisitor(visitorId, userAgent)
-		if (geo?.country && visitor[userAgent]) {
-			visitor[userAgent].country = geo.country
-		}
+		if (!visitor) return defaultValue
+		if (geo?.country) visitor.country = geo.country
 
-		if (visitor[userAgent]?.[flagSlug]) {
-			return visitor[userAgent][flagSlug]
-		}
+		const assigned = visitor[flagSlug]
+		if (assigned) return assigned
 
 		const visitorMatchesAudience = getVisitorMatchesAudience(
 			this.config.audience[flagConfig.audience],
-			visitor[userAgent],
+			visitor,
 		)
 
-		if (!visitorMatchesAudience) return flagConfig.options[0].slug
+		if (!visitorMatchesAudience) return defaultValue
 
 		const flagValue = getRandomTestValue(flagConfig.options)
 
 		if (!flagValue) return null
 
-		visitor[userAgent][flagSlug] = flagValue
+		visitor[flagSlug] = flagValue
 		return flagValue
 	}
 
@@ -110,7 +116,7 @@ export class ImproveServerSDK extends BaseImproveSDK {
 		userAgent: string,
 		// Coarse geo from the request (SSR/middleware), so audiences can target by
 		// country. The browser can't determine this, so it's passed in here.
-		geo?: { country?: string },
+		geo?: { country?: string | undefined },
 	) => {
 		const testConfig = this.getTestConfig(testSlug)
 
@@ -119,17 +125,15 @@ export class ImproveServerSDK extends BaseImproveSDK {
 		if (!visitorId || !userAgent) return testConfig.defaultValue
 
 		const visitor = this.#getVisitor(visitorId, userAgent)
-		if (geo?.country && visitor[userAgent]) {
-			visitor[userAgent].country = geo.country
-		}
+		if (!visitor) return testConfig.defaultValue
+		if (geo?.country) visitor.country = geo.country
 
-		if (visitor[userAgent]?.[testSlug]) {
-			return visitor[userAgent][testSlug]
-		}
+		const assigned = visitor[testSlug]
+		if (assigned) return assigned
 
 		const visitorMatchesAudience = getVisitorMatchesAudience(
 			this.config.audience[testConfig.audience],
-			visitor[userAgent],
+			visitor,
 		)
 
 		if (!visitorMatchesAudience) return testConfig.defaultValue
@@ -138,15 +142,15 @@ export class ImproveServerSDK extends BaseImproveSDK {
 			testConfig.allocation < 100 &&
 			Math.random() * 100 > testConfig.allocation
 		) {
-			visitor[userAgent][testSlug] = testConfig.defaultValue
-			return visitor[userAgent][testSlug]
+			visitor[testSlug] = testConfig.defaultValue
+			return testConfig.defaultValue
 		}
 
 		const testValue = getRandomTestValue(testConfig.options)
 
 		if (!testValue) return null
 
-		visitor[userAgent][testSlug] = testValue
+		visitor[testSlug] = testValue
 		return testValue
 	}
 }

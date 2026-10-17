@@ -27,12 +27,16 @@ const REASON_MESSAGES: Record<ImproveFetchErrorReason, string> = {
  */
 export class ImproveFetchError extends Error {
 	reason: ImproveFetchErrorReason
-	status?: number
-	retryAfterMs?: number
+	status?: number | undefined
+	retryAfterMs?: number | undefined
 
 	constructor(
 		reason: ImproveFetchErrorReason,
-		options?: { status?: number; retryAfterMs?: number; cause?: unknown },
+		options?: {
+			status?: number | undefined
+			retryAfterMs?: number | undefined
+			cause?: unknown
+		},
 	) {
 		super(REASON_MESSAGES[reason])
 		this.name = 'ImproveFetchError'

@@ -98,3 +98,40 @@ test('200 runs with 100 different visitor IDS', () => {
 
 	expect(outcomeCount).toStrictEqual(secondRunCount)
 })
+
+const FLAG_CONFIG: ImproveConfiguration = {
+	...TEST_CONFIG,
+	flags: {
+		'new-checkout': {
+			id: 'flag_1',
+			name: 'New checkout',
+			audience: '',
+			options: [
+				{ name: 'Off', slug: 'off', value: 'off', split: 0 },
+				{ name: 'On', slug: 'on', value: 'on', split: 100 },
+			],
+		},
+		'no-options': { id: 'flag_2', name: 'Empty', audience: '', options: [] },
+	},
+}
+
+test('getFlagValue without a user agent returns the first option, like getTestValue', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: FLAG_CONFIG,
+	})
+	expect(sdk.getFlagValue('new-checkout', 'visi_1', '')).toBe('off')
+	expect(sdk.getTestValue('startpage-visual', 'visi_1', '')).toBe('control')
+})
+
+test('getFlagValue assigns, keeps the assignment and returns null for a flag without options', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: FLAG_CONFIG,
+	})
+	expect(sdk.getFlagValue('new-checkout', 'visi_1', UA)).toBe('on')
+	expect(sdk.getFlagValue('new-checkout', 'visi_1', UA)).toBe('on')
+	expect(sdk.getFlagValue('no-options', 'visi_1', UA)).toBeNull()
+})
