@@ -26,6 +26,15 @@ await content.getEntry('entry_…') //         Entry | null
 await content.getEntries({ contentType: 'post', limit: 20, skip: 0 }) // { items, total, limit, skip }
 for await (const post of content.getAllEntries({ contentType: 'post' })) {
 }
+await content.getFirstEntry({
+	contentType: 'navigation',
+	fields: { key: 'main' },
+}) // Entry | null
+await content.getEntries({
+	contentType: 'post',
+	fields: { category: 'news', 'date[gte]': '2026-01-01', tags: ['a', 'b'] }, // a list: one of them
+	order: '-fields.date',
+})
 await content.getContentModel() //          the model file
 ```
 

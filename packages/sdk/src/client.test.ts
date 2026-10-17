@@ -132,6 +132,48 @@ describe('ContentClient', () => {
 		})
 	})
 
+	it('sends field filters and the order', async () => {
+		const fetchMock = respond({ items: [], total: 0, limit: 20, skip: 0 })
+		await new ContentClient({ token: 't', fetch: fetchMock }).getEntries({
+			contentType: 'post',
+			fields: {
+				category: 'news',
+				'rating[gte]': 4,
+				featured: true,
+				tags: ['a', 'b'],
+				'author[ne]': 'entry_1',
+			},
+			order: '-fields.date',
+		})
+		expect(
+			Object.fromEntries(requested(fetchMock).url.searchParams),
+		).toMatchObject({
+			contentType: 'post',
+			'fields.category': 'news',
+			'fields.rating[gte]': '4',
+			'fields.featured': 'true',
+			'fields.tags[in]': 'a,b',
+			'fields.author[ne]': 'entry_1',
+			order: '-fields.date',
+		})
+	})
+
+	it('finds the first entry of a query, or null', async () => {
+		const found = respond({ items: [entry], total: 3, limit: 1, skip: 0 })
+		await expect(
+			new ContentClient({ token: 't', fetch: found }).getFirstEntry({
+				contentType: 'navigation',
+				fields: { key: 'main' },
+			}),
+		).resolves.toEqual(entry)
+		expect(requested(found).url.searchParams.get('limit')).toBe('1')
+
+		const none = respond({ items: [], total: 0, limit: 1, skip: 0 })
+		await expect(
+			new ContentClient({ token: 't', fetch: none }).getFirstEntry(),
+		).resolves.toBeNull()
+	})
+
 	it('asks for the root with an empty parentPath', async () => {
 		const fetchMock = respond({ items: [], total: 0, limit: 20, skip: 0 })
 		await new ContentClient({ token: 't', fetch: fetchMock }).getEntries({

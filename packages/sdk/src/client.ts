@@ -37,14 +37,35 @@ export type RequestOptions = {
 	init?: RequestInit | undefined
 }
 
+export type FieldFilterValue = string | number | boolean
+
 export type EntriesQuery = RequestOptions & {
 	contentType?: string | undefined
 	// Only direct children of the entry at this path; '' for the root.
 	parentPath?: string | undefined
+	// Filters on `contentType`'s fields, keyed by apiId with an optional
+	// operator: `{ category: 'news', 'rating[gte]': 4, tags: ['a', 'b'] }`.
+	// A list means one of them (`[in]`). Operators: ne, in, gt, gte, lt, lte,
+	// exists (https://content.obelism.studio/docs/api/delivery).
+	fields?:
+		Record<string, FieldFilterValue | readonly FieldFilterValue[]> | undefined
+	// `publishedAt`, `firstPublishedAt`, `updatedAt`, `name`, `path` or
+	// `fields.<apiId>`, `-` first for descending. Default: the tree's order.
+	order?: string | undefined
 	// 1–100, the API's default is 20.
 	limit?: number | undefined
 	skip?: number | undefined
 }
+
+// `fields` as the API's `fields.<apiId>[op]` parameters.
+const fieldParams = (fields: EntriesQuery['fields']) =>
+	Object.fromEntries(
+		Object.entries(fields ?? {}).map(([key, value]) => {
+			if (!Array.isArray(value)) return [`fields.${key}`, String(value)]
+			const name = key.includes('[') ? key : `${key}[in]`
+			return [`fields.${name}`, value.join(',')]
+		}),
+	)
 
 const trimSlashes = (path: string) => path.replace(/^\/+|\/+$/g, '')
 
@@ -115,6 +136,8 @@ export class ContentClient {
 	getEntries = <TEntry extends Entry = Entry>({
 		contentType,
 		parentPath,
+		fields,
+		order,
 		limit,
 		skip,
 		...options
@@ -125,11 +148,22 @@ export class ContentClient {
 				contentType,
 				parentPath:
 					parentPath === undefined ? undefined : trimSlashes(parentPath),
+				...fieldParams(fields),
+				order,
 				limit,
 				skip,
 			},
 			options,
 		) as Promise<EntryList<TEntry>>
+
+	// The first entry matching the query, or null: a settings entry, or a
+	// navigation by its key, without its id.
+	//
+	//   await content.getFirstEntry({ contentType: 'navigation', fields: { key: 'main' } })
+	getFirstEntry = async <TEntry extends Entry = Entry>(
+		query: Omit<EntriesQuery, 'limit' | 'skip'> = {},
+	): Promise<TEntry | null> =>
+		(await this.getEntries<TEntry>({ ...query, limit: 1 })).items[0] ?? null
 
 	// Every entry matching the query, fetching pages of `limit` (default 100)
 	// as it goes.
