@@ -10,7 +10,7 @@
 		"clean": "rm -rf node_modules && rm -rf .next && rm -rf .turbo"
 	},
 	"dependencies": {
-		"@obelism/improve-sdk-next": "^1.0.0",
+		"@obelism/improve-sdk-next": "^1.1.2",
 		"@obelism/improve-sdk-react": "^1.0.0",
 		"@vercel/edge-config": "^1.4.3",
 		"next": "^16.2.10",
