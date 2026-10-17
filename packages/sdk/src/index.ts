@@ -22,4 +22,10 @@ export {
 	SAFE_HREF,
 } from './richText'
 export type { RichTextHtmlOptions } from './richText'
+export { alternateLinks, sitemapXml } from './sitemap'
+export type {
+	AlternateLink,
+	LocalizedUrlOptions,
+	SitemapOptions,
+} from './sitemap'
 export type * from './types'

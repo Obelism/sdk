@@ -241,7 +241,27 @@ bridge.on('change', ({ stats, statsVisible }) => …) // stats[uid].rate, 0–1
 ## Helpers
 
 - `richTextToHtml(doc, { renderEntry?, renderAsset? })`, `richTextToPlainText(doc)`
-- `imageUrl(asset, { w, h, fit, format, q })`, `imageSrcSet(asset, [480, 960])`
+- `imageUrl(asset, { w, h, fit, format, q, focus })`, `imageSrcSet(asset, [480, 960])`:
+  with `fit: 'cover'` or `'crop'` the crop keeps the asset's `focalPoint` (set
+  in the CMS under Media) in view, or the `focus` you pass (`{ x, y }` or
+  `'auto'`)
+- `alternateLinks(entry, { url, defaultLocale })`: every locale's URL of a page
+  (`entry.paths`), plus `x-default`, for `<link rel="alternate" hreflang>`
+- `sitemapXml(entries, { url, defaultLocale, exclude? })`: a sitemap with one
+  `<url>` per page and locale and its alternates; pages with "Hide from search
+  engines" (`fields.noIndex`) are left out. `url(path, locale)` decides where
+  a locale's path lives on your site:
+
+```ts
+const pages = []
+for await (const page of content.getAllEntries({ contentType: 'page' })) {
+	pages.push(page)
+}
+const xml = sitemapXml(pages, {
+	url: (path, locale) => `https://example.com/${locale}/${path}`,
+	defaultLocale: 'en',
+})
+```
 
 ## A/B tests and feature flags
 

@@ -20,6 +20,9 @@ export type Asset = {
 	height: number | null
 	title: string | Record<string, string> | null
 	alt: string | Record<string, string> | null
+	// Where crops should keep the image, fractions from the top left; null
+	// when not set. imageUrl passes it on for `cover` and `crop`.
+	focalPoint: { x: number; y: number } | null
 }
 
 // A page or data entry. Every field of its content type is present in

@@ -53,6 +53,7 @@ const exampleAsset = (mimeTypes: string[] | undefined): Asset => {
 		height: image ? 900 : null,
 		title: null,
 		alt: image ? 'An example image' : null,
+		focalPoint: null,
 	}
 }
 
