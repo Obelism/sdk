@@ -17,6 +17,6 @@
 		"typescript": "^7.0.2"
 	},
 	"dependencies": {
-		"@obelism/improve-sdk": "^3.0.0"
+		"@obelism/improve-sdk": "^3.1.0"
 	}
 }
