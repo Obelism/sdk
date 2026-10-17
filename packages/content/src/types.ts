@@ -134,19 +134,56 @@ type BaseField = {
 
 export type FieldDefinition = BaseField &
 	(
-		| { type: 'text'; minLength?: number; maxLength?: number; pattern?: string }
-		| { type: 'textarea'; minLength?: number; maxLength?: number }
+		| {
+				type: 'text'
+				minLength?: number
+				maxLength?: number
+				pattern?: string
+				// Checked on save; the value stays a string.
+				format?: 'url' | 'email' | 'color' | 'slug'
+				// No two published entries of the type share a value.
+				unique?: boolean
+				defaultValue?: string
+		  }
+		| {
+				type: 'textarea'
+				minLength?: number
+				maxLength?: number
+				pattern?: string
+				defaultValue?: string
+		  }
 		| { type: 'richtext' }
-		| { type: 'number'; integer?: boolean; min?: number; max?: number }
-		| { type: 'boolean' }
+		| {
+				type: 'number'
+				integer?: boolean
+				min?: number
+				max?: number
+				unique?: boolean
+				defaultValue?: number
+		  }
+		| { type: 'boolean'; defaultValue?: boolean }
 		| { type: 'datetime'; withTime?: boolean }
 		| {
 				type: 'select'
 				multiple?: boolean
 				options: { value: string; label: string }[]
+				defaultValue?: string | string[]
 		  }
-		| { type: 'asset'; multiple?: boolean; mimeTypes?: string[] }
-		| { type: 'reference'; multiple?: boolean; contentTypes?: string[] }
+		| {
+				type: 'asset'
+				multiple?: boolean
+				mimeTypes?: string[]
+				// How many a `multiple` field holds.
+				min?: number
+				max?: number
+		  }
+		| {
+				type: 'reference'
+				multiple?: boolean
+				contentTypes?: string[]
+				min?: number
+				max?: number
+		  }
 		| {
 				type: 'blocks'
 				allowedBlocks?: string[]
