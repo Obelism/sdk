@@ -1,0 +1,61 @@
+{
+	"name": "@obelism/improve-sdk-next",
+	"description": "Obelism Improve NextJS SDK",
+	"version": "1.1.1",
+	"keywords": [
+		"ab-tests",
+		"feature-flags",
+		"typescript",
+		"improve",
+		"react",
+		"nextjs"
+	],
+	"license": "MIT",
+	"author": "Obelism <hello@obelism.studio> (https://www.obelism.studio)",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Obelism/improve-sdk",
+		"directory": "packages/next-sdk"
+	},
+	"sideEffects": false,
+	"files": [
+		"dist"
+	],
+	"exports": {
+		"import": {
+			"types": "./dist/index.d.mts",
+			"default": "./dist/index.mjs"
+		},
+		"require": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "bunchee -m",
+		"dev": "bunchee --watch --no-clean",
+		"test": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"test:ci": "vitest run",
+		"lint": "npm-run-all --parallel lint:*",
+		"lint:fix": "eslint --fix",
+		"lint:types": "tsc --noEmit",
+		"clean": "rm -rf ./node_modules && rm -rf ./dist && rm -rf ./.turbo"
+	},
+	"peerDependencies": {
+		"next": ">=14.0.0",
+		"react": ">=18.0.0"
+	},
+	"devDependencies": {
+		"@obelism/improve-sdk-eslint-config": "^0.0.0",
+		"@obelism/improve-sdk-typescript-config": "^0.0.0",
+		"@types/react": "^19.2.17",
+		"bunchee": "^6.11.0",
+		"eslint": "^10.6.0",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.9"
+	},
+	"dependencies": {
+		"@obelism/improve-sdk": "^3.0.0"
+	}
+}
