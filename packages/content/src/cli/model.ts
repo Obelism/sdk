@@ -25,6 +25,9 @@ export type ModelCommandOptions = {
 	url: string
 	token: string
 	prune: boolean
+	// apply only: mark the environment's model as managed in code (read-only
+	// in the dashboard), or give it back to the dashboard. Left out: as is.
+	lock?: boolean | undefined
 	log?: (message: string) => void
 	summaryFile?: string | undefined
 	fetch?: typeof fetch
@@ -67,6 +70,7 @@ export const runModelCommand = async ({
 	url,
 	token,
 	prune,
+	lock,
 	log = console.log,
 	summaryFile,
 	fetch: fetchImpl = fetch,
@@ -103,7 +107,11 @@ export const runModelCommand = async ({
 	const { ok, status, json } = await call(
 		'POST',
 		command === 'plan' ? '/model/plan' : '/model/apply',
-		{ model, prune },
+		{
+			model,
+			prune,
+			...(command === 'apply' && lock !== undefined && { lock }),
+		},
 	)
 	// A plan with issues, or an apply refused for them, still has the plan.
 	const plan = json.changes || json.issues ? (json as ModelPlan) : null
@@ -112,6 +120,13 @@ export const runModelCommand = async ({
 
 	const applied = command === 'apply' && ok
 	log(formatPlan(plan, { applied }))
+	if (applied && lock !== undefined) {
+		log(
+			lock
+				? 'The model is now managed in code: read-only in the dashboard.'
+				: 'The model can be changed in the dashboard again.',
+		)
+	}
 	if (summaryFile) {
 		await appendFile(
 			summaryFile,

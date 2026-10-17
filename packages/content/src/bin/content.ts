@@ -8,6 +8,7 @@ import { runTypesCommand } from '../cli/typesCommand'
 
 const USAGE = `Usage: content init [--dir content] [--url origin] [--skip-install]
        content model <pull|plan|apply> [--file path] [--url origin] [--prune]
+                     [--lock | --unlock]
        content types [--dir content] [--file path] [--url origin]
 
   init          start a site's repository on the token's environment: the
@@ -26,6 +27,9 @@ const USAGE = `Usage: content init [--dir content] [--url origin] [--skip-instal
                   reads it instead of pulling the model
   --url           the CMS (default $CONTENT_URL, else ${DEFAULT_URL})
   --prune         plan and apply also delete content types the file leaves out
+  --lock          apply also marks the environment's model as managed in code:
+                  read-only in the dashboard, the agent API and MCP
+  --unlock        apply also gives the model back to the dashboard
 
 Needs CONTENT_MANAGEMENT_TOKEN: a management token from Space settings
 (not for types --file).`
@@ -39,6 +43,8 @@ const main = async () => {
 				file: { type: 'string' },
 				url: { type: 'string' },
 				prune: { type: 'boolean', default: false },
+				lock: { type: 'boolean', default: false },
+				unlock: { type: 'boolean', default: false },
 				dir: { type: 'string', default: 'content' },
 				'skip-install': { type: 'boolean', default: false },
 				help: { type: 'boolean', short: 'h', default: false },
@@ -84,12 +90,23 @@ const main = async () => {
 		})
 	}
 
+	if (values.lock && values.unlock) {
+		throw new CliError(`Use --lock or --unlock, not both.\n\n${USAGE}`, 2)
+	}
+	if ((values.lock || values.unlock) && modelCommand !== 'apply') {
+		throw new CliError(
+			`--lock and --unlock go with model apply.\n\n${USAGE}`,
+			2,
+		)
+	}
+
 	return runModelCommand({
 		command: modelCommand,
 		file: values.file ?? 'content/content-model.json',
 		url,
 		token,
 		prune: values.prune,
+		lock: values.lock ? true : values.unlock ? false : undefined,
 		summaryFile: process.env.GITHUB_STEP_SUMMARY || undefined,
 	})
 }

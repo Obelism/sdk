@@ -316,7 +316,9 @@ npx @obelism/content model plan    # what applying would change
 npx @obelism/content model apply   # apply it, all or nothing
 ```
 
-Options: `--file`, `--url` (or `$CONTENT_URL`), `--prune`. In GitHub Actions
+Options: `--file`, `--url` (or `$CONTENT_URL`), `--prune`, and for `apply`
+`--lock` (the environment's model becomes managed in code: read-only in the
+dashboard, the agent API and MCP) or `--unlock`. In GitHub Actions
 the plan is also written to the job summary.
 
 ### Types
