@@ -1,5 +1,11 @@
 # @obelism/content
 
+## 0.11.0
+
+### Minor Changes
+
+- 8c45c13: `content model apply --lock` marks the environment's content model as managed in code (read-only in the dashboard, the agent API and MCP), and `--unlock` gives it back. The lock is only set when the file applies.
+
 ## 0.10.0
 
 ### Minor Changes
