@@ -1,0 +1,9 @@
+{
+	"$schema": "https://json.schemastore.org/tsconfig",
+	"display": "improve (not yet strict)",
+	"extends": "./base.json",
+	"compilerOptions": {
+		"strictNullChecks": false,
+		"exactOptionalPropertyTypes": false
+	}
+}

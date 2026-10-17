@@ -208,3 +208,6 @@ export type ImproveConfiguration = {
 	tests: ImproveTests
 	audience: ImproveAudience
 }
+
+// The base class both SDKs extend, so its type has a public name.
+export type { BaseImproveSDK } from './base'

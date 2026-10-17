@@ -13,7 +13,8 @@
 	"author": "Obelism <hello@obelism.studio> (https://www.obelism.studio)",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Obelism/content-sdk"
+		"url": "https://github.com/Obelism/sdk",
+		"directory": "packages/content"
 	},
 	"sideEffects": false,
 	"files": [
@@ -86,7 +87,7 @@
 		"clean": "rm -rf ./node_modules && rm -rf ./dist && rm -rf ./.turbo"
 	},
 	"devDependencies": {
-		"@obelism/content-typescript-config": "^0.0.0",
+		"@obelism/sdk-typescript-config": "^0.0.0",
 		"@rollup/plugin-node-resolve": "^16.0.3",
 		"@types/node": "^24.0.0",
 		"@typescript/typescript6": "^6.0.2",

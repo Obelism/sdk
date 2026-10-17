@@ -1,5 +1,5 @@
 {
-	"extends": "@obelism/improve-sdk-typescript-config/base.json",
+	"extends": "@obelism/sdk-typescript-config/improve.json",
 	"compilerOptions": {
 		"outDir": "dist"
 	},

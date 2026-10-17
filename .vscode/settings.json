@@ -1,0 +1,8 @@
+{
+	"editor.formatOnSave": true,
+	"editor.defaultFormatter": "esbenp.prettier-vscode",
+	"search.exclude": {
+		"package-lock.json": true,
+		"node_modules": true
+	}
+}

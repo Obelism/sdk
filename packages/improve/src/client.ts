@@ -1,23 +1,20 @@
+import {
+	createNumbers,
+	DEFAULT_ENDPOINT,
+	type EventBeacon,
+	type ExposureBeacon,
+	type NumbersClient,
+} from '@obelism/numbers-sdk'
+
 import { ParsedUserAgent, parseUserAgent } from './utils/parseUserAgent'
 import { getVisitorMatchesAudience } from './utils/getVisitorMatchesAudience'
 import { getRandomTestValue } from './utils/getRandomTestValue'
 import { BaseImproveSDK } from './base'
 import { getCookie, setCookie } from './utils/clientCookie'
-import {
-	ANALYTIC_RATE_LIMIT_COOLDOWN_MS,
-	MAX_ANALYTIC_BODY_BYTES,
-	MAX_ANALYTIC_FIELD_LENGTH,
-	MAX_CURRENCY_FIELD_LENGTH,
-} from './config/constants'
-import { ANALYTICS_PATH, BASE_URL } from './config/urls'
-import { getScreenSize } from './utils/getScreenSize'
-import { isSnakeCaseEventName } from './utils/isSnakeCaseEventName'
+import { ANALYTICS_PATH } from './config/urls'
 import { pushDataLayer, resetDataLayerEcommerce } from './utils/pushDataLayer'
-import { parseRetryAfterMs } from './utils/retry'
-import { truncate } from './utils/truncate'
 import {
 	ImproveAnalyticPayload,
-	ImproveEnvironmentOption,
 	ImproveEventName,
 	ImproveSetupArgs,
 } from './types'
@@ -26,48 +23,19 @@ type Visitor = ParsedUserAgent & {
 	[testSlug: string]: string
 }
 
-// Fields common to every beacon, regardless of type.
-type BeaconCommon<T extends 'event' | 'exposure'> = {
-	type: T
-	organizationId: string
-	environment: ImproveEnvironmentOption
-
-	visitorId: string
-
-	pointer: string
-	device: string
-	screen: string
-	browser: string
-	os: string
-	visitor: string
-}
-
 /**
  * A real-world tracked event. Test-independent — the server attributes it to a
- * test/flag at read time by joining the visitor's exposures.
+ * test/flag at read time by joining the visitor's exposures. Sent through the
+ * numbers SDK (`@obelism/numbers-sdk`), which adds the page's path and UTM tags.
  */
-export type CreateEvent = BeaconCommon<'event'> & {
-	event: string
-	scope: string
-
-	/** GA4-aligned numeric value aggregated into revenue / AOV per variant. */
-	value?: number
-	/** ISO 4217 currency for `value`. */
-	currency?: string
-	/** Extra event params stored as JSON (e.g. a GA4 `ecommerce` object). */
-	params?: Record<string, unknown>
-}
+export type CreateEvent = EventBeacon
 
 /**
  * A visitor's assignment to a test/flag variant, emitted the first time the SDK
  * resolves a non-holdout value for them. The per-variant exposure count is the
  * denominator for results.
  */
-export type CreateExposure = BeaconCommon<'exposure'> & {
-	subjectKind: 'test' | 'flag'
-	subjectId: string
-	variant: string
-}
+export type CreateExposure = ExposureBeacon
 
 // Events already sent this instance, keyed by event name (or `event:dedupeKey`
 // when the caller passes one), so each fires at most once per page/session.
@@ -75,33 +43,20 @@ type TrackedEvents = {
 	[event: string]: boolean
 }
 
-// Exposures already sent this instance, keyed by `${subjectKind}:${subjectId}`.
-type TrackedExposures = {
-	[subject: string]: boolean
-}
-
 export class ImproveClientSDK extends BaseImproveSDK {
 	#visitor: Visitor | undefined
-	#visitorRecurring: boolean = false
-
 	#visitorId: string = ''
 
 	#analytics: TrackedEvents = {}
 
-	#exposures: TrackedExposures = {}
-
-	// Epoch ms until which analytics posting is suspended after a 429.
-	#rateLimitedUntil: number = 0
-
-	// Event names already warned about, so the snake_case nudge fires once per
-	// offending name instead of on every call.
-	#warnedEventNames = new Set<string>()
+	// Events and exposures go to Obelism numbers through its SDK, which keeps
+	// the visitor cookie, the device categories, the page context, the size
+	// and field limits, and backs off after a 429.
+	#numbers: NumbersClient
 
 	// Fires the missing-scope warning at most once per SDK instance, not once
 	// per call — a caller that forgets `scope` is likely forgetting it everywhere.
 	#warnedMissingScope = false
-
-	#analyticsUrl = `${BASE_URL}${ANALYTICS_PATH}`
 
 	#dataLayerEnabled: boolean = true
 
@@ -109,19 +64,27 @@ export class ImproveClientSDK extends BaseImproveSDK {
 
 	constructor(args: ImproveSetupArgs) {
 		super(args)
-		this.#analyticsUrl = `${this._baseUrl}${ANALYTICS_PATH}`
+		this.#numbers = createNumbers({
+			organizationId: this.organizationId,
+			environment: this.environment,
+			// numbers takes the events; a custom `baseUrl` (e.g. a local Improve)
+			// keeps getting them at its own /api/log.
+			endpoint: args.baseUrl
+				? `${args.baseUrl}${ANALYTICS_PATH}`
+				: DEFAULT_ENDPOINT,
+			disableWarnings: args.disableWarnings ?? false,
+		})
 		this.#dataLayerEnabled = args.dataLayer ?? true
 	}
 
 	setupVisitor = (userAgent: string = window.navigator.userAgent) => {
-		const cookieVisitorId = getCookie(this.getVisitorCookieName())
-		const validCookieVisitorId =
-			cookieVisitorId && this.validateVisitorId(cookieVisitorId)
+		// The numbers SDK reads (or makes) the visitor in the shared `visitorId`
+		// cookie, so the visitor is the same one in numbers' own script.
+		const visitor = this.#numbers.visitor()
 
-		this.#visitorRecurring = validCookieVisitorId
-		this.#visitorId = validCookieVisitorId
-			? cookieVisitorId
-			: this.generateVisitorId()
+		if (!visitor) return null
+
+		this.#visitorId = visitor.id
 
 		const parsedUserAgent = parseUserAgent(userAgent)
 
@@ -129,7 +92,9 @@ export class ImproveClientSDK extends BaseImproveSDK {
 
 		this.#visitor = parsedUserAgent
 
-		setCookie(this.getVisitorCookieName(), this.#visitorId)
+		// The audiences' categories, so numbers reports the same ones.
+		const { pointer, device, browser, os } = parsedUserAgent
+		this.#numbers.setDevice({ pointer, device, browser, os })
 
 		return this.#visitorId
 	}
@@ -236,68 +201,12 @@ export class ImproveClientSDK extends BaseImproveSDK {
 	}
 
 	setAnalyticsUrls = (url: string) => {
-		this.#analyticsUrl = url
-	}
-
-	// Fields shared by every beacon. Callers must ensure the visitor is set up.
-	#beaconCommon = <T extends 'event' | 'exposure'>(
-		type: T,
-	): BeaconCommon<T> => ({
-		type,
-		organizationId: this.organizationId,
-		environment: this.environment,
-		visitorId: this.#visitorId,
-		pointer: this.#visitor!.pointer,
-		device: this.#visitor!.device,
-		screen: getScreenSize(),
-		browser: this.#visitor!.browser,
-		os: this.#visitor!.os,
-		visitor: this.#visitorRecurring ? 'recurring' : 'new',
-	})
-
-	// Sends a beacon with a `keepalive` fetch so it outlives a navigation/unload,
-	// warns on oversized bodies, and backs off on a 429. Shared by events and
-	// exposures.
-	#send = (body: CreateEvent | CreateExposure, label: string) => {
-		// Serialize once so we can both measure and send the same bytes.
-		const serializedBody = JSON.stringify(body)
-
-		// The backend rejects bodies over 8KB with a 413 — realistically only an
-		// oversized `params` (e.g. a large GA4 `ecommerce.items` array) gets there.
-		if (
-			typeof TextEncoder !== 'undefined' &&
-			new TextEncoder().encode(serializedBody).length > MAX_ANALYTIC_BODY_BYTES
-		) {
-			this._warn(
-				`Beacon for "${label}" exceeds the ${MAX_ANALYTIC_BODY_BYTES}-byte ` +
-					`limit and will be rejected by the server — trim the \`params\` payload.`,
-			)
-		}
-
-		const request = fetch(this.#analyticsUrl, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: serializedBody,
-			keepalive: true,
-		})
-
-		// Back off when the org hits its usage/rate limit. Honor a server
-		// Retry-After when present, otherwise use a fixed cooldown.
-		request
-			.then((res) => {
-				if (res?.status === 429) {
-					const retryAfterMs = parseRetryAfterMs(res.headers.get('Retry-After'))
-					this.#rateLimitedUntil =
-						Date.now() + (retryAfterMs ?? ANALYTIC_RATE_LIMIT_COOLDOWN_MS)
-				}
-			})
-			.catch(() => {})
-
-		return request
+		this.#numbers.setEndpoint(url)
 	}
 
 	// Emits an exposure beacon the first time a visitor is assigned to a subject
-	// this instance. Idempotent server-side (unique per visitor+subject).
+	// this instance (the numbers SDK sends each subject once). Idempotent
+	// server-side (unique per visitor+subject).
 	#postExposure = (
 		subjectKind: 'test' | 'flag',
 		subjectId: string,
@@ -305,21 +214,7 @@ export class ImproveClientSDK extends BaseImproveSDK {
 	) => {
 		if (!this.#visitor || !this.#visitorId) return
 
-		// Suspended after a 429: skip, but don't mark tracked so it can retry later.
-		if (Date.now() < this.#rateLimitedUntil) return
-
-		const key = `${subjectKind}:${subjectId}`
-		if (this.#exposures[key]) return
-		this.#exposures[key] = true
-
-		const body: CreateExposure = {
-			...this.#beaconCommon('exposure'),
-			subjectKind,
-			subjectId,
-			variant,
-		}
-
-		return this.#send(body, key)
+		return this.#numbers.expose({ subjectKind, subjectId, variant })
 	}
 
 	postAnalytic = (
@@ -336,19 +231,9 @@ export class ImproveClientSDK extends BaseImproveSDK {
 		// it, or the mirrored dataLayer entry would collide with GTM internals.
 		if (event.startsWith('gtm.')) return null
 
-		// Nudge developers toward the snake_case / GA4 naming convention. Warn
-		// once per offending name so it's noticeable without spamming the console;
-		// silence entirely with the `disableWarnings` setup option.
-		if (!isSnakeCaseEventName(event) && !this.#warnedEventNames.has(event)) {
-			this.#warnedEventNames.add(event)
-			this._warn(
-				`Event name "${event}" isn't snake_case. Prefer GA4-style names ` +
-					`like "add_to_cart" or "purchase" so your events line up with ` +
-					`GA4 / Google Tag Manager. Pass \`disableWarnings: true\` at setup ` +
-					`to silence this.`,
-			)
-		}
-
+		// The numbers SDK nudges toward snake_case names itself; an empty scope
+		// is improve's own convention to warn about (numbers falls back to the
+		// page's path).
 		if (!scope && !this.#warnedMissingScope) {
 			this.#warnedMissingScope = true
 			this._warn(
@@ -358,16 +243,9 @@ export class ImproveClientSDK extends BaseImproveSDK {
 			)
 		}
 
-		// Suspended after a 429: skip sending, but don't mark the event as
-		// tracked, so it can still fire once the cooldown elapses.
-		if (Date.now() < this.#rateLimitedUntil) return null
-
 		const { value, currency, params, dedupeKey }: ImproveAnalyticPayload =
 			payload ?? {}
 		const hasValue = typeof value === 'number' && Number.isFinite(value)
-		// The backend requires `params` to be a plain (non-array) object and 400s
-		// the whole event otherwise — drop an invalid value rather than lose the
-		// event.
 		const validParams =
 			params && typeof params === 'object' && !Array.isArray(params)
 				? params
@@ -383,21 +261,17 @@ export class ImproveClientSDK extends BaseImproveSDK {
 		const trackingKey = dedupeKey ? `${event}:${dedupeKey}` : event
 		if (!this.#visitor || this.#analytics[trackingKey]) return null
 
-		this.#analytics[trackingKey] = true
-
-		const body: CreateEvent = {
-			...this.#beaconCommon('event'),
-			// Cap developer-controlled fields to the backend's varchar(256) limit;
-			// an over-length value is otherwise rejected with a 400 and the event
-			// is lost.
-			event: truncate(event, MAX_ANALYTIC_FIELD_LENGTH),
-			scope: truncate(scope || '', MAX_ANALYTIC_FIELD_LENGTH),
+		const request = this.#numbers.track(event, scope, {
 			...(hasValue ? { value } : {}),
-			...(currency
-				? { currency: truncate(currency, MAX_CURRENCY_FIELD_LENGTH) }
-				: {}),
+			...(currency ? { currency } : {}),
 			...(validParams ? { params: validParams } : {}),
-		}
+		})
+
+		// Nothing sent (paused after a 429): don't mark the event as tracked, so
+		// it can still fire once the cooldown elapses.
+		if (!request) return null
+
+		this.#analytics[trackingKey] = true
 
 		if (this.#dataLayerEnabled) {
 			// Clear any prior ecommerce object first so its keys don't bleed into
@@ -414,11 +288,11 @@ export class ImproveClientSDK extends BaseImproveSDK {
 				...(currency ? { currency } : {}),
 				// Spread custom params (incl. a GA4 `ecommerce` object) to the top
 				// level so GA4/GTM tags can read them directly.
-				...(validParams ?? {}),
+				...validParams,
 				_improve: true,
 			})
 		}
 
-		return this.#send(body, trackingKey)
+		return request
 	}
 }

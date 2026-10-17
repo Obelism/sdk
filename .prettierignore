@@ -1,0 +1,10 @@
+.env
+.gitignore
+.prettierignore
+public
+.DS_Store
+
+.env.*
+*.js.hbs
+package-lock.json
+tsconfig.tsbuildinfo

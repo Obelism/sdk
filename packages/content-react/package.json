@@ -14,7 +14,8 @@
 	"author": "Obelism <hello@obelism.studio> (https://www.obelism.studio)",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Obelism/content-sdk"
+		"url": "https://github.com/Obelism/sdk",
+		"directory": "packages/content-react"
 	},
 	"sideEffects": false,
 	"files": [
@@ -48,7 +49,7 @@
 		"@obelism/content": "^0.9.0"
 	},
 	"devDependencies": {
-		"@obelism/content-typescript-config": "^0.0.0",
+		"@obelism/sdk-typescript-config": "^0.0.0",
 		"@testing-library/react": "^16.3.3",
 		"@types/react": "^19.3.0",
 		"@types/react-dom": "^19.2.4",

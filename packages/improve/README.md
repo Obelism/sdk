@@ -149,7 +149,7 @@ setupVisitor(userAgent: string = window.navigator.userAgent) => string | null
 
 Optional method to setup the visitor, if this is not called before using any of the other Client methods it will be called automatically. You only have to call this yourself if you want to make sure it gets the `userAgent` from somewhere else.
 
-This method will automatically save the visitorID to the class and cookie + parse the userAgent to be used in the postAnalytic.
+This method will automatically save the visitorID to the class and cookie + parse the userAgent to be used in the postAnalytic. The visitor comes from the [numbers SDK](https://www.npmjs.com/package/@obelism/numbers-sdk), which keeps it in the same `visitorId` cookie, so it is the same visitor in numbers' own script tag.
 
 ### getFlagValue
 
@@ -173,7 +173,7 @@ Same as [getTestValue](/docs/sdk/javascript#gettestvalue) on the server class th
 setAnalyticsUrls = (url: string) => void
 ```
 
-Configure the analytics url to post message towards. Convenient in case add blockers block the direct post requests you can proxy them through your domain and pathname.
+Configure the analytics url to post message towards. Convenient in case add blockers block the direct post requests you can proxy them through your domain and pathname. By default events go to Obelism numbers (`https://numbers.obelism.studio/api/log`); with a custom `baseUrl` to that url's `/api/log`.
 
 ### postAnalytic
 
@@ -185,7 +185,7 @@ postAnalytic = (
 ) => Promise<Response> | null
 ```
 
-Posts an analytic event to Improve or the url configured with [setAnalyticsUrls](/docs/sdk/javascript#setanalyticsurls).
+Posts an analytic event to Obelism numbers or the url configured with [setAnalyticsUrls](/docs/sdk/javascript#setanalyticsurls), through the [numbers SDK](https://www.npmjs.com/package/@obelism/numbers-sdk): each event also carries the page's path and UTM tags. Exposures to tests and flags go the same way. Use the numbers SDK directly for page views and click tracking without tests.
 `scope` is required — a short, stable identifier for where/what the event refers to
 (e.g. `"homepage_hero_login"`), distinct from the optional `value`/`currency`/`params`/
 `dedupeKey` extras in `payload`.

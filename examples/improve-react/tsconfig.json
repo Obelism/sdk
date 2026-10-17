@@ -1,5 +1,5 @@
 {
-	"extends": "@obelism/improve-sdk-typescript-config/react-library.json",
+	"extends": "@obelism/sdk-typescript-config/improve-react-library.json",
 	"compilerOptions": {
 		"outDir": "dist"
 	},

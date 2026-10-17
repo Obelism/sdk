@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js 24.x
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.x
+
+      - name: npm install
+        run: npm ci
+        env:
+          CI: true
+
+      - name: Format
+        run: npm run format:check
+
+      - name: Build, lint and test
+        run: npx turbo run build lint test:ci

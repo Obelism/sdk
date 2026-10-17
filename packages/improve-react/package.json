@@ -13,8 +13,8 @@
 	"author": "Obelism <hello@obelism.studio> (https://www.obelism.studio)",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Obelism/improve-sdk",
-		"directory": "packages/react-sdk"
+		"url": "https://github.com/Obelism/sdk",
+		"directory": "packages/improve-react"
 	},
 	"sideEffects": false,
 	"files": [
@@ -37,22 +37,19 @@
 		"test:coverage": "vitest run --coverage",
 		"test:ci": "vitest run",
 		"lint": "npm-run-all --parallel lint:*",
-		"lint:fix": "eslint --fix",
+		"lint:oxlint": "oxlint",
 		"lint:types": "tsc --noEmit",
-		"prettier": "prettier --write --ignore-unknown .",
-		"prettier:check": "prettier --check --ignore-unknown .",
 		"clean": "rm -rf ./node_modules && rm -rf ./dist && rm -rf ./.turbo"
 	},
 	"devDependencies": {
-		"@obelism/improve-sdk-eslint-config": "^0.0.0",
-		"@obelism/improve-sdk-typescript-config": "^0.0.0",
+		"@obelism/sdk-typescript-config": "^0.0.0",
 		"@types/react": "^19.2.17",
-		"bunchee": "^6.11.0",
-		"eslint": "^10.6.0",
-		"npm-run-all": "^4.1.5",
-		"prettier": "^3.9.4",
-		"typescript": "^6.0.3",
-		"vitest": "^4.1.9"
+		"@typescript/typescript6": "^6.0.2",
+		"bunchee": "^7.0.2",
+		"npm-run-all2": "^9.0.2",
+		"oxlint": "^1.88.0",
+		"typescript": "^7.0.2",
+		"vitest": "^5.0.4"
 	},
 	"peerDependencies": {
 		"react": ">=18.0.0"

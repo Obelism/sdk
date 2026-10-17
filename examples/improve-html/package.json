@@ -1,5 +1,5 @@
 {
-	"name": "example-html",
+	"name": "example-improve-html",
 	"version": "1.0.7",
 	"main": "index.js",
 	"private": true,
@@ -12,9 +12,9 @@
 	"license": "ISC",
 	"description": "",
 	"devDependencies": {
-		"@obelism/improve-sdk-typescript-config": "^0.0.0",
+		"@obelism/sdk-typescript-config": "^0.0.0",
 		"tsup": "^8.5.1",
-		"typescript": "^6.0.3"
+		"typescript": "^7.0.2"
 	},
 	"dependencies": {
 		"@obelism/improve-sdk": "^3.0.0"

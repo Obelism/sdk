@@ -1,12 +1,12 @@
 {
-	"name": "example-nextjs-rsc",
+	"name": "example-improve-nextjs-rsc",
 	"version": "1.0.3",
 	"private": true,
 	"scripts": {
 		"dev": "next dev -p 3003",
 		"build": "next build",
 		"start": "next start",
-		"lint": "eslint",
+		"lint": "tsc --noEmit",
 		"clean": "rm -rf node_modules && rm -rf .next && rm -rf .turbo"
 	},
 	"dependencies": {
@@ -17,11 +17,9 @@
 		"react-dom": "^19.2.7"
 	},
 	"devDependencies": {
-		"@obelism/improve-sdk-eslint-config": "^0.0.0",
 		"@types/node": "^26.1.0",
 		"@types/react": "^19.2.17",
 		"@types/react-dom": "^19.2.3",
-		"eslint": "^10.6.0",
-		"typescript": "^6.0.3"
+		"typescript": "^7.0.2"
 	}
 }
