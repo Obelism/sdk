@@ -1,5 +1,11 @@
 # @obelism/content
 
+## 0.10.0
+
+### Minor Changes
+
+- 1e35ff3: Webhook types for review before publishing: `entry.review_requested` (`{ entry, revision, note }`) and `entry.review_closed` (`{ entry, outcome: 'approved' | 'sent_back', revision, reason? }`), sent by environments whose publishing is reviewed.
+
 ## 0.9.0
 
 ### Minor Changes
