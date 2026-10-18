@@ -1,5 +1,11 @@
 # @obelism/content
 
+## 0.16.0
+
+### Minor Changes
+
+- 7df6ab3: The client sends its token as `Obelism-Token` instead of `Authorization: Bearer`, so the delivery API can answer a delivery token from Cloudflare's edge cache (up to 60 seconds, cleared on publish). Needs Content with the edge cache; older Content only reads `Authorization`.
+
 ## 0.15.0
 
 ### Minor Changes
