@@ -8,8 +8,9 @@ import { BRIDGE_SOURCE } from './createBridge'
 // Messages are only exchanged with the URL's origin, and only with the
 // iframe's window:
 // - form → bridge: { source: 'obelism-content-form', type: 'ready' |
-//   'change' | 'error', content?, message? } — `change` carries the whole
-//   entry content after an edit
+//   'change' | 'error' | 'height', content?, message?, height? } —
+//   `change` carries the whole entry content after an edit, `height` the
+//   form's own height in px, which the iframe takes (up to 60vh)
 // - bridge → form: { source: 'obelism-content-bridge', type: 'content',
 //   entryId, content, locale, selectedUid }
 
@@ -110,6 +111,13 @@ export const mountFormFrame = (
 				data.content,
 				typeof data.entryId === 'string' ? data.entryId : undefined,
 			)
+		} else if (data.type === 'height') {
+			const height = (data as { height?: unknown }).height
+			if (typeof height === 'number' && Number.isFinite(height)) {
+				// A short page's form is short; a long one scrolls inside.
+				const px = Math.round(Math.min(Math.max(height, 80), 4000))
+				iframe.style.height = `min(${px}px, 60vh)`
+			}
 		} else if (data.type === 'error') {
 			handlers.onError(
 				typeof data.message === 'string' && data.message

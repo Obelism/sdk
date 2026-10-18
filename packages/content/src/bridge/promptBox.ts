@@ -23,6 +23,8 @@ export type PromptLabels = {
 	send: string
 	undo: string
 	close: string
+	minimize: string
+	expand: string
 	scopeEntry: string
 	scopeBlock: string
 	clearBlock: string
@@ -64,6 +66,8 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 	send: 'Apply',
 	undo: 'Undo',
 	close: 'Close',
+	minimize: 'Minimize, to see the page',
+	expand: 'Expand',
 	scopeEntry: 'Whole page',
 	scopeBlock: 'Selected block',
 	clearBlock: 'Edit the whole page instead',
@@ -113,6 +117,8 @@ const ICONS = {
 		'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 8h10"/><path d="M7 12h6"/>',
 	undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
 	close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+	minimize: '<path d="m6 9 6 6 6-6"/>',
+	expand: '<path d="m18 15-6-6-6 6"/>',
 	chevrons: '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
 	search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
 	check: '<path d="M20 6 9 17l-5-5"/>',
@@ -495,6 +501,17 @@ export const mountPromptBox = (
 		icon(doc, 'close'),
 	)
 	close.setAttribute('aria-label', labels.close)
+	// Minimized, only the toolbar and footer show, so a short page stays in
+	// view; the form stays mounted (and its edits) meanwhile.
+	const minimizeIcon = icon(doc, 'minimize')
+	const expandIcon = icon(doc, 'expand')
+	const minimize = element(
+		doc,
+		'button',
+		{ className: 'icon-button', type: 'button' },
+		minimizeIcon,
+		expandIcon,
+	)
 	const send = element(
 		doc,
 		'button',
@@ -517,6 +534,7 @@ export const mountPromptBox = (
 		undo,
 		newPage,
 		element(doc, 'span', { className: 'spacer' }),
+		minimize,
 		close,
 		divider,
 		send,
@@ -615,6 +633,7 @@ export const mountPromptBox = (
 	shadow.append(element(doc, 'style', { textContent: CSS }), root)
 
 	let open = false
+	let minimized = false
 	let creating = false
 	let message: { text: string; error: boolean } | null = null
 	// Form mode, and the form while mounted: a fresh one (and one-time
@@ -661,10 +680,11 @@ export const mountPromptBox = (
 		newScope.hidden = !creating
 		newPage.hidden = creating || form || !canCreate
 		newPage.disabled = busy
-		pathRow.hidden = !creating || picking
+		if (minimized) picking = false
+		pathRow.hidden = !creating || picking || minimized
 		pathInput.disabled = busy
-		input.hidden = form || picking
-		formBox.hidden = !form || picking
+		input.hidden = form || picking || minimized
+		formBox.hidden = !form || picking || minimized
 		formBox.classList.toggle('loading', formLoading)
 		toolbar.hidden = picking
 		pagesSection.hidden = !picking
@@ -688,8 +708,14 @@ export const mountPromptBox = (
 		undo.hidden = creating || !state.canUndo
 		undo.disabled = busy
 		// The form applies edits as they are made.
-		send.hidden = form
-		divider.hidden = form
+		send.hidden = form || minimized
+		divider.hidden = form || minimized
+		const toggleLabel = minimized ? labels.expand : labels.minimize
+		minimize.title = toggleLabel
+		minimize.setAttribute('aria-label', toggleLabel)
+		minimize.setAttribute('aria-expanded', String(!minimized))
+		minimizeIcon.hidden = minimized
+		expandIcon.hidden = !minimized
 		send.disabled =
 			busy ||
 			input.value.trim() === '' ||
@@ -722,7 +748,7 @@ export const mountPromptBox = (
 						? labels.selectHint
 						: ''))
 		status.textContent = note
-		status.hidden = !note
+		status.hidden = !note || minimized
 		status.className = `status${working ? ' working' : ''}${!busy && !loadingForm && message?.error ? ' error' : ''}`
 	}
 	const refresh = () => render(bridge.getState())
@@ -907,7 +933,10 @@ export const mountPromptBox = (
 
 	const setOpen = (next: boolean) => {
 		open = next
-		if (!open) picking = false
+		if (!open) {
+			picking = false
+			minimized = false
+		}
 		refresh()
 		if (site) bridge.setSelecting(open && !creating)
 		if (open && site) void fetchPages()
@@ -941,6 +970,11 @@ export const mountPromptBox = (
 		if (!form) (creating ? pathInput : input).focus()
 	})
 	close.addEventListener('click', () => setOpen(false))
+	minimize.addEventListener('click', () => {
+		minimized = !minimized
+		refresh()
+		if (!minimized) (form ? minimize : input).focus()
+	})
 	save.addEventListener('click', () => void store('save'))
 	publish.addEventListener('click', () => void store('publish'))
 	signOut.addEventListener('click', () => bridge.signOut())

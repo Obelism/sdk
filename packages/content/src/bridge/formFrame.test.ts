@@ -107,6 +107,23 @@ describe('mountFormFrame', () => {
 		expect(handlers.onError).toHaveBeenLastCalledWith('The form failed')
 	})
 
+	it('takes the height the form says it has, up to 60vh', () => {
+		const setUp = setup()
+		frame = setUp.frame
+		const { iframe, receive } = setUp
+		receive({ source: FORM_SOURCE, type: 'height', height: 312.4 })
+		expect(iframe.style.height).toBe('min(312px, 60vh)')
+		receive({ source: FORM_SOURCE, type: 'height', height: 5 })
+		expect(iframe.style.height).toBe('min(80px, 60vh)')
+		// Not from anywhere else, and only numbers.
+		receive(
+			{ source: FORM_SOURCE, type: 'height', height: 900 },
+			{ origin: 'https://evil.example' },
+		)
+		receive({ source: FORM_SOURCE, type: 'height', height: '900px' })
+		expect(iframe.style.height).toBe('min(80px, 60vh)')
+	})
+
 	it('says so when the form never gets ready', () => {
 		vi.useFakeTimers()
 		const setUp = setup()
