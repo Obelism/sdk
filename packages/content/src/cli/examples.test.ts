@@ -10,6 +10,7 @@ const model: ModelFile = {
 			apiId: 'page',
 			name: 'Page',
 			kind: 'page',
+			description: null,
 			fields: [
 				{ apiId: 'title', name: 'Title', type: 'text', localized: true },
 				{
@@ -30,12 +31,14 @@ const model: ModelFile = {
 			apiId: 'author',
 			name: 'Author',
 			kind: 'data',
+			description: null,
 			fields: [{ apiId: 'name', name: 'Name', type: 'text', maxLength: 10 }],
 		},
 		{
 			apiId: 'hero',
 			name: 'Hero',
 			kind: 'block',
+			description: null,
 			fields: [
 				{ apiId: 'image', name: 'Image', type: 'asset', mimeTypes: ['image/'] },
 				{ apiId: 'body', name: 'Body', type: 'richtext' },
@@ -55,6 +58,7 @@ const model: ModelFile = {
 			apiId: 'section',
 			name: 'Section',
 			kind: 'block',
+			description: null,
 			fields: [
 				{ apiId: 'children', name: 'Children', type: 'blocks' },
 				{

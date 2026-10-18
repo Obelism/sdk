@@ -152,11 +152,12 @@ const normalizeBasePath = (basePath: string) =>
 // the prompt bar makes. Nothing else of the site API is exposed.
 const PROXY_ROUTES: { method: string; pattern: RegExp }[] = [
 	{ method: 'GET', pattern: /^session$/ },
+	{ method: 'GET', pattern: /^pages$/ },
 	{ method: 'GET', pattern: /^entries\/[\w-]+$/ },
 	{ method: 'POST', pattern: /^entries$/ },
 	{
 		method: 'POST',
-		pattern: /^entries\/[\w-]+\/(preview|prompt|save|publish)$/,
+		pattern: /^entries\/[\w-]+\/(preview|prompt|view|apply|save|publish)$/,
 	},
 ]
 

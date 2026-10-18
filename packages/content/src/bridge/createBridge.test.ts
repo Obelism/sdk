@@ -273,6 +273,28 @@ describe('prompts', () => {
 		)
 	})
 
+	it('leaves JSON and the pages to editing on the site', async () => {
+		const { win, receive } = frame()
+		const bridge = createBridge(win, CMS)
+		offerPrompts(receive)
+		await expect(bridge.view()).rejects.toThrow('on the site')
+		await expect(bridge.applyJson({ title: 'x' })).rejects.toThrow(
+			'on the site',
+		)
+		await expect(bridge.pages()).rejects.toThrow('on the site')
+		expect(() =>
+			bridge.openPage({
+				entryId: 'e',
+				name: 'E',
+				contentType: 'page',
+				status: 'draft',
+				path: 'e',
+				url: '/e',
+			}),
+		).not.toThrow()
+		bridge.destroy()
+	})
+
 	it('gives up when the editor never answers', async () => {
 		vi.useFakeTimers()
 		const { win, receive } = frame()

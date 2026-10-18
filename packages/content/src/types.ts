@@ -199,7 +199,9 @@ export type ContentTypeDefinition = {
 	apiId: string
 	name: string
 	kind: ContentTypeKind
-	description?: string | null
+	// What the type is for. Required in the CMS; null (or missing) from a
+	// CMS from before that.
+	description: string | null
 	fields: FieldDefinition[]
 }
 
