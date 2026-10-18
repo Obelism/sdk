@@ -376,6 +376,48 @@ describe('mountPromptBox', () => {
 		expect(bridge.openForm).toHaveBeenCalledTimes(3)
 	})
 
+	it('minimizes to show the page, keeping the form', () => {
+		const { bridge, setState, forms } = fakeBridge('site')
+		unmount = mountPromptBox(document, bridge)
+		setState({ features: ['prompt', 'form', 'save', 'publish'] })
+		$<HTMLButtonElement>('.pill').click()
+		const toggle = $<HTMLButtonElement>(
+			'[aria-label="Minimize, to see the page"]',
+		)
+		expect(toggle.getAttribute('aria-expanded')).toBe('true')
+
+		// In Prompt mode: the prompt and the status go, the bar stays.
+		toggle.click()
+		expect($<HTMLTextAreaElement>('textarea').hidden).toBe(true)
+		expect($<HTMLElement>('.status').hidden).toBe(true)
+		expect($<HTMLButtonElement>('.primary').hidden).toBe(true)
+		expect($<HTMLElement>('.toolbar').hidden).toBe(false)
+		expect($<HTMLElement>('.footer').hidden).toBe(false)
+		expect(toggle.getAttribute('aria-label')).toBe('Expand')
+		expect(toggle.getAttribute('aria-expanded')).toBe('false')
+		toggle.click()
+		expect($<HTMLTextAreaElement>('textarea').hidden).toBe(false)
+
+		// In Form mode the form stays loaded while minimized.
+		$<HTMLButtonElement>('.modes button:last-child').click()
+		forms[0]!.options.onReady!()
+		const frame = $('.form iframe')
+		toggle.click()
+		expect($<HTMLElement>('.form').hidden).toBe(true)
+		expect(frame.isConnected).toBe(true)
+		toggle.click()
+		expect($<HTMLElement>('.form').hidden).toBe(false)
+		expect($('.form iframe')).toBe(frame)
+		expect(bridge.openForm).toHaveBeenCalledTimes(1)
+
+		// Closing forgets it: the box opens expanded.
+		toggle.click()
+		$<HTMLButtonElement>('.close').click()
+		$<HTMLButtonElement>('.pill').click()
+		expect($<HTMLElement>('.form').hidden).toBe(false)
+		expect(toggle.getAttribute('aria-label')).toBe('Minimize, to see the page')
+	})
+
 	it('removes the form with the box', () => {
 		const { bridge, setState } = fakeBridge('site')
 		unmount = mountPromptBox(document, bridge)
