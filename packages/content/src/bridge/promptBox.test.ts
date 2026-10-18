@@ -5,9 +5,11 @@ import {
 	type ApplyJsonResult,
 	type BridgeState,
 	createEmitter,
+	type FormHandle,
+	type FormOptions,
 	INITIAL_STATE,
 } from './createBridge'
-import { jsonErrorAt, mountPromptBox } from './promptBox'
+import { mountPromptBox } from './promptBox'
 
 const PAGES = [
 	{
@@ -41,6 +43,8 @@ const fakeBridge = (mode: 'editor' | 'site' = 'editor') => {
 	const emitter = createEmitter()
 	let state: BridgeState = INITIAL_STATE
 	let answer: (value: { summary: string } | Error) => void = () => {}
+	// The forms opened, newest last.
+	const forms: { frame: HTMLIFrameElement; options: FormOptions }[] = []
 	const bridge = {
 		isEditing: true,
 		mode,
@@ -78,6 +82,15 @@ const fakeBridge = (mode: 'editor' | 'site' = 'editor') => {
 				changed: ['title'],
 			}),
 		),
+		openForm: vi.fn(
+			(container: HTMLElement, options: FormOptions = {}): FormHandle => {
+				const frame = document.createElement('iframe')
+				frame.title = options.title ?? ''
+				container.appendChild(frame)
+				forms.push({ frame, options })
+				return { close: () => frame.remove() }
+			},
+		),
 		pages: vi.fn(async () => PAGES),
 		openPage: vi.fn(),
 		undo: vi.fn(),
@@ -97,6 +110,7 @@ const fakeBridge = (mode: 'editor' | 'site' = 'editor') => {
 	return {
 		bridge,
 		setState,
+		forms,
 		answer: (value: { summary: string } | Error) => answer(value),
 	}
 }
@@ -286,115 +300,94 @@ describe('mountPromptBox', () => {
 		expect($('span.pill').textContent).toContain('Viewing drafts')
 	})
 
-	it('edits the page or the selected block as JSON on the site', async () => {
-		const { bridge, setState } = fakeBridge('site')
+	it('edits the page in the CMS’s form on the site', () => {
+		const { bridge, setState, forms } = fakeBridge('site')
 		unmount = mountPromptBox(document, bridge)
-		setState({ features: ['prompt', 'create', 'save'] })
+		setState({ features: ['prompt', 'create', 'save', 'publish'] })
 		$<HTMLButtonElement>('.pill').click()
 		const mode = (text: string) =>
 			[...shadow().querySelectorAll<HTMLButtonElement>('.modes button')].find(
 				(button) => button.textContent === text,
 			)!
+		const visible = () =>
+			[...shadow().querySelectorAll('button')]
+				.filter((button) => !button.closest('[hidden]') && !button.hidden)
+				.map((button) => button.textContent)
 		expect(mode('Prompt').getAttribute('aria-pressed')).toBe('true')
+		expect(bridge.openForm).not.toHaveBeenCalled()
 
-		mode('JSON').click()
-		const code = $<HTMLTextAreaElement>('textarea.code')
-		await vi.waitFor(() => expect(code.value).toBe('{\n  "title": "Home"\n}\n'))
-		expect(bridge.view).toHaveBeenCalledTimes(1)
-		expect(bridge.view).toHaveBeenCalledWith({ uid: null })
-		expect(code.hidden).toBe(false)
+		mode('Form').click()
+		expect(mode('Form').getAttribute('aria-pressed')).toBe('true')
+		expect(bridge.openForm).toHaveBeenCalledTimes(1)
+		const form = $<HTMLElement>('.form')
+		expect(form.hidden).toBe(false)
+		expect(form.querySelector('iframe')!.title).toBe('The content form')
 		expect($<HTMLTextAreaElement>('textarea').hidden).toBe(true)
-		expect(code.spellcheck).toBe(false)
-		expect(mode('JSON').getAttribute('aria-pressed')).toBe('true')
-		// No New page while editing JSON.
-		const newPage = [...shadow().querySelectorAll('button')].find(
-			(button) => button.textContent === 'New page',
-		)!
-		expect(newPage.hidden).toBe(true)
-
-		// Enter is a new line; Tab a tab.
-		code.value = '{\n  "title": }'
-		code.dispatchEvent(new Event('input'))
-		code.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
-		expect(bridge.applyJson).not.toHaveBeenCalled()
-		code.setSelectionRange(1, 1)
-		const tab = new KeyboardEvent('keydown', { key: 'Tab', cancelable: true })
-		code.dispatchEvent(tab)
-		expect(tab.defaultPrevented).toBe(true)
-		expect(code.value).toBe('{\t\n  "title": }')
-
-		code.dispatchEvent(
-			new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true }),
+		expect($('.status').textContent).toBe('Opening the form…')
+		expect($('.status').className).toContain('working')
+		expect(form.className).toContain('loading')
+		// Edits apply live: no Apply, and no New page; the footer stays.
+		expect($<HTMLButtonElement>('.primary').hidden).toBe(true)
+		expect(visible()).not.toContain('New page')
+		expect(visible()).toEqual(
+			expect.arrayContaining(['Save', 'Publish', 'Exit editing']),
 		)
-		expect($('.status').textContent).toBe('Not valid JSON at line 2, column 12')
+
+		forms[0]!.options.onReady!()
+		expect(form.className).not.toContain('loading')
+		expect($('.status').textContent).toBe(
+			'Click a block to change only that block',
+		)
+		setState({ canUndo: true, selectedUid: 'b_1' })
+		expect(visible()).toContain('Undo')
+		expect($('.scope').textContent).toContain('Selected block')
+
+		forms[0]!.options.onError!('The form failed to load')
+		expect($('.status').textContent).toBe('The form failed to load')
 		expect($('.status').className).toContain('error')
-		expect(code.selectionStart).toBe(14)
-		expect(bridge.applyJson).not.toHaveBeenCalled()
 
-		code.value = '[1]'
-		$<HTMLFormElement>('form').dispatchEvent(new Event('submit'))
-		expect($('.status').textContent).toContain('an object of fields')
-
-		code.value = '{ "title": "Welcome" }'
-		code.dispatchEvent(
-			new KeyboardEvent('keydown', { key: 'Enter', metaKey: true }),
-		)
-		await vi.waitFor(() => expect($('.status').textContent).toBe('Applied'))
-		expect(bridge.applyJson).toHaveBeenCalledWith(
-			{ title: 'Welcome' },
-			{ uid: null },
-		)
-		// What the CMS made of it.
-		expect(bridge.view).toHaveBeenCalledTimes(2)
-		expect(code.value).toBe('{\n  "title": "Home"\n}\n')
-
-		// From the answer, when the CMS sends it: no second request.
-		vi.mocked(bridge.applyJson).mockResolvedValueOnce({
-			changed: ['title'],
-			view: { title: 'Welcome!' },
-		})
-		code.value = '{ "title": "Welcome!" }'
-		$<HTMLFormElement>('form').dispatchEvent(new Event('submit'))
-		await vi.waitFor(() =>
-			expect(code.value).toBe('{\n  "title": "Welcome!"\n}\n'),
-		)
-		expect(bridge.view).toHaveBeenCalledTimes(2)
-
-		// A new selection loads its JSON, unless the text was edited.
-		setState({ selectedUid: 'b_1' })
-		await vi.waitFor(() => expect(code.value).toContain('"_uid": "b_1"'))
-		expect(bridge.view).toHaveBeenLastCalledWith({ uid: 'b_1' })
-		expect($('.scope').textContent).toContain('Selected block')
-
-		code.value = '{ "heading": "Edited" }'
-		code.dispatchEvent(new Event('input'))
-		setState({ selectedUid: null })
-		await vi.waitFor(() =>
-			expect($('.status').textContent).toContain('Kept your unapplied JSON'),
-		)
-		expect(bridge.view).toHaveBeenCalledTimes(3)
-		expect(code.value).toBe('{ "heading": "Edited" }')
-		// Still the block's JSON, so applied to the block.
-		expect($('.scope').textContent).toContain('Selected block')
-		code.dispatchEvent(
-			new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true }),
-		)
-		await vi.waitFor(() =>
-			expect(bridge.applyJson).toHaveBeenLastCalledWith(
-				{ heading: 'Edited' },
-				{ uid: 'b_1' },
-			),
-		)
-
-		$<HTMLButtonElement>('button[aria-label="Reload the JSON"]').click()
-		await vi.waitFor(() => expect(code.value).toBe('{\n  "title": "Home"\n}\n'))
-
+		// Back to Prompt: the form goes, and a fresh one comes next time.
 		mode('Prompt').click()
-		expect(code.hidden).toBe(true)
+		expect(form.querySelector('iframe')).toBeNull()
 		expect($<HTMLTextAreaElement>('textarea').hidden).toBe(false)
+		expect($<HTMLButtonElement>('.primary').hidden).toBe(false)
+		mode('Form').click()
+		expect(bridge.openForm).toHaveBeenCalledTimes(2)
+		// A late answer from the first form changes nothing.
+		forms[0]!.options.onReady!()
+		expect($('.status').textContent).toBe('Opening the form…')
+
+		// Closing the box removes it too; opening it shows a fresh one.
+		$<HTMLButtonElement>('.close').click()
+		expect(form.querySelector('iframe')).toBeNull()
+		$<HTMLButtonElement>('.pill').click()
+		expect(bridge.openForm).toHaveBeenCalledTimes(3)
+		expect(form.querySelectorAll('iframe')).toHaveLength(1)
+
+		// Not for a new page.
+		mode('Prompt').click()
+		;[...shadow().querySelectorAll('button')]
+			.find((button) => button.textContent === 'New page')!
+			.click()
+		expect($<HTMLElement>('.modes').hidden).toBe(true)
+		expect(form.querySelector('iframe')).toBeNull()
+
+		unmount()
+		expect(bridge.openForm).toHaveBeenCalledTimes(3)
 	})
 
-	it('offers JSON only on the site, and not for a new page', () => {
+	it('removes the form with the box', () => {
+		const { bridge, setState } = fakeBridge('site')
+		unmount = mountPromptBox(document, bridge)
+		setState({ features: ['prompt'] })
+		$<HTMLButtonElement>('.pill').click()
+		$<HTMLButtonElement>('.modes button:last-child').click()
+		const frame = $('.form iframe')
+		unmount()
+		expect(frame.isConnected).toBe(false)
+	})
+
+	it('offers the form only on the site, and not for a new page', () => {
 		const editor = fakeBridge()
 		unmount = mountPromptBox(document, editor.bridge)
 		editor.setState({ features: ['prompt'] })
@@ -404,12 +397,23 @@ describe('mountPromptBox', () => {
 
 		const { bridge, setState } = fakeBridge('site')
 		unmount = mountPromptBox(document, bridge)
+		// A CMS from before the form.
 		setState({ features: ['prompt', 'create'] })
 		$<HTMLButtonElement>('.pill').click()
+		expect($<HTMLElement>('.modes').hidden).toBe(true)
+		setState({ features: ['prompt', 'form', 'create'] })
 		expect($<HTMLElement>('.modes').hidden).toBe(false)
+		expect($('.modes').textContent).toBe('PromptForm')
 		;[...shadow().querySelectorAll('button')]
 			.find((button) => button.textContent === 'New page')!
 			.click()
+		expect($<HTMLElement>('.modes').hidden).toBe(true)
+		unmount()
+
+		const pageless = fakeBridge('site')
+		unmount = mountPromptBox(document, { ...pageless.bridge, entryId: null })
+		pageless.setState({ features: ['prompt', 'save'] })
+		$<HTMLButtonElement>('.pill').click()
 		expect($<HTMLElement>('.modes').hidden).toBe(true)
 	})
 
@@ -478,16 +482,5 @@ describe('mountPromptBox', () => {
 		expect(chip.textContent).toBe('Pages')
 		chip.click()
 		expect(shadow().querySelectorAll('[role="option"]')).toHaveLength(3)
-	})
-})
-
-describe('jsonErrorAt', () => {
-	it('finds where text stops being JSON', () => {
-		expect(jsonErrorAt('{ "a": [1, -2.5e3, true, null, "\\u00e9"] }')).toBe(-1)
-		expect(jsonErrorAt('{ "a": }')).toBe(7)
-		expect(jsonErrorAt('[1, 2,]')).toBe(6)
-		expect(jsonErrorAt('{ "a": 1 } x')).toBe(11)
-		expect(jsonErrorAt('"\\q"')).toBe(2)
-		expect(jsonErrorAt('')).toBe(0)
 	})
 })

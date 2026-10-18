@@ -15,6 +15,8 @@ export type {
 	BridgeState,
 	ContentBridge,
 	CreatePageResult,
+	FormHandle,
+	FormOptions,
 	PromptResult,
 	SitePage,
 } from './bridge/createBridge'

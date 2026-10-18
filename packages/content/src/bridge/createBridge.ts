@@ -87,6 +87,20 @@ export type ApplyJsonResult = {
 	view?: Record<string, unknown> | undefined
 }
 
+export type FormOptions = {
+	// The iframe's title, for screen readers. Default: 'Content form'.
+	title?: string | undefined
+	// The form shows and can be edited.
+	onReady?: (() => void) | undefined
+	// It couldn't open, or the CMS reports a problem in it.
+	onError?: ((message: string) => void) | undefined
+}
+
+export type FormHandle = {
+	// Removes the form; its one-time address is spent.
+	close(): void
+}
+
 // A page of the site, from `pages()`: every page entry of the space
 // environment, drafts included.
 export type SitePage = {
@@ -131,17 +145,24 @@ export type ContentBridge = {
 	// Editing on the site: the entry — or the block `uid`, the selected one
 	// by default — as JSON, the way a language model sees it: one locale,
 	// rich text as Markdown, blocks with `_uid` and `_type`. With the changes
-	// made here that aren't saved yet.
+	// made here that aren't saved yet. The raw alternative to `openForm`.
 	view(options?: {
 		uid?: string | null | undefined
 	}): Promise<Record<string, unknown>>
 	// Editing on the site: applies `changes` (fields by apiId, shaped like
 	// `view()`) to the entry or block, like a prompt's answer: checked the
-	// same way, into the unsaved changes, undone with `undo()`.
+	// same way, into the unsaved changes, undone with `undo()`. The raw
+	// alternative to `openForm`.
 	applyJson(
 		changes: Record<string, unknown>,
 		options?: { uid?: string | null | undefined },
 	): Promise<ApplyJsonResult>
+	// Editing on the site: the CMS's own form for the page's entry — or the
+	// entry around the selected block — in an iframe in `container`. Edits in
+	// it land in the unsaved changes as they are made (one undo step per
+	// burst of edits) and show on the page; prompts, undo and a new selection
+	// show in it. One form at a time: opening another closes this one.
+	openForm(container: HTMLElement, options?: FormOptions): FormHandle
 	// Editing on the site: the space's pages, to go to one with `openPage`.
 	pages(): Promise<SitePage[]>
 	// Editing on the site: opens a page from `pages()`, after asking when
@@ -230,6 +251,12 @@ export const INERT_METHODS = {
 		Promise.reject(new Error('New pages are made on the site itself')),
 	view: onlyWhileEditingSite,
 	applyJson: onlyWhileEditingSite,
+	openForm: (_container: HTMLElement, options: FormOptions = {}) => {
+		queueMicrotask(() =>
+			options.onError?.('Only while signed in to edit on the site'),
+		)
+		return { close: () => {} }
+	},
 	pages: onlyWhileEditingSite,
 	openPage: () => {},
 	undo: () => {},

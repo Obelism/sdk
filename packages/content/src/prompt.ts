@@ -31,7 +31,7 @@ export type PromptRequest = {
 	// The editor's request with the current content; on a retry also the
 	// previous answer and what was wrong with it.
 	messages: PromptMessage[]
-	// JSON Schema of the answer: { changes: object, summary: string }.
+	// JSON Schema of the answer: { intent, changes: object, summary: string }.
 	schema: Record<string, unknown>
 }
 

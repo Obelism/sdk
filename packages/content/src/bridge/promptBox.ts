@@ -1,4 +1,9 @@
-import type { BridgeState, ContentBridge, SitePage } from './createBridge'
+import type {
+	BridgeState,
+	ContentBridge,
+	FormHandle,
+	SitePage,
+} from './createBridge'
 
 // The prompt box: a small bar at the bottom of the page, inside the visual
 // editor or on a site signed in to edit, where an editor types what to
@@ -8,10 +13,9 @@ import type { BridgeState, ContentBridge, SitePage } from './createBridge'
 // content), acts on the selected block or the whole entry, and offers undo.
 // On the site it also saves, publishes and signs out, and can add a page
 // ("New page": a path and what the page is for); in the visual editor the
-// editor around the site does that. On the site it also edits the content
-// as JSON — what a prompt sends the language model, to change by hand or to
-// tweak what a prompt made — and goes to any page of the space, drafts
-// included.
+// editor around the site does that. On the site it also shows the CMS's own
+// entry form (Form mode, `bridge.openForm`), edited live, and goes to any
+// page of the space, drafts included.
 
 export type PromptLabels = {
 	open: string
@@ -42,17 +46,9 @@ export type PromptLabels = {
 	created: string
 	modes: string
 	modePrompt: string
-	modeJson: string
-	json: string
-	jsonLoading: string
-	jsonReload: string
-	jsonKept: string
-	// `{line}` and `{column}` are filled in.
-	jsonInvalidAt: string
-	jsonInvalid: string
-	jsonNotObject: string
-	applied: string
-	unchanged: string
+	form: string
+	formTitle: string
+	formLoading: string
 	pages: string
 	pagesSearch: string
 	pagesLoading: string
@@ -92,16 +88,9 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 	created: 'Opening the new page…',
 	modes: 'Edit with',
 	modePrompt: 'Prompt',
-	modeJson: 'JSON',
-	json: 'The content as JSON',
-	jsonLoading: 'Loading the JSON…',
-	jsonReload: 'Reload the JSON',
-	jsonKept: 'Kept your unapplied JSON. Reload to see the current content.',
-	jsonInvalidAt: 'Not valid JSON at line {line}, column {column}',
-	jsonInvalid: 'Not valid JSON',
-	jsonNotObject: 'The JSON has to be an object of fields, like { "title": … }',
-	applied: 'Applied',
-	unchanged: 'Nothing changed',
+	form: 'Form',
+	formTitle: 'The content form',
+	formLoading: 'Opening the form…',
 	pages: 'Pages',
 	pagesSearch: 'Find a page',
 	pagesLoading: 'Loading pages…',
@@ -124,8 +113,6 @@ const ICONS = {
 		'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 8h10"/><path d="M7 12h6"/>',
 	undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
 	close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-	reload:
-		'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
 	chevrons: '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
 	search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
 	check: '<path d="M20 6 9 17l-5-5"/>',
@@ -231,13 +218,13 @@ textarea {
 	font-size: 16px; line-height: 1.6; color: rgb(var(--theme-foreground-rgb));
 }
 textarea::placeholder { color: rgb(var(--theme-foreground-muted-rgb)); }
-/* JSON: a plain code editor, taller, scrolling instead of wrapping. */
-textarea.code {
-	height: 40vh; min-height: 160px; max-height: 50vh; overflow: auto; resize: vertical;
-	white-space: pre; overflow-wrap: normal; tab-size: 2;
-	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
-	font-size: 13px; line-height: 1.55;
+/* Form: the CMS's entry form, edited live. */
+.form { padding: 12px 12px 0; }
+.form iframe {
+	display: block; width: 100%; height: min(560px, 60vh); border: none; border-radius: 12px;
+	background: rgb(var(--theme-background-actions-rgb) / .45);
 }
+.form.loading iframe { visibility: hidden; }
 /* New page: where it goes, above what it is for. */
 .path {
 	display: flex; align-items: center; gap: 10px; padding: 16px 22px 0;
@@ -281,7 +268,7 @@ button.chip:disabled { opacity: .5; }
 .icon-button.primary { background: rgb(var(--theme-accent-rgb)); color: #fff; }
 .icon-button.primary:hover:not(:disabled) { background: rgb(var(--theme-accent-rgb)); color: #fff; opacity: .88; }
 .icon-button.primary:disabled { opacity: .35; }
-/* Prompt or JSON: two small pills in one track. */
+/* Prompt or Form: two small pills in one track. */
 .modes {
 	display: inline-flex; flex: none; gap: 2px; padding: 2px; border-radius: var(--border-radius-pill);
 	border: 1px solid rgb(var(--theme-border-rgb) / .2); background: rgb(var(--theme-background-actions-rgb) / .6);
@@ -372,98 +359,6 @@ const icon = (doc: Document, name: keyof typeof ICONS) => {
 	return span
 }
 
-// Where `text` stops being JSON: the offset of the first character that
-// doesn't fit, or -1 when it is JSON. JSON.parse's errors don't all say
-// where (V8's "Unexpected token" doesn't, Safari's never do).
-export const jsonErrorAt = (text: string): number => {
-	let i = 0
-	const fail = (): never => {
-		throw i
-	}
-	const space = () => {
-		while (i < text.length && ' \t\n\r'.includes(text[i]!)) i++
-	}
-	const string = () => {
-		i++
-		while (i < text.length) {
-			const char = text[i]!
-			if (char === '"') {
-				i++
-				return
-			}
-			if (char === '\\') {
-				const next = text[i + 1] ?? ''
-				if (next === 'u' && /^[\da-f]{4}$/i.test(text.slice(i + 2, i + 6))) {
-					i += 6
-				} else if (next !== '' && '"\\/bfnrt'.includes(next)) {
-					i += 2
-				} else {
-					i++
-					fail()
-				}
-			} else if (char < ' ') {
-				fail()
-			} else {
-				i++
-			}
-		}
-		fail()
-	}
-	const items = (close: string, item: () => void) => {
-		i++
-		space()
-		if (text[i] === close) {
-			i++
-			return
-		}
-		for (;;) {
-			item()
-			space()
-			if (text[i] === close) {
-				i++
-				return
-			}
-			if (text[i] !== ',') fail()
-			i++
-		}
-	}
-	const value = (): void => {
-		space()
-		const char = text[i] ?? ''
-		if (char === '{') {
-			return items('}', () => {
-				space()
-				if (text[i] !== '"') fail()
-				string()
-				space()
-				if (text[i] !== ':') fail()
-				i++
-				value()
-			})
-		}
-		if (char === '[') return items(']', value)
-		if (char === '"') return string()
-		for (const word of ['true', 'false', 'null']) {
-			if (text.startsWith(word, i)) {
-				i += word.length
-				return
-			}
-		}
-		const number = /^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?/.exec(text.slice(i))
-		if (!number) return fail()
-		i += number[0].length
-	}
-	try {
-		value()
-		space()
-		if (i < text.length) fail()
-		return -1
-	} catch (at) {
-		if (typeof at !== 'number') throw at
-		return Math.min(at, text.length)
-	}
-}
-
 // Mounts the box on the page; returns a function that removes it.
 export const mountPromptBox = (
 	doc: Document,
@@ -508,14 +403,8 @@ export const mountPromptBox = (
 		rows: 1,
 	})
 	input.setAttribute('aria-label', labels.open)
-	// JSON mode (on the site): the entry or block as JSON, edited by hand.
-	const code = element(doc, 'textarea', {
-		className: 'code',
-		spellcheck: false,
-		autocomplete: 'off',
-	})
-	code.setAttribute('aria-label', labels.json)
-	code.setAttribute('autocapitalize', 'off')
+	// Form mode (on the site): the CMS's form, mounted while shown.
+	const formBox = element(doc, 'div', { className: 'form' })
 
 	// What the prompt acts on: the whole page, or the selected block with a
 	// way back to the page.
@@ -545,30 +434,23 @@ export const mountPromptBox = (
 		labels.undo,
 	)
 
-	// Prompt or JSON (on the site).
+	// Prompt or Form (on the site).
 	const modeButton = (text: string) => {
 		const button = element(doc, 'button', { type: 'button', textContent: text })
 		button.setAttribute('aria-pressed', 'false')
 		return button
 	}
 	const promptMode = modeButton(labels.modePrompt)
-	const jsonMode = modeButton(labels.modeJson)
+	const formMode = modeButton(labels.form)
 	const modes = element(
 		doc,
 		'span',
 		{ className: 'modes' },
 		promptMode,
-		jsonMode,
+		formMode,
 	)
 	modes.setAttribute('role', 'group')
 	modes.setAttribute('aria-label', labels.modes)
-	const reload = element(
-		doc,
-		'button',
-		{ className: 'icon-button', type: 'button', title: labels.jsonReload },
-		icon(doc, 'reload'),
-	)
-	reload.setAttribute('aria-label', labels.jsonReload)
 
 	// New page (on the site, for people who may add pages): the scope becomes
 	// the new page, with a way back, and a path field shows above the prompt.
@@ -624,6 +506,7 @@ export const mountPromptBox = (
 		icon(doc, 'send'),
 	)
 	send.title = labels.send
+	const divider = element(doc, 'span', { className: 'divider' })
 	const toolbar = element(
 		doc,
 		'div',
@@ -634,9 +517,8 @@ export const mountPromptBox = (
 		undo,
 		newPage,
 		element(doc, 'span', { className: 'spacer' }),
-		reload,
 		close,
-		element(doc, 'span', { className: 'divider' }),
+		divider,
 		send,
 	)
 
@@ -718,7 +600,7 @@ export const mountPromptBox = (
 		status,
 		pathRow,
 		input,
-		code,
+		formBox,
 		toolbar,
 		pagesSection,
 		footer,
@@ -735,15 +617,11 @@ export const mountPromptBox = (
 	let open = false
 	let creating = false
 	let message: { text: string; error: boolean } | null = null
-	// JSON mode: the text as last loaded, and what it is of (the block's
-	// uid, null for the whole entry). `seenUid` is the selection last loaded
-	// for: a new one loads its JSON, and undefined loads it again.
-	let json = false
-	let loaded = ''
-	let viewUid: string | null = null
-	let seenUid: string | null | undefined
-	let loadingView = false
-	let viewRequest = 0
+	// Form mode, and the form while mounted: a fresh one (and one-time
+	// address) every time it shows.
+	let form = false
+	let formHandle: FormHandle | null = null
+	let formLoading = false
 	// The pages, fetched once the panel opens and kept; `active` is the
 	// option arrow keys are on.
 	let picking = false
@@ -772,46 +650,51 @@ export const mountPromptBox = (
 		const onlyNew = pageless && canCreate
 		if (!canCreate) creating = false
 		if (onlyNew) creating = true
-		if (creating || pageless) json = false
+		if (creating || pageless || !site) form = false
+		// The form is there only while shown in the open panel.
+		const showForm = open && available && form
+		if (showForm && !formHandle) mountForm()
+		else if (!showForm && formHandle) unmountForm()
 		pillText.textContent = onlyNew ? labels.newPage : labels.open
 		cancelNew.hidden = onlyNew
 		scope.hidden = creating
 		newScope.hidden = !creating
-		newPage.hidden = creating || json || !canCreate
+		newPage.hidden = creating || form || !canCreate
 		newPage.disabled = busy
 		pathRow.hidden = !creating || picking
 		pathInput.disabled = busy
-		input.hidden = json || picking
-		code.hidden = !json || picking
+		input.hidden = form || picking
+		formBox.hidden = !form || picking
+		formBox.classList.toggle('loading', formLoading)
 		toolbar.hidden = picking
 		pagesSection.hidden = !picking
 		input.placeholder = creating
 			? labels.newPagePlaceholder
 			: labels.placeholder
-		// In JSON mode the scope is what the JSON is of.
-		const scopeUid = json ? viewUid : state.selectedUid
-		scopeText.textContent = scopeUid ? labels.scopeBlock : labels.scopeEntry
+		scopeText.textContent = state.selectedUid
+			? labels.scopeBlock
+			: labels.scopeEntry
 		clearBlock.hidden = !state.selectedUid
-		pageIcon.hidden = !!scopeUid
-		blockIcon.hidden = !scopeUid
-		modes.hidden = !site || creating || pageless
-		promptMode.setAttribute('aria-pressed', String(!json))
-		jsonMode.setAttribute('aria-pressed', String(json))
+		pageIcon.hidden = !!state.selectedUid
+		blockIcon.hidden = !state.selectedUid
+		// A CMS from before the form doesn't offer it.
+		modes.hidden =
+			!site || creating || pageless || !state.features.includes('form')
+		promptMode.setAttribute('aria-pressed', String(!form))
+		formMode.setAttribute('aria-pressed', String(form))
 		modes.querySelectorAll('button').forEach((button) => {
-			button.disabled = busy || loadingView
+			button.disabled = busy
 		})
-		reload.hidden = !json
-		reload.disabled = busy || loadingView
 		undo.hidden = creating || !state.canUndo
-		undo.disabled = busy || loadingView
-		const text = json ? code.value : input.value
+		undo.disabled = busy
+		// The form applies edits as they are made.
+		send.hidden = form
+		divider.hidden = form
 		send.disabled =
 			busy ||
-			loadingView ||
-			text.trim() === '' ||
+			input.value.trim() === '' ||
 			(creating && pathInput.value.trim() === '')
 		input.disabled = busy
-		code.disabled = busy || loadingView
 		save.hidden = !state.features.includes('save') || pageless
 		save.disabled = busy || !state.unsaved
 		save.textContent = state.saving ? labels.saving : labels.save
@@ -826,27 +709,21 @@ export const mountPromptBox = (
 		pageChipText.textContent =
 			pages?.find(({ entryId }) => entryId === bridge.entryId)?.name ??
 			labels.pages
-		const working = state.prompting || loadingView
+		const loadingForm = form && formLoading && !picking
+		const working = state.prompting || loadingForm
 		const note = state.prompting
 			? creating
 				? labels.creating
 				: labels.working
-			: loadingView
-				? labels.jsonLoading
+			: loadingForm
+				? labels.formLoading
 				: (message?.text ??
 					(site && !creating && !picking && !state.selectedUid
 						? labels.selectHint
 						: ''))
 		status.textContent = note
 		status.hidden = !note
-		status.className = `status${working ? ' working' : ''}${!busy && !loadingView && message?.error ? ' error' : ''}`
-
-		// A new selection while editing JSON (or a reload asked for): its
-		// JSON, after this render.
-		if (open && json && !picking && state.selectedUid !== seenUid) {
-			seenUid = state.selectedUid
-			queueMicrotask(() => void loadView(false))
-		}
+		status.className = `status${working ? ' working' : ''}${!busy && !loadingForm && message?.error ? ' error' : ''}`
 	}
 	const refresh = () => render(bridge.getState())
 
@@ -855,119 +732,45 @@ export const mountPromptBox = (
 		input.style.height = `${input.scrollHeight}px`
 	}
 
-	// Loads the JSON of the selection. Unless `force`, keeps text edited
-	// since the last load, with a note. True once loaded.
-	const loadView = async (force: boolean) => {
-		const uid = bridge.getState().selectedUid
-		seenUid = uid
-		if (!force && code.value !== loaded) {
-			message = { text: labels.jsonKept, error: false }
-			refresh()
-			return false
-		}
-		const request = ++viewRequest
-		loadingView = true
-		message = null
-		refresh()
-		try {
-			const view = await bridge.view({ uid })
-			if (request !== viewRequest) return false
-			loaded = `${JSON.stringify(view, null, 2)}\n`
-			code.value = loaded
-			code.scrollTop = 0
-			viewUid = uid
-			return true
-		} catch (error) {
-			if (request === viewRequest) message = failure(error)
-			return false
-		} finally {
-			if (request === viewRequest) {
-				loadingView = false
+	// Callbacks come later (the address is fetched first), never during a
+	// render.
+	const mountForm = () => {
+		formLoading = true
+		formBox.classList.add('loading')
+		const handle = bridge.openForm(formBox, {
+			title: labels.formTitle,
+			onReady: () => {
+				if (formHandle !== handle) return
+				formLoading = false
+				message = null
 				refresh()
-			}
-		}
+			},
+			onError: (text) => {
+				if (formHandle !== handle) return
+				formLoading = false
+				message = { text, error: true }
+				refresh()
+			},
+		})
+		formHandle = handle
 	}
 
-	// Loads the JSON again once rendered, keeping edited text.
-	const requestView = () => {
-		seenUid = undefined
-		refresh()
+	const unmountForm = () => {
+		formHandle?.close()
+		formHandle = null
+		formLoading = false
 	}
 
-	const setJson = (next: boolean) => {
-		if (json === next) return
-		json = next
+	const setForm = (next: boolean) => {
+		if (form === next) return
+		form = next
 		message = null
-		requestView()
-		;(json ? code : input).focus()
-	}
-
-	// Where the text stops being JSON, as a line and column.
-	const parseProblem = (text: string, error: unknown) => {
-		const offset = jsonErrorAt(text)
-		if (offset < 0) {
-			const reason = error instanceof Error ? error.message : String(error)
-			return { text: `${labels.jsonInvalid}: ${reason}` }
-		}
-		const before = text.slice(0, offset)
-		const line = before.split('\n').length
-		const column = offset - before.lastIndexOf('\n')
-		return {
-			text: labels.jsonInvalidAt
-				.replace('{line}', String(line))
-				.replace('{column}', String(column)),
-			offset,
-		}
-	}
-
-	const applyJson = async () => {
-		const text = code.value
-		if (!text.trim() || bridge.getState().prompting || loadingView) return
-		let changes: unknown
-		try {
-			changes = JSON.parse(text)
-		} catch (error) {
-			const problem = parseProblem(text, error)
-			message = { text: problem.text, error: true }
-			refresh()
-			code.focus()
-			if (problem.offset !== undefined) {
-				code.setSelectionRange(problem.offset, problem.offset)
-			}
-			return
-		}
-		if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
-			message = { text: labels.jsonNotObject, error: true }
-			return refresh()
-		}
-		message = null
-		try {
-			const { changed, view } = await bridge.applyJson(
-				changes as Record<string, unknown>,
-				{ uid: viewUid },
-			)
-			// What the CMS made of it, from now on what's edited: in the
-			// answer, or asked for (a CMS from before `view` in it).
-			if (view) {
-				++viewRequest
-				loaded = `${JSON.stringify(view, null, 2)}\n`
-				code.value = loaded
-			}
-			if (view || (await loadView(true))) {
-				message = {
-					text: changed.length > 0 ? labels.applied : labels.unchanged,
-					error: false,
-				}
-			}
-		} catch (error) {
-			message = failure(error)
-		}
 		refresh()
-		code.focus()
+		if (!form) input.focus()
 	}
 
 	const submit = async () => {
-		if (json) return applyJson()
+		if (form) return
 		const prompt = input.value.trim()
 		if (!prompt || bridge.getState().prompting) return
 		message = null
@@ -1108,7 +911,6 @@ export const mountPromptBox = (
 		refresh()
 		if (site) bridge.setSelecting(open && !creating)
 		if (open && site) void fetchPages()
-		if (open && json) requestView()
 	}
 
 	const setCreating = (next: boolean) => {
@@ -1136,7 +938,7 @@ export const mountPromptBox = (
 
 	pill.addEventListener('click', () => {
 		setOpen(true)
-		;(creating ? pathInput : json ? code : input).focus()
+		if (!form) (creating ? pathInput : input).focus()
 	})
 	close.addEventListener('click', () => setOpen(false))
 	save.addEventListener('click', () => void store('save'))
@@ -1146,12 +948,8 @@ export const mountPromptBox = (
 	clearBlock.addEventListener('click', () => bridge.select(null))
 	newPage.addEventListener('click', () => setCreating(true))
 	cancelNew.addEventListener('click', () => setCreating(false))
-	promptMode.addEventListener('click', () => setJson(false))
-	jsonMode.addEventListener('click', () => setJson(true))
-	reload.addEventListener('click', () => {
-		void loadView(true)
-		code.focus()
-	})
+	promptMode.addEventListener('click', () => setForm(false))
+	formMode.addEventListener('click', () => setForm(true))
 	pageChip.addEventListener('click', () => setPicking(!picking))
 	pathInput.addEventListener('input', refresh)
 	pathInput.addEventListener('keydown', (event) => {
@@ -1185,7 +983,6 @@ export const mountPromptBox = (
 	undo.addEventListener('click', () => {
 		message = null
 		bridge.undo()
-		if (json) requestView()
 	})
 	panel.addEventListener('submit', (event) => {
 		event.preventDefault()
@@ -1203,45 +1000,13 @@ export const mountPromptBox = (
 			setOpen(false)
 		}
 	})
-	code.addEventListener('input', refresh)
-	code.addEventListener('keydown', (event) => {
-		// Enter is a new line here; Ctrl or Cmd + Enter applies.
-		if (
-			event.key === 'Enter' &&
-			(event.ctrlKey || event.metaKey) &&
-			!event.isComposing
-		) {
-			event.preventDefault()
-			void submit()
-		} else if (
-			event.key === 'Tab' &&
-			!event.shiftKey &&
-			!event.ctrlKey &&
-			!event.metaKey &&
-			!event.altKey
-		) {
-			// A tab, not the next button (Shift + Tab still leaves). Through
-			// execCommand where it works, so the browser's undo has it.
-			event.preventDefault()
-			let inserted = false
-			try {
-				inserted = doc.execCommand('insertText', false, '\t')
-			} catch {}
-			if (!inserted) {
-				code.setRangeText('\t', code.selectionStart, code.selectionEnd, 'end')
-			}
-			refresh()
-		} else if (event.key === 'Escape') {
-			setOpen(false)
-		}
-	})
-
 	const unsubscribe = bridge.on('change', render)
 	refresh()
 	doc.body.appendChild(host)
 
 	return () => {
 		unsubscribe()
+		unmountForm()
 		host.remove()
 	}
 }

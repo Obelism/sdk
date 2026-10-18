@@ -155,20 +155,30 @@ getContentBridge({ pagePath: (path, locale) => `/${locale}/${path}` })
 await bridge.createPage('/pricing', 'Our plans, for agencies') // or your own UI
 ```
 
-There the box also switches between **Prompt** and **JSON**. JSON shows the
-page, or the selected block, as the language model sees it (one locale, rich
-text as Markdown, blocks with `_uid` and `_type`), with the changes that
-aren't saved yet: change it by hand, or tweak what a prompt just made, and
-apply it (Ctrl/Cmd + Enter). It is checked like a prompt's answer, lands in
-the unsaved changes and undoes the same way. A chip under the prompt names
-the page and opens every page of the space, drafts included, to go to one
-(at `pagePath`, in the page's language when it has a path there):
+There the box also switches between **Prompt** and **Form**. Form shows the
+CMS's own form for the page — or for the entry around the selected block —
+right in the box: the fields, and blocks as cards to open and add,
+as in the dashboard. Edits apply as you make them: they land in the unsaved
+changes, show on the page, and undo a burst of typing at a time. A prompt or
+an undo shows in the form too. A chip under the prompt names the page and
+opens every page of the space, drafts included, to go to one (at
+`pagePath`, in the page's language when it has a path there):
+
+```ts
+const form = bridge.openForm(element, { onReady, onError }) // an iframe
+form.close()
+const pages = await bridge.pages() // { entryId, name, status, path, url }[]
+bridge.openPage(pages[0]) // asks first when changes aren't saved
+```
+
+The form needs `createSiteEditing`'s `/cms/api/form`, which gets the CMS
+page a one-time address. For the raw content instead, as a language model
+sees it (one locale, rich text as Markdown, blocks with `_uid` and
+`_type`), there is JSON:
 
 ```ts
 const view = await bridge.view() // or { uid } for a block
 const { changed } = await bridge.applyJson({ ...view, title: 'Pricing' })
-const pages = await bridge.pages() // { entryId, name, status, path, url }[]
-bridge.openPage(pages[0]) // asks first when changes aren't saved
 ```
 
 The CMS runs prompts on Workers AI. To use your own model, set a prompt

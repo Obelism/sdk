@@ -8,11 +8,13 @@ import {
 	type ContentBridge,
 	type CreatePageResult,
 	createEmitter,
+	type FormHandle,
 	INITIAL_STATE,
 	type PromptResult,
 	selectionStyle,
 	type SitePage,
 } from './createBridge'
+import { type FormContent, type FormFrame, mountFormFrame } from './formFrame'
 
 // The bridge on a site signed in to edit (`/cms/login`, from
 // @obelism/content/site), outside the visual editor. It plays the editor's
@@ -23,9 +25,10 @@ import {
 //
 // What it edits is the page's entry — the outermost element marked with
 // `editable(entry)` — or, for a selected block, the entry around that block.
-// Besides prompts it edits JSON (`view`, then `applyJson`: the entry as a
-// language model sees it, changed by hand), and lists the space's pages to
-// go to one.
+// Besides prompts it shows the CMS's own entry form (`openForm`, an iframe
+// kept in step with the content here, see formFrame.ts), edits JSON (`view`,
+// then `applyJson`: the raw alternative), and lists the space's pages to go
+// to one.
 
 // The base path of the site's handler while signed in to edit, else null.
 export const readSiteEditing = (doc: Document): string | null => {
@@ -69,6 +72,12 @@ type Working = {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
+// Edits in the form further apart than this are separate undo steps.
+export const FORM_BURST_MS = 1000
+// How long the page waits for the form's edits to settle before it shows
+// them.
+export const FORM_RENDER_MS = 300
+
 export type SiteBridgeOptions = {
 	// Where a CMS path (`solutions/agencies`) is on the site, in a locale.
 	// Default: `/` + path.
@@ -89,6 +98,11 @@ export const createSiteBridge = (
 	// Entries changed here since the last publish.
 	const touched = new Set<string>()
 	let session: SessionInfo | null = null
+	// The open form's, if any; and when the form last changed content, for
+	// undo steps (-Infinity: the next edit starts a new step).
+	let closeForm: (() => void) | null = null
+	let lastFormEdit = -Infinity
+	const renderTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 	let state: BridgeState = INITIAL_STATE
 	const setState = (next: Partial<BridgeState>) => {
@@ -158,19 +172,30 @@ export const createSiteBridge = (
 		return codes.includes(base) ? base : session.space.defaultLocale
 	}
 
+	// One request per entry at a time: a second would overwrite edits made
+	// while the first was out.
+	const loading = new Map<string, Promise<Working>>()
 	const load = async (entryId: string) => {
 		const loaded = working.get(entryId)
 		if (loaded) return loaded
-		const entry = await api<{ content: unknown; draftRevision: number }>(
-			`entries/${encodeURIComponent(entryId)}`,
-		)
-		const fresh = {
-			content: entry.content,
-			saved: entry.content,
-			revision: entry.draftRevision,
+		let pending = loading.get(entryId)
+		if (!pending) {
+			pending = api<{ content: unknown; draftRevision: number }>(
+				`entries/${encodeURIComponent(entryId)}`,
+			)
+				.then((entry) => {
+					const fresh = working.get(entryId) ?? {
+						content: entry.content,
+						saved: entry.content,
+						revision: entry.draftRevision,
+					}
+					working.set(entryId, fresh)
+					return fresh
+				})
+				.finally(() => loading.delete(entryId))
+			loading.set(entryId, pending)
 		}
-		working.set(entryId, fresh)
-		return fresh
+		return pending
 	}
 
 	// The entry a prompt or JSON acts on, for the block `uid` (the selected
@@ -210,6 +235,21 @@ export const createSiteBridge = (
 		win.requestAnimationFrame(() => highlight(state.selectedUid))
 	}
 
+	const logError = (error: unknown) =>
+		console.error('[@obelism/content bridge]', error)
+
+	// Renders once the form's edits settle.
+	const renderSoon = (entryId: string) => {
+		clearTimeout(renderTimers.get(entryId))
+		renderTimers.set(
+			entryId,
+			setTimeout(() => {
+				renderTimers.delete(entryId)
+				void render(entryId).catch(logError)
+			}, FORM_RENDER_MS),
+		)
+	}
+
 	const afterStore = (event: 'saved' | 'published') => {
 		emitter.emit(event, {})
 		if (emitter.listeners.update.size === 0) win.location.reload()
@@ -227,6 +267,7 @@ export const createSiteBridge = (
 			touched.add(entryId)
 		}
 		history.length = 0
+		lastFormEdit = -Infinity
 		refreshUnsaved()
 	}
 
@@ -255,6 +296,7 @@ export const createSiteBridge = (
 					{ prompt: text, content: entry.content, locale: locale(), uid },
 				)
 				history.push({ entryId, content: entry.content })
+				lastFormEdit = -Infinity
 				entry.content = result.content
 				refreshUnsaved()
 				await render(entryId)
@@ -331,6 +373,7 @@ export const createSiteBridge = (
 				// Nothing to undo when nothing changed.
 				if (!same(result.content, entry.content)) {
 					history.push({ entryId, content: entry.content })
+					lastFormEdit = -Infinity
 					entry.content = result.content
 					refreshUnsaved()
 					await render(entryId)
@@ -342,6 +385,99 @@ export const createSiteBridge = (
 			} finally {
 				setState({ prompting: false })
 			}
+		},
+
+		openForm(container, options = {}): FormHandle {
+			const { title = 'Content form', onReady, onError } = options
+			closeForm?.()
+			let closed = false
+			let frame: FormFrame | null = null
+			// What the form was last sent, or sent back itself.
+			let shown: FormContent | null = null
+			let unsubscribe = () => {}
+			const fail = (error: unknown) => {
+				if (!closed)
+					onError?.(error instanceof Error ? error.message : String(error))
+			}
+			const close = () => {
+				if (closed) return
+				closed = true
+				unsubscribe()
+				frame?.destroy()
+				if (closeForm === close) closeForm = null
+			}
+			closeForm = close
+
+			// Sends the form the entry for the selection, when anything of it
+			// changed: prompts, undo, a reload after saving, the selection.
+			const show = () => {
+				if (closed || !frame) return
+				const entryId = entryFor(state.selectedUid)
+				if (!entryId) return
+				const entry = working.get(entryId)
+				if (!entry) {
+					load(entryId).then(show, fail)
+					return
+				}
+				const next: FormContent = {
+					entryId,
+					content: entry.content,
+					locale: locale(),
+					selectedUid: state.selectedUid,
+				}
+				if (
+					shown &&
+					shown.entryId === next.entryId &&
+					shown.content === next.content &&
+					shown.locale === next.locale &&
+					shown.selectedUid === next.selectedUid
+				) {
+					return
+				}
+				shown = next
+				frame.show(next)
+			}
+
+			const change = (content: Record<string, unknown>, from?: string) => {
+				const entryId = from ?? shown?.entryId
+				const entry = entryId === undefined ? undefined : working.get(entryId)
+				if (
+					closed ||
+					entryId === undefined ||
+					!entry ||
+					same(content, entry.content)
+				) {
+					return
+				}
+				const now = Date.now()
+				if (now - lastFormEdit >= FORM_BURST_MS) {
+					history.push({ entryId, content: entry.content })
+				}
+				lastFormEdit = now
+				entry.content = content
+				// Not sent back: the form has it.
+				if (shown?.entryId === entryId) shown = { ...shown, content }
+				refreshUnsaved()
+				renderSoon(entryId)
+			}
+
+			const start = async () => {
+				if (!has('form')) throw new Error('You may not edit content here')
+				await load(target(undefined).entryId)
+				// A fresh one every time: the address works once, for a minute.
+				const { url } = await api<{ url?: unknown }>('form', {})
+				if (closed) return
+				const address = typeof url === 'string' ? url : ''
+				frame = mountFormFrame(win, container, address, title, {
+					onReady: () => onReady?.(),
+					onChange: change,
+					onError: (message) => onError?.(message),
+				})
+				unsubscribe = emitter.on('change', show)
+				show()
+			}
+			start().catch(fail)
+			return { close }
 		},
 
 		async pages() {
@@ -386,11 +522,10 @@ export const createSiteBridge = (
 			const last = history.pop()
 			const entry = last && working.get(last.entryId)
 			if (!last || !entry) return
+			lastFormEdit = -Infinity
 			entry.content = last.content
 			refreshUnsaved()
-			void render(last.entryId).catch((error: unknown) =>
-				console.error('[@obelism/content bridge]', error),
-			)
+			void render(last.entryId).catch(logError)
 		},
 
 		async save() {
@@ -450,6 +585,9 @@ export const createSiteBridge = (
 		},
 
 		destroy() {
+			closeForm?.()
+			renderTimers.forEach((timer) => clearTimeout(timer))
+			renderTimers.clear()
 			cleanup.splice(0).forEach((undo) => undo())
 		},
 	}
