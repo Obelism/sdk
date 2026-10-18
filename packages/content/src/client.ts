@@ -284,7 +284,10 @@ export class ContentClient {
 			headers: {
 				...headersToObject(merged.headers),
 				Accept: 'application/json',
-				Authorization: `Bearer ${this.#token}`,
+				// Not `Authorization`: Cloudflare never caches a request that
+				// carries it, and this header lets the API answer a delivery
+				// token from its edge cache.
+				'Obelism-Token': this.#token,
 			},
 			signal: merged.signal
 				? AbortSignal.any([merged.signal, timeout])
