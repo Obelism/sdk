@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { type BridgeState, createEmitter, INITIAL_STATE } from './createBridge'
+import {
+	type ApplyJsonResult,
+	type BridgeState,
+	createEmitter,
+	INITIAL_STATE,
+} from './createBridge'
 import { jsonErrorAt, mountPromptBox } from './promptBox'
 
 const PAGES = [
@@ -68,9 +73,11 @@ const fakeBridge = (mode: 'editor' | 'site' = 'editor') => {
 		view: vi.fn(async ({ uid }: { uid?: string | null | undefined } = {}) =>
 			uid ? { heading: 'Hi', _uid: uid, _type: 'hero' } : { title: 'Home' },
 		),
-		applyJson: vi.fn(async (_changes: Record<string, unknown>) => ({
-			changed: ['title'],
-		})),
+		applyJson: vi.fn(
+			async (_changes: Record<string, unknown>): Promise<ApplyJsonResult> => ({
+				changed: ['title'],
+			}),
+		),
 		pages: vi.fn(async () => PAGES),
 		openPage: vi.fn(),
 		undo: vi.fn(),
