@@ -11,8 +11,8 @@
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "^0.134.0",
-		"@obelism/content": "^0.12.0",
-		"@obelism/content-react": "^0.2.10",
+		"@obelism/content": "^0.13.0",
+		"@obelism/content-react": "^0.2.11",
 		"next": "^16.4.1",
 		"react": "^19.3.1",
 		"react-dom": "^19.3.1",
