@@ -49,9 +49,9 @@ describe('ContentClient', () => {
 			locale: 'nl',
 			depth: '2',
 		})
-		expect((init.headers as Record<string, string>).Authorization).toBe(
-			'Bearer cms_d_x',
-		)
+		const headers = init.headers as Record<string, string>
+		expect(headers['Obelism-Token']).toBe('cms_d_x')
+		expect(headers.Authorization).toBeUndefined()
 	})
 
 	it('lets a call override the defaults and add fetch options', async () => {
