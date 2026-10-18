@@ -8,6 +8,7 @@ import { createSiteBridge, readSiteEditing } from './bridge/siteBridge'
 import { DEFAULT_URL, normalizeUrl } from './config'
 
 export type {
+	ApplyJsonResult,
 	BridgeEvent,
 	BridgeEvents,
 	BridgeListener,
@@ -15,6 +16,7 @@ export type {
 	ContentBridge,
 	CreatePageResult,
 	PromptResult,
+	SitePage,
 } from './bridge/createBridge'
 export { INITIAL_STATE } from './bridge/createBridge'
 export { DEFAULT_PROMPT_LABELS, mountPromptBox } from './bridge/promptBox'
@@ -36,8 +38,9 @@ export type BridgeOptions = {
 	// Default: shown.
 	prompt?: boolean | PromptBoxOptions | undefined
 	// Editing on the site: where a CMS path (`solutions/agencies`) in a
-	// locale is on the site, to open a page made with "New page" (the path
-	// is the one in that locale). Default: `/` + path.
+	// locale is on the site, to open a page made with "New page" or picked
+	// from the pages (the path is the one in that locale). Default: `/` +
+	// path.
 	pagePath?: ((path: string, locale: string) => string) | undefined
 }
 

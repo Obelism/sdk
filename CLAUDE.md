@@ -129,6 +129,9 @@ Optional integration syncs the datafile to Vercel Edge Config (`@vercel/edge-con
     `content model pull|plan|apply` (management API), moved from the CMS's
     `cli/`, and `content types` (`cli/typegen.ts`: content-types.ts, a type
     per content type, from the model). The CMS's `getProjectSetup` MCP tool tells agents to run `init`
+  - On the site the prompt box also edits JSON (`bridge.view()` /
+    `applyJson()`, the CMS's `/api/site/v1/entries/{id}/view|apply`) and
+    lists the pages (`bridge.pages()` / `openPage()`, `GET pages`)
   - `pickImproveVariant` / `isImproveBlock` (`improve.ts`): the built-in
     `_improve` block (the CMS's docs/adr/0012)
 - `packages/content-react` → `@obelism/content-react`: `ContentBridge`,

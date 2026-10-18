@@ -50,7 +50,7 @@ export type BridgeState = {
 	features: readonly string[]
 	// The block selected on the page or in the editor, null for none.
 	selectedUid: string | null
-	// A prompt (or a new page) is running.
+	// A prompt, a new page or applied JSON is running.
 	prompting: boolean
 	// The editor can undo the last prompt.
 	canUndo: boolean
@@ -80,6 +80,28 @@ export type CreatePageResult = {
 	url: string
 }
 
+export type ApplyJsonResult = {
+	// The fields (apiIds) the JSON changed; empty when it changed nothing.
+	changed: string[]
+	// The JSON again, as the CMS applied it (from CMS versions that send it).
+	view?: Record<string, unknown> | undefined
+}
+
+// A page of the site, from `pages()`: every page entry of the space
+// environment, drafts included.
+export type SitePage = {
+	entryId: string
+	name: string
+	contentType: string
+	// 'changed': published, with a newer draft.
+	status: 'draft' | 'published' | 'changed'
+	// The CMS path in the page's locale (`solutions/agencies`, '' for the
+	// home page; the default locale's, or any, when it has none there)…
+	path: string
+	// …and where it is on the site (`pagePath`).
+	url: string
+}
+
 export type ContentBridge = {
 	// True inside the visual editor, and on a site signed in to edit.
 	readonly isEditing: boolean
@@ -106,6 +128,25 @@ export type ContentBridge = {
 	// existing page), written from `prompt` like the page it is on, and
 	// stored as a draft straight away. Then opens it.
 	createPage(path: string, prompt: string): Promise<CreatePageResult>
+	// Editing on the site: the entry — or the block `uid`, the selected one
+	// by default — as JSON, the way a language model sees it: one locale,
+	// rich text as Markdown, blocks with `_uid` and `_type`. With the changes
+	// made here that aren't saved yet.
+	view(options?: {
+		uid?: string | null | undefined
+	}): Promise<Record<string, unknown>>
+	// Editing on the site: applies `changes` (fields by apiId, shaped like
+	// `view()`) to the entry or block, like a prompt's answer: checked the
+	// same way, into the unsaved changes, undone with `undo()`.
+	applyJson(
+		changes: Record<string, unknown>,
+		options?: { uid?: string | null | undefined },
+	): Promise<ApplyJsonResult>
+	// Editing on the site: the space's pages, to go to one with `openPage`.
+	pages(): Promise<SitePage[]>
+	// Editing on the site: opens a page from `pages()`, after asking when
+	// changes aren't saved.
+	openPage(page: SitePage): void
 	// Undoes the last prompt in the editor.
 	undo(): void
 	// Editing on the site: stores the changed content as drafts…
@@ -179,11 +220,18 @@ const inertPrompt = () =>
 const onlyOnSite = () =>
 	Promise.reject(new Error('Save and publish in the visual editor itself'))
 
+const onlyWhileEditingSite = () =>
+	Promise.reject(new Error('Only while signed in to edit on the site'))
+
 // What every bridge without a feature does for it.
 export const INERT_METHODS = {
 	prompt: inertPrompt,
 	createPage: () =>
 		Promise.reject(new Error('New pages are made on the site itself')),
+	view: onlyWhileEditingSite,
+	applyJson: onlyWhileEditingSite,
+	pages: onlyWhileEditingSite,
+	openPage: () => {},
 	undo: () => {},
 	save: onlyOnSite,
 	publish: onlyOnSite,

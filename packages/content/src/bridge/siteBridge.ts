@@ -2,6 +2,7 @@ import { ENTRY_ATTRIBUTE, UID_ATTRIBUTE } from '../editable'
 import { SITE_EDITING_COOKIE, SITE_REQUEST_HEADER } from '../site'
 import type { Entry } from '../types'
 import {
+	type ApplyJsonResult,
 	blockSelector,
 	type BridgeState,
 	type ContentBridge,
@@ -10,6 +11,7 @@ import {
 	INITIAL_STATE,
 	type PromptResult,
 	selectionStyle,
+	type SitePage,
 } from './createBridge'
 
 // The bridge on a site signed in to edit (`/cms/login`, from
@@ -21,6 +23,9 @@ import {
 //
 // What it edits is the page's entry — the outermost element marked with
 // `editable(entry)` — or, for a selected block, the entry around that block.
+// Besides prompts it edits JSON (`view`, then `applyJson`: the entry as a
+// language model sees it, changed by hand), and lists the space's pages to
+// go to one.
 
 // The base path of the site's handler while signed in to edit, else null.
 export const readSiteEditing = (doc: Document): string | null => {
@@ -42,6 +47,17 @@ export const readSiteEditing = (doc: Document): string | null => {
 type SessionInfo = {
 	features: string[]
 	space: { defaultLocale: string; locales: { code: string }[] }
+}
+
+type PagesAnswer = {
+	pages: {
+		entryId: string
+		name: string
+		contentType: string
+		status: SitePage['status']
+		// The CMS path by locale code.
+		paths: Record<string, string>
+	}[]
 }
 
 type Working = {
@@ -157,6 +173,19 @@ export const createSiteBridge = (
 		return fresh
 	}
 
+	// The entry a prompt or JSON acts on, for the block `uid` (the selected
+	// one when left out).
+	const target = (option: string | null | undefined) => {
+		const uid = option === undefined ? state.selectedUid : option
+		const entryId = entryFor(uid)
+		if (!entryId) {
+			throw new Error(
+				'Nothing on this page is marked as an entry: add editable(entry)',
+			)
+		}
+		return { uid, entryId }
+	}
+
 	const highlight = (uid: string | null) => {
 		doc.querySelectorAll('[data-cms-selected]').forEach((element) => {
 			element.removeAttribute('data-cms-selected')
@@ -217,13 +246,7 @@ export const createSiteBridge = (
 			const text = prompt.trim()
 			if (!text) throw new Error('Say what to change')
 			if (!has('prompt')) throw new Error('You may not edit content here')
-			const uid = options.uid === undefined ? state.selectedUid : options.uid
-			const entryId = entryFor(uid)
-			if (!entryId) {
-				throw new Error(
-					'Nothing on this page is marked as an entry: add editable(entry)',
-				)
-			}
+			const { uid, entryId } = target(options.uid)
 			setState({ prompting: true })
 			try {
 				const entry = await load(entryId)
@@ -274,6 +297,89 @@ export const createSiteBridge = (
 			} finally {
 				setState({ prompting: false })
 			}
+		},
+
+		async view(options = {}) {
+			const { uid, entryId } = target(options.uid)
+			const entry = await load(entryId)
+			const { view } = await api<{ view: Record<string, unknown> }>(
+				`entries/${encodeURIComponent(entryId)}/view`,
+				{ content: entry.content, locale: locale(), uid },
+			)
+			return view
+		},
+
+		async applyJson(changes, options = {}): Promise<ApplyJsonResult> {
+			if (!has('prompt')) throw new Error('You may not edit content here')
+			if (!changes || typeof changes !== 'object' || Array.isArray(changes)) {
+				throw new Error('Send the fields to change as an object')
+			}
+			const { uid, entryId } = target(options.uid)
+			setState({ prompting: true })
+			try {
+				const entry = await load(entryId)
+				const result = await api<{
+					content: unknown
+					changed?: string[]
+					view?: Record<string, unknown> | null
+				}>(`entries/${encodeURIComponent(entryId)}/apply`, {
+					changes,
+					content: entry.content,
+					locale: locale(),
+					uid,
+				})
+				// Nothing to undo when nothing changed.
+				if (!same(result.content, entry.content)) {
+					history.push({ entryId, content: entry.content })
+					entry.content = result.content
+					refreshUnsaved()
+					await render(entryId)
+				}
+				return {
+					changed: result.changed ?? [],
+					...(result.view && { view: result.view }),
+				}
+			} finally {
+				setState({ prompting: false })
+			}
+		},
+
+		async pages() {
+			const { pages } = await api<PagesAnswer>('pages')
+			const preferred = [locale(), session?.space.defaultLocale]
+			return pages.flatMap((page): SitePage[] => {
+				// The page's path in this locale, else the default's, else any.
+				const code =
+					preferred.find(
+						(code) => code !== undefined && page.paths[code] !== undefined,
+					) ?? Object.keys(page.paths)[0]
+				const path = code === undefined ? undefined : page.paths[code]
+				if (code === undefined || path === undefined) return []
+				return [
+					{
+						entryId: page.entryId,
+						name: page.name,
+						contentType: page.contentType,
+						status: page.status,
+						path,
+						url: pagePath(path, code),
+					},
+				]
+			})
+		},
+
+		openPage(page) {
+			if (
+				state.unsaved &&
+				!win.confirm('Leave this page and lose the changes you have not saved?')
+			) {
+				return
+			}
+			// Asked already: no second question from `beforeunload`.
+			working.clear()
+			history.length = 0
+			refreshUnsaved()
+			win.location.assign(page.url)
 		},
 
 		undo() {

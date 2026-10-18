@@ -59,14 +59,27 @@ const model: ModelFile = {
 				{ apiId: 'meta', name: 'Meta', type: 'json' },
 			],
 		},
-		{ apiId: 'author', name: 'Author', kind: 'data', fields: [] },
+		{
+			apiId: 'author',
+			name: 'Author',
+			kind: 'data',
+			description: null,
+			fields: [],
+		},
 		{
 			apiId: 'hero',
 			name: 'Hero',
 			kind: 'block',
+			description: 'The top of a page, */ with a heading',
 			fields: [{ apiId: 'heading', name: 'Heading', type: 'text' }],
 		},
-		{ apiId: 'asset', name: 'Asset', kind: 'block', fields: [] },
+		{
+			apiId: 'asset',
+			name: 'Asset',
+			kind: 'block',
+			description: '',
+			fields: [],
+		},
 	],
 }
 
@@ -78,7 +91,7 @@ describe('generateTypes', () => {
 
 import type { Asset, Block, Entry, EntryStub, ImproveBlock, RichTextDocument } from '@obelism/content'
 
-// Blog post (page): A post on the blog
+/** Blog post (page): A post on the blog */
 export type BlogPost = Entry<
 	{
 		title: string | null
@@ -87,7 +100,7 @@ export type BlogPost = Entry<
 		readingTime: number | null
 		featured: boolean | null
 		date: string | null
-		// Where it is listed
+		/** Where it is listed */
 		category: 'news' | 'it\\'s' | null
 		tags: 'a'[] | null
 		image: Asset | null
@@ -101,13 +114,13 @@ export type BlogPost = Entry<
 	'blogPost'
 >
 
-// Author (data)
+/** Author (data) */
 export type Author = Entry<
 	Record<never, never>,
 	'author'
 >
 
-// Hero (block)
+/** Hero (block): The top of a page, *\\/ with a heading */
 export type Hero = Block<
 	{
 		heading: string | null
@@ -115,7 +128,7 @@ export type Hero = Block<
 	'hero'
 >
 
-// Asset (block)
+/** Asset (block) */
 export type AssetBlock = Block<
 	Record<never, never>,
 	'asset'
@@ -134,6 +147,7 @@ export type ContentBlock = Hero | AssetBlock
 					apiId: 'settings',
 					name: 'Settings',
 					kind: 'data',
+					description: 'Site-wide',
 					fields: [
 						{
 							apiId: 'home',

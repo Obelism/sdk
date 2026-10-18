@@ -155,6 +155,22 @@ getContentBridge({ pagePath: (path, locale) => `/${locale}/${path}` })
 await bridge.createPage('/pricing', 'Our plans, for agencies') // or your own UI
 ```
 
+There the box also switches between **Prompt** and **JSON**. JSON shows the
+page, or the selected block, as the language model sees it (one locale, rich
+text as Markdown, blocks with `_uid` and `_type`), with the changes that
+aren't saved yet: change it by hand, or tweak what a prompt just made, and
+apply it (Ctrl/Cmd + Enter). It is checked like a prompt's answer, lands in
+the unsaved changes and undoes the same way. A chip under the prompt names
+the page and opens every page of the space, drafts included, to go to one
+(at `pagePath`, in the page's language when it has a path there):
+
+```ts
+const view = await bridge.view() // or { uid } for a block
+const { changed } = await bridge.applyJson({ ...view, title: 'Pricing' })
+const pages = await bridge.pages() // { entryId, name, status, path, url }[]
+bridge.openPage(pages[0]) // asks first when changes aren't saved
+```
+
 The CMS runs prompts on Workers AI. To use your own model, set a prompt
 endpoint under Space settings → Prompt editing and answer it with
 `createPromptHandler` (it verifies the signed request; you call the model):
@@ -333,6 +349,7 @@ npx @obelism/content types --file content/content-model.json  # from the model f
 Pages and data become `Entry<{ …fields }, 'apiId'>`, blocks
 `Block<{ …fields }, 'apiId'>`, named after the apiId (`blogPost` →
 `BlogPost`), with `ContentEntry` and `ContentBlock` as the unions of them.
+Content type and field descriptions become JSDoc, so editors show them.
 Each field is typed by what the delivery API answers with its defaults (one
 locale, rich text as a document), and `| null` when empty:
 

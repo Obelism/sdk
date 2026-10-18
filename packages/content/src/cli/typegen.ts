@@ -40,8 +40,9 @@ const list = (type: string, multiple: boolean | undefined) =>
 const nullable = (type: string) =>
 	type === 'unknown' ? type : `${type} | null`
 
+// JSDoc, so editors show it on hover.
 const comment = (text: string, indent: string) =>
-	`${indent}// ${text.replace(/\s+/g, ' ').trim()}\n`
+	`${indent}/** ${text.replace(/\s+/g, ' ').trim().replace(/\*\//g, '*\\/')} */\n`
 
 export const generateTypes = (model: ModelFile): string => {
 	const types = model.contentTypes

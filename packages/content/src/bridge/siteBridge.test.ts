@@ -249,6 +249,190 @@ describe('createSiteBridge', () => {
 		expect(calls.some(({ path }) => path === 'entries')).toBe(false)
 	})
 
+	it('shows and applies JSON, undone like a prompt', async () => {
+		const { win, calls } = site({
+			session: () => SESSION,
+			'entries/entry_page': () => ({
+				content: { title: { en: 'Old', nl: 'Oud' } },
+				draftRevision: 3,
+			}),
+			'entries/entry_page/view': ({ content }) => ({
+				view: { title: content.title.nl },
+			}),
+			'entries/entry_page/apply': ({ changes, content }) =>
+				changes.title === content.title.nl
+					? { content, changed: [] }
+					: {
+							content: { title: { ...content.title, nl: changes.title } },
+							changed: ['title'],
+						},
+			'entries/entry_page/preview': ({ content }) => ({
+				entry: { id: 'entry_page', fields: { title: content.title.nl } },
+			}),
+		})
+		const bridge = createSiteBridge(win, '/cms')
+		await vi.waitFor(() =>
+			expect(bridge.getState().features).toContain('prompt'),
+		)
+		const updates: unknown[] = []
+		bridge.on('update', ({ entry }) => updates.push(entry))
+
+		expect(await bridge.view()).toEqual({ title: 'Oud' })
+		expect(calls.at(-1)).toMatchObject({
+			path: 'entries/entry_page/view',
+			body: {
+				content: { title: { en: 'Old', nl: 'Oud' } },
+				locale: 'nl',
+				uid: null,
+			},
+			headers: { 'x-obelism-content': '1' },
+		})
+
+		expect(await bridge.applyJson({ title: 'Oud' })).toEqual({ changed: [] })
+		expect(bridge.getState()).toMatchObject({ unsaved: false, canUndo: false })
+
+		expect(await bridge.applyJson({ title: 'Nieuw' })).toEqual({
+			changed: ['title'],
+		})
+		expect(calls.find(({ path }) => path.endsWith('/apply'))!.body).toEqual({
+			changes: { title: 'Oud' },
+			content: { title: { en: 'Old', nl: 'Oud' } },
+			locale: 'nl',
+			uid: null,
+		})
+		expect(updates).toEqual([{ id: 'entry_page', fields: { title: 'Nieuw' } }])
+		expect(bridge.getState()).toMatchObject({
+			unsaved: true,
+			canUndo: true,
+			prompting: false,
+		})
+		// The view has the change that isn't saved.
+		expect(await bridge.view()).toEqual({ title: 'Nieuw' })
+
+		bridge.undo()
+		await vi.waitFor(() => expect(updates).toHaveLength(2))
+		expect(bridge.getState()).toMatchObject({ unsaved: false, canUndo: false })
+		await expect(bridge.applyJson([] as never)).rejects.toThrow('an object')
+	})
+
+	it('shows and applies JSON for the block asked for', async () => {
+		const { win, calls } = site({
+			session: () => SESSION,
+			'entries/entry_nav': () => ({ content: {}, draftRevision: 1 }),
+			'entries/entry_nav/view': () => ({ view: { _uid: 'link' } }),
+			'entries/entry_nav/apply': () =>
+				Response.json({ error: 'label: Required' }, { status: 422 }),
+		})
+		const bridge = createSiteBridge(win, '/cms')
+		await vi.waitFor(() =>
+			expect(bridge.getState().features).toContain('prompt'),
+		)
+		await bridge.view({ uid: 'link' })
+		expect(calls.at(-1)).toMatchObject({
+			path: 'entries/entry_nav/view',
+			body: { uid: 'link' },
+		})
+		await expect(
+			bridge.applyJson({ label: null }, { uid: 'link' }),
+		).rejects.toThrow('label: Required')
+		expect(bridge.getState()).toMatchObject({
+			prompting: false,
+			canUndo: false,
+		})
+	})
+
+	it('lists the pages in the page’s locale, and opens one', async () => {
+		const confirm = vi.fn(() => false)
+		const { win, calls, assign } = site({
+			session: () => SESSION,
+			pages: () => ({
+				pages: [
+					{
+						entryId: 'entry_home',
+						name: 'Home',
+						contentType: 'page',
+						status: 'published',
+						paths: { en: '', nl: '' },
+					},
+					{
+						entryId: 'entry_agencies',
+						name: 'Agencies',
+						contentType: 'page',
+						status: 'draft',
+						paths: { en: 'solutions/agencies' },
+					},
+					{
+						entryId: 'entry_de',
+						name: 'Nur Deutsch',
+						contentType: 'page',
+						status: 'changed',
+						paths: { de: 'nur' },
+					},
+					{
+						entryId: 'entry_nowhere',
+						name: 'Nowhere',
+						contentType: 'page',
+						status: 'draft',
+						paths: {},
+					},
+				],
+			}),
+			'entries/entry_page': () => ({ content: {}, draftRevision: 1 }),
+			'entries/entry_page/prompt': () => ({ content: { a: 1 }, summary: '' }),
+		})
+		;(win as unknown as { confirm: typeof confirm }).confirm = confirm
+		const bridge = createSiteBridge(win, '/cms', {
+			pagePath: (path, locale) => `/${locale}/${path}`,
+		})
+		await vi.waitFor(() =>
+			expect(bridge.getState().features).toContain('prompt'),
+		)
+
+		const pages = await bridge.pages()
+		expect(calls.at(-1)).toMatchObject({ path: 'pages', body: undefined })
+		expect(pages).toEqual([
+			{
+				entryId: 'entry_home',
+				name: 'Home',
+				contentType: 'page',
+				status: 'published',
+				path: '',
+				url: '/nl/',
+			},
+			{
+				entryId: 'entry_agencies',
+				name: 'Agencies',
+				contentType: 'page',
+				status: 'draft',
+				path: 'solutions/agencies',
+				url: '/en/solutions/agencies',
+			},
+			{
+				entryId: 'entry_de',
+				name: 'Nur Deutsch',
+				contentType: 'page',
+				status: 'changed',
+				path: 'nur',
+				url: '/de/nur',
+			},
+		])
+
+		bridge.openPage(pages[1]!)
+		expect(assign).toHaveBeenLastCalledWith('/en/solutions/agencies')
+		expect(confirm).not.toHaveBeenCalled()
+
+		await bridge.prompt('Change it')
+		bridge.openPage(pages[0]!)
+		expect(confirm).toHaveBeenCalled()
+		expect(assign).toHaveBeenCalledTimes(1)
+
+		confirm.mockReturnValue(true)
+		bridge.openPage(pages[0]!)
+		expect(assign).toHaveBeenLastCalledWith('/nl/')
+		// Asked once: leaving doesn't ask again.
+		expect(bridge.getState().unsaved).toBe(false)
+	})
+
 	it('signs out through the site’s logout', () => {
 		const { win } = site({ session: () => SESSION })
 		const bridge = createSiteBridge(win, '/cms')

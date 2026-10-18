@@ -146,6 +146,19 @@ describe('createSiteEditing', () => {
 		).toBe(404)
 		await post('/cms/api/entries', { 'x-obelism-content': '1' })
 		expect(fetch.mock.calls.at(-1)![0]).toBe(`${CMS}/api/site/v1/entries`)
+		for (const action of ['view', 'apply']) {
+			await post(`/cms/api/entries/entry_1/${action}`, {
+				'x-obelism-content': '1',
+			})
+			expect(fetch.mock.calls.at(-1)![0]).toBe(
+				`${CMS}/api/site/v1/entries/entry_1/${action}`,
+			)
+		}
+		await handler(get('/cms/api/pages', cookie))
+		expect(fetch.mock.calls.at(-1)![0]).toBe(`${CMS}/api/site/v1/pages`)
+		expect(
+			(await handler(get('/cms/api/pages', cookie, { method: 'POST' }))).status,
+		).toBe(404)
 		expect((await handler(get('/cms/api/session'))).status).toBe(401)
 
 		// The CMS ended the session: the cookies go too.
