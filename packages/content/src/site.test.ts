@@ -154,6 +154,10 @@ describe('createSiteEditing', () => {
 				`${CMS}/api/site/v1/entries/entry_1/${action}`,
 			)
 		}
+		await post('/cms/api/form', { 'x-obelism-content': '1' })
+		expect(fetch.mock.calls.at(-1)![0]).toBe(`${CMS}/api/site/v1/form`)
+		expect((await handler(get('/cms/api/form', cookie))).status).toBe(404)
+		expect((await post('/cms/api/form')).status).toBe(403)
 		await handler(get('/cms/api/pages', cookie))
 		expect(fetch.mock.calls.at(-1)![0]).toBe(`${CMS}/api/site/v1/pages`)
 		expect(

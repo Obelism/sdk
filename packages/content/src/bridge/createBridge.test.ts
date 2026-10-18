@@ -273,7 +273,7 @@ describe('prompts', () => {
 		)
 	})
 
-	it('leaves JSON and the pages to editing on the site', async () => {
+	it('leaves JSON, the form and the pages to editing on the site', async () => {
 		const { win, receive } = frame()
 		const bridge = createBridge(win, CMS)
 		offerPrompts(receive)
@@ -282,6 +282,15 @@ describe('prompts', () => {
 			'on the site',
 		)
 		await expect(bridge.pages()).rejects.toThrow('on the site')
+		const container = document.createElement('div')
+		const onError = vi.fn()
+		bridge.openForm(container, { onError }).close()
+		await vi.waitFor(() =>
+			expect(onError).toHaveBeenCalledWith(
+				'Only while signed in to edit on the site',
+			),
+		)
+		expect(container.children).toHaveLength(0)
 		expect(() =>
 			bridge.openPage({
 				entryId: 'e',

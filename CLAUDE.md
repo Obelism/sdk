@@ -115,7 +115,10 @@ Optional integration syncs the datafile to Vercel Edge Config (`@vercel/edge-con
     an httpOnly cookie) and `readSiteToken`; editing on the site outside the
     visual editor (the CMS's content/docs/guides/site-editing.mdx, docs/adr/0010). The
     browser half is `bridge/siteBridge.ts`, which `getContentBridge` starts
-    when the editing cookie is set
+    when the editing cookie is set; the prompt box's Form mode is the CMS's
+    entry form in an iframe (`bridge.openForm`, `bridge/formFrame.ts`, a
+    one-time URL from `/cms/api/form`; its postMessage protocol must stay in
+    step with the CMS's `/site/form` page)
   - `./prompt`: `createPromptHandler` / `verifyPromptRequest`, for a
     customer's own model behind the space's prompt endpoint
   - `./webhooks`: `verifyWebhook` / `createWebhookHandler` and the
