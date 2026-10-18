@@ -1,5 +1,12 @@
 # @obelism/content-react
 
+## 0.2.10
+
+### Patch Changes
+
+- Updated dependencies [f8339dc]
+  - @obelism/content@0.12.0
+
 ## 0.2.9
 
 ### Patch Changes
