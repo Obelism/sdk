@@ -167,6 +167,35 @@ describe('buildExamples', () => {
 		})
 	})
 
+	it('writes a link to a page for a link field', () => {
+		const examples = buildExamples(
+			{
+				version: 1,
+				contentTypes: [
+					{
+						apiId: 'promo',
+						name: 'Promo',
+						description: 'A page that sends visitors on.',
+						kind: 'page',
+						fields: [{ apiId: 'next', name: 'Next', type: 'link' }],
+					},
+				],
+			},
+			off,
+		) as Record<string, any>
+		expect(examples.promo.fields.next).toEqual({
+			type: 'entry',
+			entry: {
+				id: 'entry_example',
+				title: 'Example page',
+				slug: 'example',
+				path: 'example',
+			},
+			query: null,
+			hash: null,
+		})
+	})
+
 	it('writes a store item for a shopify field', () => {
 		const examples = buildExamples(
 			{

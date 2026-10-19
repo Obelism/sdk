@@ -160,6 +160,18 @@ export const buildExamples = (
 					? [...blocks, improveBlock(field.allowedBlocks, depth + 1)]
 					: blocks
 			}
+			case 'link':
+				return {
+					type: 'entry',
+					entry: {
+						id: 'entry_example',
+						title: 'Example page',
+						slug: 'example',
+						path: 'example',
+					},
+					query: null,
+					hash: null,
+				}
 			case 'shopify': {
 				const item =
 					field.resource === 'collection'

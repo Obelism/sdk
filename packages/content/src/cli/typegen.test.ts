@@ -199,6 +199,23 @@ export type ContentBlock = Hero | AssetBlock
 		expect(types).toContain("ShopifyItem } from '@obelism/content'")
 	})
 
+	it('types link fields as Link', () => {
+		const types = generateTypes({
+			version: 1,
+			contentTypes: [
+				{
+					apiId: 'button',
+					name: 'Button',
+					description: 'A link styled as a button.',
+					kind: 'block',
+					fields: [{ apiId: 'link', name: 'Link', type: 'link' }],
+				},
+			],
+		})
+		expect(types).toMatch(/\tlink: Link \| null\n/)
+		expect(types).toContain("Link } from '@obelism/content'")
+	})
+
 	it('writes only the header for an empty model', () => {
 		expect(generateTypes({ version: 1, contentTypes: [] })).not.toContain(
 			'import',

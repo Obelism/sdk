@@ -12,6 +12,8 @@ export { ContentApiError } from './errors'
 export { imageSrcSet, imageUrl } from './images'
 export { IMPROVE_BLOCK, isImproveBlock, pickImproveVariant } from './improve'
 export type { ImageTransform } from './images'
+export { linkHref } from './links'
+export type { LinkHrefOptions } from './links'
 export { PREVIEW_PARAMS, readPreviewParams } from './preview'
 export {
 	fetchShopifyCollection,

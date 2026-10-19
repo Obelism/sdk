@@ -295,6 +295,27 @@ const xml = sitemapXml(pages, {
 })
 ```
 
+## Links
+
+A `link` field goes to a page of the space or to any address, each with an
+optional query and anchor. It is delivered as `Link`: the page's `id`,
+`title`, `slug` and `path` (never its fields), or the `url`, plus `query` and
+`hash` without their `?` and `#`. A link to a page that isn't published is
+`null`. Where a page's path lives on your site is your routing, so
+`linkHref` takes it as `url` (default `/<path>`) and adds the query and hash:
+
+```tsx
+import { linkHref } from '@obelism/content'
+
+;<a
+	href={
+		linkHref(button.link, { url: (path) => `/${locale}/${path}` }) ?? undefined
+	}
+>
+	{button.label}
+</a>
+```
+
 ## A/B tests and feature flags
 
 Any blocks field can hold the built-in improve block (`ImproveBlock`,
@@ -404,6 +425,7 @@ locale, rich text as a document), and `| null` when empty:
 | select                   | the options' values, `'a' \| 'b'` (a list when multiple)             |
 | asset                    | `Asset` (a list when multiple)                                       |
 | reference                | the allowed entry types or their `EntryStub`s (a list when multiple) |
+| link                     | `Link`                                                               |
 | blocks                   | a list of the allowed block types and `ImproveBlock`                 |
 | richtext                 | `RichTextDocument`                                                   |
 | json                     | `unknown`                                                            |
