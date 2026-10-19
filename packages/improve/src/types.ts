@@ -6,6 +6,12 @@ export type ImproveTestState = 'draft' | 'active' | 'finished' | 'archived'
 
 export type ImproveSetupArgs = {
 	organizationId: string
+	/**
+	 * The space (`space_…`): one site or project of the organization, with its
+	 * own tests, flags, audiences, tokens and allowed origins. Without it, the
+	 * organization's first space. Copy it from Settings → Implementation.
+	 */
+	spaceId?: string | undefined
 	environment: ImproveEnvironmentOption
 	state?: ImproveTestState | undefined
 	config?: ImproveConfiguration | undefined

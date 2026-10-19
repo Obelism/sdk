@@ -15,6 +15,7 @@ No bundler needed:
 	defer
 	src="https://numbers.obelism.studio/script.js"
 	data-organization="org_…"
+	data-space="space_…"
 	data-environment="production"
 ></script>
 ```
@@ -27,6 +28,8 @@ client on `window.numbers`:
 numbers.track('sign_up', 'footer_form')
 ```
 
+`data-space` names the space (one site or project of the organization) the
+events belong to; without it they go to the organization's first space.
 `data-endpoint="https://…"` sends somewhere else, e.g. a proxy on your own
 domain. npm CDNs serve the same file from
 `@obelism/numbers-sdk/dist/script.global.js`.
@@ -42,6 +45,7 @@ import { createNumbers } from '@obelism/numbers-sdk'
 
 const numbers = createNumbers({
 	organizationId: 'org_…',
+	spaceId: 'space_…', // optional: without it, the organization's first space
 	environment: 'production', // default; or 'develop', 'staging'
 	// endpoint: 'https://numbers.obelism.studio/api/log',
 	// disableWarnings: true,

@@ -100,6 +100,18 @@ describe('track', () => {
 		})
 	})
 
+	it('names the space when it has one', () => {
+		numbersFor({ spaceId: 'space_1' }).track('sign_up', 'footer_form')
+		numbersFor().track('sign_up', 'footer_form')
+
+		const [withSpace, without] = sentBodies()
+		expect(withSpace).toMatchObject({
+			organizationId: 'org_1',
+			spaceId: 'space_1',
+		})
+		expect(without).not.toHaveProperty('spaceId')
+	})
+
 	it('scopes to the path without a scope, and caps what numbers would refuse', () => {
 		history.replaceState(null, '', '/about')
 		numbersFor().track('a'.repeat(300), '', {

@@ -14,6 +14,11 @@ export type Device = {
 
 export type NumbersOptions = {
 	organizationId: string
+	/**
+	 * The space (`space_…`) the events belong to: one site or project of the
+	 * organization. Without it, the organization's first space.
+	 */
+	spaceId?: string | undefined
 	/** Default `production`. */
 	environment?: Environment
 	/**
@@ -85,6 +90,7 @@ export type Exposure = {
 export type BeaconCommon<T extends 'event' | 'exposure'> = {
 	type: T
 	organizationId: string
+	spaceId?: string
 	environment: Environment
 	visitorId: string
 	pointer: string
