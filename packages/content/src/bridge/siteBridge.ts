@@ -1,12 +1,18 @@
-import { ENTRY_ATTRIBUTE, UID_ATTRIBUTE } from '../editable'
+import {
+	ENTRY_ATTRIBUTE,
+	PRODUCT_ATTRIBUTE,
+	PRODUCT_HANDLE_ATTRIBUTE,
+	UID_ATTRIBUTE,
+} from '../editable'
 import { SITE_EDITING_COOKIE, SITE_REQUEST_HEADER } from '../site'
-import type { Entry } from '../types'
+import type { Entry, ShopifyItem } from '../types'
 import {
 	type ApplyJsonResult,
 	blockSelector,
 	type BridgeState,
 	type ContentBridge,
 	type CreatePageResult,
+	type CreateProductPageResult,
 	createEmitter,
 	type FormHandle,
 	INITIAL_STATE,
@@ -60,6 +66,8 @@ type PagesAnswer = {
 		status: SitePage['status']
 		// The CMS path by locale code.
 		paths: Record<string, string>
+		// A product page's product (CMS versions from 2026-10-20).
+		product?: ShopifyItem | null
 	}[]
 }
 
@@ -82,12 +90,18 @@ export type SiteBridgeOptions = {
 	// Where a CMS path (`solutions/agencies`) is on the site, in a locale.
 	// Default: `/` + path.
 	pagePath?: ((path: string, locale: string) => string) | undefined
+	// Where a product page is on the site, by its product's handle: your
+	// product route. Default: `/products/` + handle.
+	productPath?: ((handle: string, locale: string) => string) | undefined
 }
 
 export const createSiteBridge = (
 	win: Window,
 	basePath: string,
-	{ pagePath = (path) => `/${path}` }: SiteBridgeOptions = {},
+	{
+		pagePath = (path) => `/${path}`,
+		productPath = (handle) => `/products/${handle}`,
+	}: SiteBridgeOptions = {},
 ): ContentBridge => {
 	const doc = win.document
 	const emitter = createEmitter()
@@ -152,6 +166,14 @@ export const createSiteBridge = (
 	const pageEntryId = () =>
 		doc.querySelector(`[${ENTRY_ATTRIBUTE}]`)?.getAttribute(ENTRY_ATTRIBUTE) ??
 		null
+
+	// The product the page shows (editableProduct), if it marks one.
+	const pageProduct = (): ShopifyItem | null => {
+		const element = doc.querySelector(`[${PRODUCT_ATTRIBUTE}]`)
+		const id = element?.getAttribute(PRODUCT_ATTRIBUTE)
+		const handle = element?.getAttribute(PRODUCT_HANDLE_ATTRIBUTE)
+		return id && handle ? { id, handle } : null
+	}
 
 	const entryFor = (uid: string | null) => {
 		const block = uid ? doc.querySelector(blockSelector(uid)) : null
@@ -279,6 +301,9 @@ export const createSiteBridge = (
 		get entryId() {
 			return pageEntryId()
 		},
+		get product() {
+			return pageProduct()
+		},
 		environment: null,
 		on: emitter.on,
 		getState: () => state,
@@ -336,6 +361,32 @@ export const createSiteBridge = (
 					path: created.path,
 					url,
 				}
+			} finally {
+				setState({ prompting: false })
+			}
+		},
+
+		async createProductPage(
+			product = pageProduct() ?? undefined,
+		): Promise<CreateProductPageResult> {
+			if (!product) {
+				throw new Error(
+					'Nothing on this page is marked as a product: add editableProduct(product)',
+				)
+			}
+			if (!has('create')) throw new Error('You may not add pages here')
+			if (state.unsaved) {
+				throw new Error('Save or undo your changes before adding a page')
+			}
+			setState({ prompting: true })
+			try {
+				const made = await api<CreateProductPageResult>('product-pages', {
+					product: { id: product.id, handle: product.handle },
+				})
+				// The site's product route finds its page now (drafts, while
+				// editing): show it.
+				win.location.reload()
+				return made
 			} finally {
 				setState({ prompting: false })
 			}
@@ -498,7 +549,10 @@ export const createSiteBridge = (
 						contentType: page.contentType,
 						status: page.status,
 						path,
-						url: pagePath(path, code),
+						url: page.product
+							? productPath(page.product.handle, code)
+							: pagePath(path, code),
+						product: page.product ?? null,
 					},
 				]
 			})

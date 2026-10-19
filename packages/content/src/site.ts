@@ -155,6 +155,8 @@ const PROXY_ROUTES: { method: string; pattern: RegExp }[] = [
 	{ method: 'GET', pattern: /^pages$/ },
 	{ method: 'GET', pattern: /^entries\/[\w-]+$/ },
 	{ method: 'POST', pattern: /^entries$/ },
+	// "Add a product page" on a product the site marks (editableProduct).
+	{ method: 'POST', pattern: /^product-pages$/ },
 	// The one-time address of the CMS's entry form (the prompt box's Form).
 	{ method: 'POST', pattern: /^form$/ },
 	{

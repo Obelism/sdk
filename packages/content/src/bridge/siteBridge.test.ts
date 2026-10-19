@@ -405,6 +405,7 @@ describe('createSiteBridge', () => {
 				status: 'published',
 				path: '',
 				url: '/nl/',
+				product: null,
 			},
 			{
 				entryId: 'entry_agencies',
@@ -413,6 +414,7 @@ describe('createSiteBridge', () => {
 				status: 'draft',
 				path: 'solutions/agencies',
 				url: '/en/solutions/agencies',
+				product: null,
 			},
 			{
 				entryId: 'entry_de',
@@ -421,6 +423,7 @@ describe('createSiteBridge', () => {
 				status: 'changed',
 				path: 'nur',
 				url: '/de/nur',
+				product: null,
 			},
 		])
 
@@ -693,5 +696,63 @@ describe('createSiteBridge', () => {
 		const bridge = createSiteBridge(win, '/cms')
 		bridge.signOut()
 		expect(win.location.href).toBe('/cms/logout?return_to=%2Fhome')
+	})
+
+	it('makes a product page for the product the page shows', async () => {
+		document.body.innerHTML = `<main data-cms-product="gid://shopify/Product/42" data-cms-product-handle="mug"></main>`
+		const { win, calls, reload } = site({
+			session: () => ({ ...SESSION, features: ['prompt', 'create'] }),
+			'product-pages': () => ({
+				entryId: 'entry_mug',
+				path: 'products/mug',
+				created: true,
+			}),
+			pages: () => ({
+				pages: [
+					{
+						entryId: 'entry_mug',
+						name: 'Mug',
+						contentType: 'productPage',
+						status: 'draft',
+						paths: { en: 'products/mug' },
+						product: { id: 'gid://shopify/Product/42', handle: 'mug' },
+					},
+				],
+			}),
+		})
+		const bridge = createSiteBridge(win, '/cms', {
+			productPath: (handle, locale) => `/${locale}/shop/${handle}`,
+		})
+		await vi.waitFor(() =>
+			expect(bridge.getState().features).toContain('create'),
+		)
+		expect(bridge.entryId).toBeNull()
+		expect(bridge.product).toEqual({
+			id: 'gid://shopify/Product/42',
+			handle: 'mug',
+		})
+
+		expect(await bridge.createProductPage()).toEqual({
+			entryId: 'entry_mug',
+			path: 'products/mug',
+			created: true,
+		})
+		expect(calls.at(-1)).toMatchObject({
+			path: 'product-pages',
+			body: { product: { id: 'gid://shopify/Product/42', handle: 'mug' } },
+		})
+		expect(reload).toHaveBeenCalled()
+
+		const [page] = await bridge.pages()
+		expect(page).toMatchObject({
+			url: '/en/shop/mug',
+			product: { id: 'gid://shopify/Product/42', handle: 'mug' },
+		})
+
+		document.body.innerHTML = '<main></main>'
+		expect(bridge.product).toBeNull()
+		await expect(bridge.createProductPage()).rejects.toThrow(
+			'Nothing on this page is marked as a product',
+		)
 	})
 })

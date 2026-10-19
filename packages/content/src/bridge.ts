@@ -15,6 +15,7 @@ export type {
 	BridgeState,
 	ContentBridge,
 	CreatePageResult,
+	CreateProductPageResult,
 	FormHandle,
 	FormOptions,
 	PromptResult,
@@ -44,6 +45,10 @@ export type BridgeOptions = {
 	// from the pages (the path is the one in that locale). Default: `/` +
 	// path.
 	pagePath?: ((path: string, locale: string) => string) | undefined
+	// Editing on the site: where a product page is on the site, by its
+	// product's handle, in a locale: your product route, which looks its page
+	// up by product. Default: `/products/` + handle.
+	productPath?: ((handle: string, locale: string) => string) | undefined
 }
 
 // Kept on the window, so two copies of this package on one page still share
@@ -78,6 +83,7 @@ export const getContentBridge = ({
 	url,
 	prompt = true,
 	pagePath,
+	productPath,
 }: BridgeOptions = {}): ContentBridge => {
 	if (typeof window === 'undefined') return SERVER_BRIDGE
 	const win = window as BridgeWindow
@@ -97,7 +103,8 @@ export const getContentBridge = ({
 			bridge.isEditing || win.parent !== win
 				? null
 				: readSiteEditing(win.document)
-		if (sitePath) bridge = createSiteBridge(win, sitePath, { pagePath })
+		if (sitePath)
+			bridge = createSiteBridge(win, sitePath, { pagePath, productPath })
 		if (bridge.isEditing && prompt) {
 			const unmount = mountPromptBox(
 				win.document,

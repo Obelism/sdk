@@ -155,6 +155,26 @@ getContentBridge({ pagePath: (path, locale) => `/${locale}/${path}` })
 await bridge.createPage('/pricing', 'Our plans, for agencies') // or your own UI
 ```
 
+On a product route, mark the Shopify product the page shows. When the
+product has no product page yet (nothing on the page is `editable(entry)`),
+the box offers **Add a product page**: the CMS makes a draft of the space's
+product page type for it (its handle as slug, under `products` when the
+space has that page or folder) and the page reloads, now finding it. The
+page list opens product pages at `productPath` (default
+`/products/<handle>`):
+
+```tsx
+import { editable, editableProduct } from '@obelism/content'
+
+// app/products/[handle]/page.tsx: the store's product, and its page if any.
+;<main {...editableProduct(product)} {...editable(productPage)}>
+	…
+</main>
+
+getContentBridge({ productPath: (handle, locale) => `/${locale}/p/${handle}` })
+await bridge.createProductPage() // or your own UI; bridge.product says which
+```
+
 There the box also switches between **Prompt** and **Form**. Form shows the
 CMS's own form for the page — or for the entry around the selected block —
 right in the box: the fields, and blocks as cards to open and add,
@@ -297,19 +317,25 @@ const xml = sitemapXml(pages, {
 
 ## Links
 
-A `link` field goes to a page of the space or to any address, each with an
-optional query and anchor. It is delivered as `Link`: the page's `id`,
-`title`, `slug` and `path` (never its fields), or the `url`, plus `query` and
-`hash` without their `?` and `#`. A link to a page that isn't published is
-`null`. Where a page's path lives on your site is your routing, so
-`linkHref` takes it as `url` (default `/<path>`) and adds the query and hash:
+A `link` field goes to a page of the space, to any address, or to a product
+of the space's Shopify store, each with an optional query and anchor. It is
+delivered as `Link`: the page's `id`, `title`, `slug` and `path` (never its
+fields), the `url`, or the `product` (`{ id, handle }`) with its product
+page as `entry` (`null` when it has none), plus `query` and `hash` without
+their `?` and `#`. A link to a page that isn't published is `null`. Where a
+page's path lives on your site is your routing, so `linkHref` takes it as
+`url` (default `/<path>`), a product's address as `product` (default
+`/products/<handle>`), and adds the query and hash:
 
 ```tsx
 import { linkHref } from '@obelism/content'
 
 ;<a
 	href={
-		linkHref(button.link, { url: (path) => `/${locale}/${path}` }) ?? undefined
+		linkHref(button.link, {
+			url: (path) => `/${locale}/${path}`,
+			product: ({ handle }) => `/${locale}/products/${handle}`,
+		}) ?? undefined
 	}
 >
 	{button.label}
@@ -365,6 +391,18 @@ collection?.products.map((product) => ({
 	price: product.priceRange.minVariantPrice,
 	image: product.featuredImage,
 }))
+```
+
+A page type with a unique product field is a product page type: one page
+per product, for what the store doesn't hold. On your product route, find
+the page by the product's id, and render the store's product alone when there
+is none:
+
+```ts
+const productPage = await content.getFirstEntry({
+	contentType: 'productPage',
+	fields: { product: product.id }, // gid://shopify/Product/…
+})
 ```
 
 `fetchShopifyProducts(items, options)` does the same for a product field

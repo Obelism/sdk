@@ -299,6 +299,7 @@ describe('prompts', () => {
 				status: 'draft',
 				path: 'e',
 				url: '/e',
+				product: null,
 			}),
 		).not.toThrow()
 		bridge.destroy()
