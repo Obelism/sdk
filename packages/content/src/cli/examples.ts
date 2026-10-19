@@ -160,6 +160,13 @@ export const buildExamples = (
 					? [...blocks, improveBlock(field.allowedBlocks, depth + 1)]
 					: blocks
 			}
+			case 'shopify': {
+				const item =
+					field.resource === 'collection'
+						? { id: 'gid://shopify/Collection/1', handle: 'example-collection' }
+						: { id: 'gid://shopify/Product/1', handle: 'example-product' }
+				return field.multiple ? [item] : item
+			}
 			case 'json':
 				return {}
 		}

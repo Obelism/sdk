@@ -166,4 +166,43 @@ describe('buildExamples', () => {
 			variants: { control: expect.any(Array), variation: expect.any(Array) },
 		})
 	})
+
+	it('writes a store item for a shopify field', () => {
+		const examples = buildExamples(
+			{
+				version: 1,
+				contentTypes: [
+					{
+						apiId: 'shop',
+						name: 'Shop',
+						description: 'A shop page.',
+						kind: 'page',
+						fields: [
+							{
+								apiId: 'collection',
+								name: 'Collection',
+								type: 'shopify',
+								resource: 'collection',
+							},
+							{
+								apiId: 'products',
+								name: 'Products',
+								type: 'shopify',
+								resource: 'product',
+								multiple: true,
+							},
+						],
+					},
+				],
+			},
+			off,
+		) as Record<string, any>
+		expect(examples.shop.fields).toEqual({
+			collection: {
+				id: 'gid://shopify/Collection/1',
+				handle: 'example-collection',
+			},
+			products: [{ id: 'gid://shopify/Product/1', handle: 'example-product' }],
+		})
+	})
 })
