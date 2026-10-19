@@ -1,5 +1,12 @@
 # @obelism/content
 
+## 0.17.0
+
+### Minor Changes
+
+- ea5b10b: Link fields: the `link` field type (a page of the space or any address, with an optional query and anchor) in `FieldDefinition`, `content types` (`Link`) and `content init`'s examples, the `Link` and `LinkTarget` types for what delivery answers, and `linkHref(link, { url })` to turn one into an address with your site's routing.
+- a949968: Shopify fields: the `shopify` field type (a collection or product of the space's Shopify store, stored as `{ id, handle }`) in `FieldDefinition`, `content types` (`ShopifyItem`) and `content init`'s examples, and `fetchShopifyCollection` / `fetchShopifyProducts` to read prices, stock and images live from the Storefront API.
+
 ## 0.16.0
 
 ### Minor Changes
