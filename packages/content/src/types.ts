@@ -122,6 +122,16 @@ export type RedirectList = {
 // The content model, as `GET /api/delivery/v1/content-model` answers it and
 // as `content model pull` writes it.
 
+// A collection or product of the space's Shopify store, as a `shopify` field
+// holds it: its GID (`gid://shopify/Collection/123`), the same in every
+// environment, and the handle it had when picked. Fetch what changes (price,
+// stock, images) from Shopify by the id: fetchShopifyCollection and
+// fetchShopifyProducts. Link with the handle.
+export type ShopifyItem = {
+	id: string
+	handle: string
+}
+
 export type ContentTypeKind = 'page' | 'data' | 'block'
 
 type BaseField = {
@@ -187,6 +197,13 @@ export type FieldDefinition = BaseField &
 		| {
 				type: 'blocks'
 				allowedBlocks?: string[]
+				min?: number
+				max?: number
+		  }
+		| {
+				type: 'shopify'
+				resource: 'collection' | 'product'
+				multiple?: boolean
 				min?: number
 				max?: number
 		  }

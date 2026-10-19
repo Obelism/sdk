@@ -167,6 +167,38 @@ export type ContentBlock = Hero | AssetBlock
 		)
 	})
 
+	it('types shopify fields as ShopifyItem', () => {
+		const types = generateTypes({
+			version: 1,
+			contentTypes: [
+				{
+					apiId: 'productGrid',
+					name: 'Product grid',
+					description: 'Products in a grid.',
+					kind: 'block',
+					fields: [
+						{
+							apiId: 'collection',
+							name: 'Collection',
+							type: 'shopify',
+							resource: 'collection',
+						},
+						{
+							apiId: 'products',
+							name: 'Products',
+							type: 'shopify',
+							resource: 'product',
+							multiple: true,
+						},
+					],
+				},
+			],
+		})
+		expect(types).toMatch(/\tcollection: ShopifyItem \| null\n/)
+		expect(types).toMatch(/\tproducts: ShopifyItem\[\] \| null\n/)
+		expect(types).toContain("ShopifyItem } from '@obelism/content'")
+	})
+
 	it('writes only the header for an empty model', () => {
 		expect(generateTypes({ version: 1, contentTypes: [] })).not.toContain(
 			'import',

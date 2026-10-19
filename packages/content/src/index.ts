@@ -13,6 +13,19 @@ export { imageSrcSet, imageUrl } from './images'
 export { IMPROVE_BLOCK, isImproveBlock, pickImproveVariant } from './improve'
 export type { ImageTransform } from './images'
 export { PREVIEW_PARAMS, readPreviewParams } from './preview'
+export {
+	fetchShopifyCollection,
+	fetchShopifyProducts,
+	SHOPIFY_STOREFRONT_API_VERSION,
+	ShopifyStorefrontError,
+} from './shopify'
+export type {
+	ShopifyCollection,
+	ShopifyImage,
+	ShopifyMoney,
+	ShopifyProduct,
+	ShopifyStorefrontOptions,
+} from './shopify'
 export type { PreviewParams } from './preview'
 export {
 	escapeHtml,

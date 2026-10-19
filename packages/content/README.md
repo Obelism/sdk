@@ -319,6 +319,38 @@ const blocks = layout.flatMap((block) => {
 variant, else the first one, when the option is `null` (the test isn't
 active or the visitor isn't in it) or has no variant.
 
+## Shopify
+
+A `shopify` field holds a collection or product of the Shopify store
+connected to the space (Settings in Obelism Content), as `ShopifyItem`:
+`{ id, handle }`. Content stores only that, so fetch prices, stock and images
+live from Shopify's Storefront API with the store's domain and Storefront
+token (Settings → Copy as .env):
+
+```ts
+import { fetchShopifyCollection } from '@obelism/content'
+
+// A productGrid block: { heading, collection, columns }.
+const collection = await fetchShopifyCollection(block.collection, {
+	shop: process.env.SHOPIFY_STORE_DOMAIN!,
+	storefrontToken: process.env.SHOPIFY_STOREFRONT_TOKEN!,
+	first: 12,
+	country: 'NL', // optional: the market's prices
+})
+
+collection?.products.map((product) => ({
+	href: `/products/${product.handle}`,
+	title: product.title,
+	price: product.priceRange.minVariantPrice,
+	image: product.featuredImage,
+}))
+```
+
+`fetchShopifyProducts(items, options)` does the same for a product field
+(one item or a list), in the field's order. Both leave out what the store no
+longer has. A Hydrogen or Liquid site can use the `id` with its own
+Storefront queries instead.
+
 ## CLI
 
 Start a site's repository on a space, in its root:
