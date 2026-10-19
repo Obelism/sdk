@@ -20,6 +20,7 @@ const SDK_TYPES = [
 	'Entry',
 	'EntryStub',
 	'ImproveBlock',
+	'Link',
 	'RichTextDocument',
 	'ShopifyItem',
 ] as const
@@ -118,6 +119,8 @@ export const generateTypes = (model: ModelFile): string => {
 				const improve = `${use('ImproveBlock')}${allowed.length === 0 ? '' : `<${blocks}>`}`
 				return list(union([blocks, improve]), true)
 			}
+			case 'link':
+				return use('Link')
 			case 'shopify':
 				return list(use('ShopifyItem'), field.multiple)
 			case 'json':

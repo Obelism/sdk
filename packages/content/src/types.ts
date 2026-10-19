@@ -55,6 +55,36 @@ export type EntryStub<TContentType extends string = string> = {
 	contentType: TContentType
 }
 
+// The page a link field goes to: enough to link to it, never its fields.
+// `title` is its `title` field (its name when it has none) and `path` its
+// path, both in the requested locale; `title` is `{ [locale]: string }` for
+// a localized title fetched with locale `*`.
+export type LinkTarget = {
+	id: string
+	title: string | Record<string, string>
+	slug: string | null
+	path: string | null
+}
+
+// A link field's value: a page of the space, or any address (another site,
+// `/search`, `#faq`, `mailto:`). `query` (`a=1&b=2`) and `hash` (`pricing`)
+// come without their `?` and `#`, null when not set. A link to a page the
+// token can't see (not published, for a delivery token) is null itself.
+// There is no ready address: `linkHref` builds one with your site's routing.
+export type Link =
+	| {
+			type: 'entry'
+			entry: LinkTarget
+			query: string | null
+			hash: string | null
+	  }
+	| {
+			type: 'url'
+			url: string
+			query: string | null
+			hash: string | null
+	  }
+
 // One item of a blocks field. `_uid` is stable and unique within the entry:
 // put it on the block's element (see `editable`) so the visual editor can
 // select it.
@@ -193,6 +223,11 @@ export type FieldDefinition = BaseField &
 				contentTypes?: string[]
 				min?: number
 				max?: number
+		  }
+		| {
+				type: 'link'
+				// The page types it may go to; any page type when left out.
+				contentTypes?: string[]
 		  }
 		| {
 				type: 'blocks'
