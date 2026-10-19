@@ -25,6 +25,7 @@ export default generateImproveProvider(...)
 ```ts
 generateImproveProvider(improveArgs: {
 	organizationId: string
+	spaceId?: string // the space; without it, the organization's first
 	environment: 'develop' | 'staging' | 'production'
 	config?: Configuration
 	fetchTimeout?: number

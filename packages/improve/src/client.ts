@@ -66,6 +66,7 @@ export class ImproveClientSDK extends BaseImproveSDK {
 		super(args)
 		this.#numbers = createNumbers({
 			organizationId: this.organizationId,
+			spaceId: this.spaceId,
 			environment: this.environment,
 			// numbers takes the events; a custom `baseUrl` (e.g. a local Improve)
 			// keeps getting them at its own /api/log.

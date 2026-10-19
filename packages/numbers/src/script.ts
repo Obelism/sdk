@@ -6,7 +6,10 @@ import type { Environment } from './types'
 // serve it from dist/script.global.js:
 //
 //   <script defer src="https://numbers.obelism.studio/script.js"
-//     data-organization="org_…" data-environment="production"></script>
+//     data-organization="org_…" data-space="space_…"
+//     data-environment="production"></script>
+//
+// `data-space` is optional: without it, the organization's first space.
 //
 // It sends page views and clicks on tagged elements, and puts the client on
 // `window.numbers` (`numbers.track('sign_up', 'footer_form')`). Events go to
@@ -23,6 +26,7 @@ export const startScript = (
 	if (!organizationId) return null
 	const numbers = createNumbers({
 		organizationId,
+		spaceId: script.dataset.space || undefined,
 		environment: (script.dataset.environment || 'production') as Environment,
 		endpoint:
 			script.dataset.endpoint ||

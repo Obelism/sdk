@@ -21,6 +21,7 @@ While similar they both work slightly different but are based on the same base. 
 ```ts
 constructor({
 	organizationId: string
+	spaceId?: string
 	environment: 'develop' | 'staging' | 'production'
 	config?: Configuration
 	fetchTimeout?: number
@@ -29,6 +30,7 @@ constructor({
 ```
 
 - **organizationId** - Unique identifier of your Organization, available from your dashboard
+- **spaceId** - (optional) The space (`space_…`) to work in: one site or project of your Organization, with its own tests, flags, audiences, API tokens and allowed origins. Copy it from Settings → Implementation. Without it, the Organization's first space
 - **environment** - Application environment, can be one of three values
 - **config** - (optional) Configuration file, this can be either fetched or provided on initialization
 - **fetchTimeout** - (optional) When fetching the config after what amount of ms should it abort, default; 3000ms

@@ -42,6 +42,19 @@ describe('startScript', () => {
 		})
 	})
 
+	it('takes data-space', () => {
+		startScript(
+			window,
+			scriptTag({
+				src: 'https://numbers.obelism.studio/script.js',
+				'data-organization': 'org_1',
+				'data-space': 'space_1',
+			}),
+		)
+		const [, init] = fetchMock.mock.calls[0]!
+		expect(JSON.parse(String(init!.body)).spaceId).toBe('space_1')
+	})
+
 	it('takes data-endpoint, and production by default', () => {
 		startScript(
 			window,

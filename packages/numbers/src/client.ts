@@ -35,6 +35,7 @@ export type Sent = Promise<Response | undefined>
 
 export type NumbersClient = {
 	readonly organizationId: string
+	readonly spaceId: string | undefined
 	readonly environment: Environment
 	/** The visitor, from the cookie or new. `null` outside the browser. */
 	visitor: () => Visitor | null
@@ -74,6 +75,7 @@ const isBrowser = () =>
 
 export const createNumbers = ({
 	organizationId,
+	spaceId,
 	environment = 'production',
 	endpoint = DEFAULT_ENDPOINT,
 	device: givenDevice,
@@ -109,6 +111,7 @@ export const createNumbers = ({
 		return {
 			type,
 			organizationId,
+			...(spaceId && { spaceId }),
 			environment,
 			visitorId: current.id,
 			pointer: device.pointer,
@@ -267,6 +270,7 @@ export const createNumbers = ({
 
 	return {
 		organizationId,
+		spaceId,
 		environment,
 		visitor: getVisitor,
 		setDevice: (next) => {

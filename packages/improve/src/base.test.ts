@@ -43,6 +43,20 @@ afterEach(() => {
 	vi.unstubAllGlobals()
 })
 
+// A space's datafile; the organization's id means its first space.
+test('fetches the space’s datafile, or the organization’s first space’s', async () => {
+	const fetchMock = vi.fn().mockResolvedValue(makeResponse(200, CONFIG))
+	vi.stubGlobal('fetch', fetchMock)
+
+	await setup({ spaceId: 'space_1' })._fetchConfig()
+	await setup()._fetchConfig()
+
+	expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+		'https://improve.obelism.studio/config/space_1/develop/active',
+		'https://improve.obelism.studio/config/org_1/develop/active',
+	])
+})
+
 test('resolves and stores config on success', async () => {
 	const fetchMock = vi.fn().mockResolvedValue(makeResponse(200, CONFIG))
 	vi.stubGlobal('fetch', fetchMock)

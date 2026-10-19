@@ -35,6 +35,7 @@ type RequestInitWithNext = RequestInit & {
 
 export class BaseImproveSDK {
 	organizationId: string
+	spaceId: string | undefined
 	environment: ImproveEnvironmentOption = 'develop'
 	state: ImproveTestState | undefined
 
@@ -48,6 +49,7 @@ export class BaseImproveSDK {
 
 	constructor({
 		organizationId,
+		spaceId,
 		environment,
 		state,
 		config,
@@ -58,6 +60,7 @@ export class BaseImproveSDK {
 		disableWarnings,
 	}: ImproveSetupArgs) {
 		this.organizationId = organizationId
+		this.spaceId = spaceId
 		this.environment = environment
 		this.state = state
 		this._baseUrl = baseUrl || BASE_URL
@@ -69,7 +72,9 @@ export class BaseImproveSDK {
 			this.#configFetch = {
 				url: [
 					`${this._baseUrl}${CONFIG_PATH}`,
-					this.organizationId,
+					// The space's datafile; the organization's id means its first
+					// space.
+					this.spaceId || this.organizationId,
 					this.environment,
 					this.state || 'active',
 				].join('/'),
