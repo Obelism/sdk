@@ -1,5 +1,11 @@
 # @obelism/content
 
+## 0.19.1
+
+### Patch Changes
+
+- 321f24b: Prompt box: a drag's flick is capped and doesn't count after the pointer stood still, so one coarse pointer event no longer throws the box to the other side
+
 ## 0.19.0
 
 ### Minor Changes
