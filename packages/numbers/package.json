@@ -43,6 +43,9 @@
 		"lint:types": "tsc --noEmit",
 		"clean": "rm -rf ./node_modules && rm -rf ./dist && rm -rf ./.turbo"
 	},
+	"dependencies": {
+		"@obelism/events-sdk": "^0.0.0"
+	},
 	"devDependencies": {
 		"@obelism/sdk-typescript-config": "^0.0.0",
 		"@rollup/plugin-node-resolve": "^16.0.3",

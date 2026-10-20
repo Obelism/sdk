@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-Obelism's public SDKs in one repository (`Obelism/sdk`): improve, Content and
-numbers. It replaced `Obelism/improve-sdk`, `Obelism/content-sdk` and
+Obelism's public SDKs in one repository (`Obelism/sdk`): improve, Content,
+numbers and events. It replaced `Obelism/improve-sdk`, `Obelism/content-sdk` and
 `Obelism/numbers-sdk`, whose histories it holds (`git log --follow` works
 across the move). The products are in `../obelism` (`apps/improve`,
 `apps/content`, `apps/numbers`); their APIs are what these packages call.
@@ -21,6 +21,7 @@ npx turbo run build lint test:ci --filter=@obelism/improve-sdk...   # one packag
 
 ## Layout
 
+- `packages/events` → `@obelism/events-sdk`
 - `packages/numbers` → `@obelism/numbers-sdk`
 - `packages/improve` → `@obelism/improve-sdk`, `packages/improve-react` →
   `@obelism/improve-sdk-react`, `packages/improve-next` →
@@ -35,10 +36,29 @@ npx turbo run build lint test:ci --filter=@obelism/improve-sdk...   # one packag
 - `examples/improve-*` (each deployed by its own Vercel project, on `main`
   only, `vercel.json`) and `examples/content-nextjs`
 
-Packages depend on each other through the workspace: improve on numbers,
+Packages depend on each other through the workspace: numbers on events,
+improve on numbers,
 improve-react and improve-next on improve, content-react on Content. Never
 pin one to a version that isn't in the repository; changesets updates the
 ranges when it versions.
+
+## events (`packages/events`)
+
+The page's event bus: sites publish, trackers subscribe, so no tracker is
+called from a site's code.
+
+- `getEvents()` (`events.ts`): the bus on `window.obelismEvents`, shared by
+  every copy of the package on the page (bundles, the numbers script tag);
+  an inert one on the server. `createEvents()` makes a separate one.
+- `emit(name, { scope, value, currency, params, dedupeKey })`,
+  `expose(exposure)` (once per subject), `subscribe(fn, { replay })` (the
+  last 100 events replayed by default, for trackers that load late),
+  `autoTrack` (`autoTrack.ts`: page views on history changes, `click` for
+  `data-events-id` and `data-numbers-id`; one at a time).
+- Owns the event types numbers re-exports (`EventName`, `Exposure`).
+  Subscribers: numbers (`numbers.connect`). Improve still sends through its
+  own numbers client; publishing its exposures and `postAnalytic` on the bus
+  is the next step.
 
 ## numbers (`packages/numbers`)
 
@@ -47,8 +67,8 @@ The browser client of Obelism numbers (`../obelism/apps/numbers`, whose
 
 - `createNumbers()` (`client.ts`): `track`, `pageView`, `expose` (improve's
   test and flag assignments), `autoTrack` (page views on history changes,
-  `click` events for `data-numbers-id`), `visitor`, `setDevice`,
-  `setEndpoint`. Safe to create on the server: outside the browser every call
+  `click` events for `data-numbers-id`), `connect` (subscribes to an events
+  bus), `visitor`, `setDevice`, `setEndpoint`. Safe to create on the server: outside the browser every call
   returns `null`.
 - The visitor (`visitor.ts`) is improve's `visitorId` cookie and id format;
   keep it in step with `packages/improve/src/config/constants.ts` and
@@ -58,7 +78,8 @@ The browser client of Obelism numbers (`../obelism/apps/numbers`, whose
 - Limits (`constants.ts`) follow numbers' `ingest.ts`: 256-character fields,
   8-character currency, 1024-character paths, 8 KB bodies.
 - Also built as one script tag, `dist/script.global.js` (`src/scriptEntry.ts`
-  → `script.ts`, `rollup.script.config.mjs`): numbers serves it as its
+  → `script.ts`, `rollup.script.config.mjs`), with the events bus bundled:
+  it connects to the page's bus and runs the bus's `autoTrack`. numbers serves it as its
   `public/script.js` (`npm run script:update` there after a release).
 
 ## improve (`packages/improve`, `improve-react`, `improve-next`)

@@ -21,12 +21,17 @@ No bundler needed:
 ```
 
 It sends a page view on load and on every client-side navigation, a `click`
-for clicks on (or inside) an element with `data-numbers-id="…"`, and puts the
-client on `window.numbers`:
+for clicks on (or inside) an element with `data-numbers-id="…"`, and
+whatever the site emits on the page's
+[events bus](../events/README.md), `window.obelismEvents`:
 
 ```js
-numbers.track('sign_up', 'footer_form')
+obelismEvents.emit('sign_up', { scope: 'footer_form' })
 ```
+
+Every other tracker subscribed to the bus gets the same event. The client
+itself is on `window.numbers`, for sending to numbers alone
+(`numbers.track('sign_up', 'footer_form')`).
 
 `data-space` names the space (one site or project of the organization) the
 events belong to; without it they go to the organization's first space.
@@ -62,6 +67,30 @@ numbers.track('add_to_cart', 'product_page', {
 numbers.track('view_item', 'list', { dedupeKey: 'sku_1' }) // once per key
 numbers.pageView() // by hand, without autoTrack
 ```
+
+### With the events SDK
+
+Rather than calling numbers from the site's code, publish on the page's
+bus ([`@obelism/events-sdk`](../events/README.md)) and connect numbers to
+it, next to any other tracker:
+
+```ts
+import { getEvents } from '@obelism/events-sdk'
+
+const events = getEvents()
+numbers.connect(events) // default: getEvents(); returns a disconnect
+events.autoTrack() // page views and clicks, for every subscriber
+
+events.emit('add_to_cart', {
+	scope: 'product_page',
+	value: 59.95,
+	currency: 'EUR',
+})
+```
+
+numbers sends the bus's events (`page_view` as a page view, with the
+referrer) and exposures, those emitted before it connected too. Use
+`events.autoTrack()` or `numbers.autoTrack()`, not both: each sends page views.
 
 The client is safe to create during server rendering: outside the browser
 every call does nothing and returns `null`.

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { EventsWindow } from '@obelism/events-sdk'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { type ScriptWindow, startScript } from './script'
@@ -16,6 +17,7 @@ beforeEach(() => {
 	fetchMock = vi.fn<typeof fetch>(async () => new Response('{}'))
 	vi.stubGlobal('fetch', fetchMock)
 	delete (window as ScriptWindow).numbers
+	delete (window as EventsWindow).obelismEvents
 })
 
 afterEach(() => {
@@ -40,6 +42,22 @@ describe('startScript', () => {
 			environment: 'staging',
 			event: 'page_view',
 		})
+	})
+
+	it('sends what the site emits on the page’s bus', () => {
+		startScript(
+			window,
+			scriptTag({
+				src: 'https://numbers.obelism.studio/script.js',
+				'data-organization': 'org_1',
+			}),
+		)
+		;(window as EventsWindow).obelismEvents!.emit('sign_up', {
+			scope: 'footer_form',
+		})
+		expect(JSON.parse(String(fetchMock.mock.calls[1]![1]!.body))).toMatchObject(
+			{ event: 'sign_up', scope: 'footer_form' },
+		)
 	})
 
 	it('takes data-space', () => {

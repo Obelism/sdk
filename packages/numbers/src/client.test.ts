@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createEvents } from '@obelism/events-sdk'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createNumbers } from './client'
@@ -275,5 +276,45 @@ describe('autoTrack', () => {
 		stop()
 		button.click()
 		expect(sentBodies()).toMatchObject([{ event: 'click', scope: 'block_1' }])
+	})
+})
+
+describe('connect', () => {
+	it('sends the bus’s events, exposures and page views, those from before it too', () => {
+		const events = createEvents()
+		events.emit('page_view')
+		const numbers = numbersFor()
+		const disconnect = numbers.connect(events)
+		events.emit('purchase', {
+			scope: 'checkout',
+			value: 42,
+			currency: 'EUR',
+			params: { id: 'o_1' },
+		})
+		events.expose({ subjectKind: 'test', subjectId: 't_1', variant: 'b' })
+		expect(sentBodies()).toMatchObject([
+			{ type: 'event', event: 'page_view', scope: '/' },
+			{
+				type: 'event',
+				event: 'purchase',
+				scope: 'checkout',
+				value: 42,
+				currency: 'EUR',
+				params: { id: 'o_1' },
+			},
+			{ type: 'exposure', subjectKind: 'test', subjectId: 't_1', variant: 'b' },
+		])
+
+		disconnect()
+		events.emit('sign_up')
+		expect(fetchMock).toHaveBeenCalledTimes(3)
+	})
+
+	it('leaves out what the bus leaves out', () => {
+		const events = createEvents()
+		numbersFor().connect(events)
+		events.emit('click', { scope: 'cta' })
+		expect(Object.keys(sentBodies()[0]!)).not.toContain('value')
+		expect(Object.keys(sentBodies()[0]!)).not.toContain('params')
 	})
 })

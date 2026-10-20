@@ -1,3 +1,5 @@
+import type { Exposure } from '@obelism/events-sdk'
+
 export type Environment = 'develop' | 'staging' | 'production'
 
 /**
@@ -32,58 +34,27 @@ export type NumbersOptions = {
 	disableWarnings?: boolean
 }
 
-/**
- * Event names GA4 / Google Tag Manager recommend. Reusing them lines your
- * numbers up with any GA4 tagging you have.
- *
- * @see https://support.google.com/analytics/answer/9267735
- */
-export type RecommendedEventName =
-	| 'page_view'
-	| 'view_item'
-	| 'view_item_list'
-	| 'select_item'
-	| 'add_to_cart'
-	| 'remove_from_cart'
-	| 'view_cart'
-	| 'begin_checkout'
-	| 'add_payment_info'
-	| 'add_shipping_info'
-	| 'purchase'
-	| 'refund'
-	| 'sign_up'
-	| 'login'
-	| 'search'
-	| 'select_content'
-	| 'share'
-	| 'generate_lead'
-
-/** An event's name: snake_case, any string, the GA4 ones suggested. */
-export type EventName = RecommendedEventName | (string & {})
+// The event names and exposures are the events SDK's: the bus numbers
+// subscribes to (`connect`) carries them.
+export type {
+	EventName,
+	Exposure,
+	RecommendedEventName,
+} from '@obelism/events-sdk'
 
 export type TrackOptions = {
 	/** A numeric value, e.g. an order total (GA4 `value`). */
-	value?: number
+	value?: number | undefined
 	/** ISO 4217 currency for `value`, e.g. `'EUR'`. */
-	currency?: string
+	currency?: string | undefined
 	/** Extra parameters, stored as JSON (e.g. a GA4 `ecommerce` object). */
-	params?: Record<string, unknown>
+	params?: Record<string, unknown> | undefined
 	/**
 	 * Sends the event once per client for this event and key, e.g. an item id
 	 * for a `view_item` fired every render. Not sent; without it every call
 	 * sends.
 	 */
-	dedupeKey?: string
-}
-
-/**
- * A visitor's assignment to a test's or flag's variant, for SDKs that run
- * them (improve's). numbers attributes the visitor's events to it.
- */
-export type Exposure = {
-	subjectKind: 'test' | 'flag'
-	subjectId: string
-	variant: string
+	dedupeKey?: string | undefined
 }
 
 /** Fields every request carries. */

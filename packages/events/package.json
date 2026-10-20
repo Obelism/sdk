@@ -1,0 +1,60 @@
+{
+	"name": "@obelism/events-sdk",
+	"description": "Obelism events SDK: one page-wide event bus that sites publish to and trackers (Obelism numbers first) subscribe to",
+	"version": "0.0.0",
+	"keywords": [
+		"analytics",
+		"events",
+		"pub-sub",
+		"tracking",
+		"typescript",
+		"obelism"
+	],
+	"license": "MIT",
+	"author": "Obelism <hello@obelism.studio> (https://www.obelism.studio)",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Obelism/sdk",
+		"directory": "packages/events"
+	},
+	"sideEffects": false,
+	"files": [
+		"dist"
+	],
+	"exports": {
+		".": {
+			"import": {
+				"types": "./dist/index.d.mts",
+				"default": "./dist/index.mjs"
+			},
+			"require": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			}
+		}
+	},
+	"scripts": {
+		"build": "bunchee",
+		"dev": "bunchee --watch --no-clean",
+		"test": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"test:ci": "vitest run",
+		"lint": "npm-run-all --parallel lint:*",
+		"lint:oxlint": "oxlint",
+		"lint:types": "tsc --noEmit",
+		"clean": "rm -rf ./node_modules && rm -rf ./dist && rm -rf ./.turbo"
+	},
+	"devDependencies": {
+		"@obelism/sdk-typescript-config": "^0.0.0",
+		"@typescript/typescript6": "^6.0.2",
+		"bunchee": "^7.0.2",
+		"jsdom": "^30.1.2",
+		"npm-run-all2": "^9.0.2",
+		"oxlint": "^1.88.0",
+		"typescript": "^7.0.2",
+		"vitest": "^5.0.4"
+	},
+	"engines": {
+		"node": ">=20"
+	}
+}

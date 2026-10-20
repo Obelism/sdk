@@ -1,3 +1,5 @@
+import { type Events, getEvents } from '@obelism/events-sdk'
+
 import {
 	DEFAULT_ENDPOINT,
 	MAX_BODY_BYTES,
@@ -58,6 +60,13 @@ export type NumbersClient = {
 	expose: (exposure: Exposure) => Sent | null
 	/** Starts page views and click tracking; returns a function that stops them. */
 	autoTrack: (options?: AutoTrackOptions) => () => void
+	/**
+	 * Subscribes to an events SDK bus (default: the page's, `getEvents()`)
+	 * and sends what it carries: its events (`page_view` as a page view) and
+	 * exposures, those from before it connected too. Returns a function that
+	 * disconnects.
+	 */
+	connect: (events?: Events) => () => void
 }
 
 const SNAKE_CASE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/
@@ -268,6 +277,21 @@ export const createNumbers = ({
 		}
 	}
 
+	const connect = (events: Events = getEvents()) =>
+		events.subscribe((event) => {
+			if (event.kind === 'exposure') {
+				const { subjectKind, subjectId, variant } = event
+				expose({ subjectKind, subjectId, variant })
+			} else if (event.name === 'page_view') pageView()
+			else
+				track(event.name, event.scope, {
+					value: event.value,
+					currency: event.currency,
+					params: event.params,
+					dedupeKey: event.dedupeKey,
+				})
+		})
+
 	return {
 		organizationId,
 		spaceId,
@@ -283,5 +307,6 @@ export const createNumbers = ({
 		pageView,
 		expose,
 		autoTrack,
+		connect,
 	}
 }

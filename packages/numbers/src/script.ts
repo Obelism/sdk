@@ -1,3 +1,5 @@
+import { getEvents } from '@obelism/events-sdk'
+
 import { createNumbers, type NumbersClient } from './client'
 import type { Environment } from './types'
 
@@ -11,9 +13,12 @@ import type { Environment } from './types'
 //
 // `data-space` is optional: without it, the organization's first space.
 //
-// It sends page views and clicks on tagged elements, and puts the client on
-// `window.numbers` (`numbers.track('sign_up', 'footer_form')`). Events go to
-// the origin the script came from, or `data-endpoint`.
+// It subscribes to the page's events SDK bus (`window.obelismEvents`, made
+// here when nothing made it before) and has the bus emit page views and
+// clicks on tagged elements, so sites publish with
+// `obelismEvents.emit('sign_up', { scope: 'footer_form' })` and every
+// tracker on the bus gets it. The client itself is on `window.numbers`.
+// Events go to the origin the script came from, or `data-endpoint`.
 
 export type ScriptWindow = Window & { numbers?: NumbersClient }
 
@@ -34,6 +39,8 @@ export const startScript = (
 		disableWarnings: true,
 	})
 	target.numbers = numbers
-	numbers.autoTrack()
+	const events = getEvents()
+	numbers.connect(events)
+	events.autoTrack()
 	return numbers
 }
