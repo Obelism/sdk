@@ -1,5 +1,17 @@
 # @obelism/content
 
+## 0.19.0
+
+### Minor Changes
+
+- f55a2ac: Prompt box: drag it (the pill, or the open box by its bars) to the left or right of the screen, or back to the middle; it springs into place and this browser remembers where
+
+### Patch Changes
+
+- f55a2ac: Form mode: one loading state. With a CMS that says so on `ready`, the prompt box keeps its "Opening the form…" until the form has loaded the entry (`loaded`), instead of then showing the form's own loading text
+- f55a2ac: Prompt box: when minimized, clicking any of its buttons other than Minimize and Close expands it again
+- f55a2ac: Prompt box: the mark on the pill is drawn, so it sits centred in any font
+
 ## 0.18.0
 
 ### Minor Changes
