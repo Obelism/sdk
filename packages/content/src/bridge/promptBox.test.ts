@@ -316,9 +316,9 @@ describe('mountPromptBox', () => {
 		expect($<HTMLTextAreaElement>('textarea').hidden).toBe(true)
 		expect($('.status').textContent).toContain('This product has no page yet')
 
-		const add = [...shadow().querySelectorAll('button')].find(
+		const add = [...shadow().querySelectorAll('.toolbar button')].find(
 			(button) => button.textContent === 'Add a product page',
-		)!
+		) as HTMLButtonElement
 		expect(add.hidden).toBe(false)
 		add.click()
 		expect(bridge.createProductPage).toHaveBeenCalled()
@@ -459,6 +459,87 @@ describe('mountPromptBox', () => {
 		$<HTMLButtonElement>('.pill').click()
 		expect($<HTMLElement>('.form').hidden).toBe(false)
 		expect(toggle.getAttribute('aria-label')).toBe('Minimize, to see the page')
+	})
+
+	it('expands when another button is clicked while minimized', () => {
+		const { bridge, setState } = fakeBridge('site')
+		unmount = mountPromptBox(document, bridge)
+		setState({ features: ['prompt', 'create', 'save', 'publish'] })
+		$<HTMLButtonElement>('.pill').click()
+		const toggle = $<HTMLButtonElement>(
+			'[aria-label="Minimize, to see the page"]',
+		)
+		toggle.click()
+		expect($<HTMLTextAreaElement>('textarea').hidden).toBe(true)
+
+		// The pages open, in place of the toolbar.
+		$<HTMLButtonElement>('.page-chip').click()
+		expect(toggle.getAttribute('aria-expanded')).toBe('true')
+		expect($<HTMLElement>('.pages').hidden).toBe(false)
+
+		// Closing still closes.
+		$<HTMLButtonElement>('.page-chip').click()
+		toggle.click()
+		$<HTMLButtonElement>('.close').click()
+		expect($<HTMLElement>('.panel').hidden).toBe(true)
+	})
+
+	it('moves to a side of the screen when dragged, and stays there', () => {
+		const { bridge, setState } = fakeBridge('site')
+		unmount = mountPromptBox(document, bridge)
+		setState({ features: ['prompt'] })
+		const root = $<HTMLElement>('.root')
+		const pill = $<HTMLButtonElement>('.pill')
+		const pointer = (type: string, target: Element, clientX: number) =>
+			target.dispatchEvent(
+				new PointerEvent(type, {
+					bubbles: true,
+					composed: true,
+					isPrimary: true,
+					pointerId: 1,
+					button: 0,
+					clientX,
+				}),
+			)
+		const width = window.innerWidth
+
+		// A drag from the pill to the right third: not a click on it.
+		pointer('pointerdown', pill, width / 2)
+		pointer('pointermove', pill, width - 40)
+		expect(root.classList.contains('dragging')).toBe(true)
+		pointer('pointerup', pill, width - 40)
+		pill.click()
+		expect(root.dataset.side).toBe('right')
+		expect(root.classList.contains('dragging')).toBe(false)
+		expect($<HTMLElement>('.panel').hidden).toBe(true)
+
+		// A wobble is still a click.
+		pointer('pointerdown', pill, 100)
+		pointer('pointermove', pill, 103)
+		pointer('pointerup', pill, 103)
+		pill.click()
+		expect($<HTMLElement>('.panel').hidden).toBe(false)
+
+		// Not from the prompt; from the toolbar, back to the middle.
+		const textarea = $<HTMLTextAreaElement>('textarea')
+		pointer('pointerdown', textarea, width - 40)
+		pointer('pointermove', textarea, width / 2)
+		pointer('pointerup', textarea, width / 2)
+		expect(root.dataset.side).toBe('right')
+		const toolbar = $<HTMLElement>('.toolbar')
+		pointer('pointerdown', toolbar, width - 40)
+		pointer('pointermove', toolbar, width / 2)
+		pointer('pointerup', toolbar, width / 2)
+		expect(root.dataset.side).toBeUndefined()
+
+		// The left, remembered next time.
+		pointer('pointerdown', toolbar, width / 2)
+		pointer('pointermove', toolbar, 20)
+		pointer('pointerup', toolbar, 20)
+		unmount()
+		unmount = mountPromptBox(document, bridge)
+		expect($<HTMLElement>('.root').dataset.side).toBe('left')
+		localStorage.clear()
 	})
 
 	it('removes the form with the box', () => {

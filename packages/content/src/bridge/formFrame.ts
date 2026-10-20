@@ -8,15 +8,17 @@ import { BRIDGE_SOURCE } from './createBridge'
 // Messages are only exchanged with the URL's origin, and only with the
 // iframe's window:
 // - form → bridge: { source: 'obelism-content-form', type: 'ready' |
-//   'change' | 'error' | 'height', content?, message?, height? } —
-//   `change` carries the whole entry content after an edit, `height` the
-//   form's own height in px, which the iframe takes (up to 60vh)
+//   'loaded' | 'change' | 'error' | 'height', loading?, content?, message?,
+//   height? } — `ready` with `loading: true` when the form still loads the
+//   entry after it and says `loaded` once it shows (a CMS from before says
+//   only `ready`), `change` carries the whole entry content after an edit,
+//   `height` the form's own height in px, which the iframe takes (up to 60vh)
 // - bridge → form: { source: 'obelism-content-bridge', type: 'content',
 //   entryId, content, locale, selectedUid }
 
 export const FORM_SOURCE = 'obelism-content-form'
 
-// How long the form may take to say it is ready.
+// How long the form may take to show.
 export const FORM_READY_TIMEOUT_MS = 30_000
 
 // What the form shows: an entry's content as edited here, in a locale, with
@@ -71,6 +73,7 @@ export const mountFormFrame = (
 	iframe.src = url
 
 	let ready = false
+	let shown = false
 	let latest: FormContent | null = null
 	const post = () => {
 		if (!ready || !latest) return
@@ -81,8 +84,13 @@ export const mountFormFrame = (
 	}
 
 	const timer = setTimeout(() => {
-		if (!ready) handlers.onError('The form did not open')
+		if (!shown) handlers.onError('The form did not open')
 	}, FORM_READY_TIMEOUT_MS)
+	const show = () => {
+		shown = true
+		clearTimeout(timer)
+		handlers.onReady()
+	}
 
 	const onMessage = (event: MessageEvent) => {
 		if (
@@ -98,14 +106,18 @@ export const mountFormFrame = (
 			content?: unknown
 			entryId?: unknown
 			message?: unknown
+			loading?: unknown
 		} | null
 		if (!data || data.source !== FORM_SOURCE) return
 		if (data.type === 'ready') {
 			// Again after the form reloads itself: it gets the content again.
 			ready = true
-			clearTimeout(timer)
-			handlers.onReady()
 			post()
+			// Until the form loaded the entry, the box's own loading state
+			// stands in for the form's.
+			if (data.loading !== true) show()
+		} else if (data.type === 'loaded') {
+			if (ready) show()
 		} else if (data.type === 'change' && isObject(data.content)) {
 			handlers.onChange(
 				data.content,
