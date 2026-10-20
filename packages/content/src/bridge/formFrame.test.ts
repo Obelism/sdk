@@ -72,6 +72,36 @@ describe('mountFormFrame', () => {
 		expect(postMessage).toHaveBeenCalledTimes(3)
 	})
 
+	it('waits for a form that loads the entry to show', () => {
+		vi.useFakeTimers()
+		const setUp = setup()
+		frame = setUp.frame
+		const { handlers, postMessage, receive } = setUp
+		frame.show(CONTENT)
+
+		// The content goes on ready; showing waits for loaded.
+		receive({ source: FORM_SOURCE, type: 'ready', loading: true })
+		expect(postMessage).toHaveBeenCalledTimes(1)
+		expect(handlers.onReady).not.toHaveBeenCalled()
+		receive({ source: FORM_SOURCE, type: 'loaded' })
+		expect(handlers.onReady).toHaveBeenCalledTimes(1)
+		vi.advanceTimersByTime(FORM_READY_TIMEOUT_MS)
+		expect(handlers.onError).not.toHaveBeenCalled()
+	})
+
+	it('says so when the form never loads', () => {
+		vi.useFakeTimers()
+		const setUp = setup()
+		frame = setUp.frame
+		const { handlers, receive } = setUp
+		// Loaded before ready doesn't count.
+		receive({ source: FORM_SOURCE, type: 'loaded' })
+		receive({ source: FORM_SOURCE, type: 'ready', loading: true })
+		vi.advanceTimersByTime(FORM_READY_TIMEOUT_MS)
+		expect(handlers.onReady).not.toHaveBeenCalled()
+		expect(handlers.onError).toHaveBeenCalledWith('The form did not open')
+	})
+
 	it('only listens to the form itself, on the CMS origin', () => {
 		const setUp = setup()
 		frame = setUp.frame

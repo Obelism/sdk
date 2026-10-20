@@ -117,6 +117,15 @@ export type PromptBoxOptions = {
 	labels?: Partial<PromptLabels> | undefined
 }
 
+type Side = 'left' | 'center' | 'right'
+const SIDE_KEY = 'obelism-content-prompt-side'
+// How far the pointer moves before it drags the box, not clicks it.
+const DRAG_THRESHOLD_PX = 6
+// How far ahead a flick carries the box: its speed for this long.
+const FLICK_MS = 150
+// Its distance from the side of the screen, as in the CSS.
+const EDGE_PX = 16
+
 // Icons (Lucide), drawn in the text colour.
 const ICONS = {
 	page: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
@@ -131,6 +140,7 @@ const ICONS = {
 	chevrons: '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
 	search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
 	check: '<path d="M20 6 9 17l-5-5"/>',
+	mark: '<path d="M12 3v18M3 12h18"/><g fill="currentColor" stroke="none"><circle cx="7" cy="7" r="1.75"/><circle cx="17" cy="7" r="1.75"/><circle cx="7" cy="17" r="1.75"/><circle cx="17" cy="17" r="1.75"/></g>',
 	send: '<path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z"/><path d="M6 12h16"/>',
 }
 
@@ -157,10 +167,20 @@ const CSS = `
 	--font-inter: 'InterVariable', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
 		Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
 	position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+	transition: translate .45s cubic-bezier(0.34, 1.3, 0.64, 1);
 	z-index: 2147483647; width: min(640px, calc(100vw - 32px)); color-scheme: light dark;
 	font: 400 14px/1.4 var(--font-inter); color: rgb(var(--theme-foreground-rgb));
 	-webkit-font-smoothing: antialiased;
 }
+/* Dragged to a side of the screen, it stays there, springing into place. */
+.root[data-side='left'] { left: 16px; transform: none; }
+.root[data-side='right'] { left: auto; right: 16px; transform: none; }
+.root[data-side='left'] .bar { justify-content: flex-start; }
+.root[data-side='right'] .bar { justify-content: flex-end; }
+.root.dragging { transition: none; user-select: none; -webkit-user-select: none; }
+.root.dragging, .root.dragging * { cursor: grabbing !important; }
+.toolbar, .footer, .status { cursor: grab; touch-action: none; }
+.pill { touch-action: none; }
 @media (prefers-color-scheme: dark) {
 	.root {
 		--theme-foreground-rgb: var(--color-white-rgb);
@@ -196,7 +216,8 @@ button:focus-visible { outline: 2px solid rgb(var(--theme-accent-rgb)); outline-
 }
 button.pill:hover { color: rgb(var(--theme-foreground-rgb)); transform: translateY(-2px); }
 .pill > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mark { color: rgb(var(--theme-accent-rgb)); font-size: 22px; line-height: 1; }
+.mark { color: rgb(var(--theme-accent-rgb)); }
+.mark svg { width: 20px; height: 20px; }
 .pill.compact { width: auto; height: 40px; padding: 0 18px; font-size: 14px; gap: 4px; }
 
 /* Open: a floating card, the text on top and a row of pill buttons below. */
@@ -214,7 +235,7 @@ button.pill:hover { color: rgb(var(--theme-foreground-rgb)); transform: translat
 @keyframes rise { from { opacity: 0; transform: translateY(8px) scale(.98); } }
 @keyframes spin { to { transform: rotate(1turn); } }
 @media (prefers-reduced-motion: reduce) {
-	.panel { animation: none; }
+	.root, .panel { animation: none; transition: none; }
 	.pill { transition: none; }
 }
 .status {
@@ -374,6 +395,12 @@ const icon = (doc: Document, name: keyof typeof ICONS) => {
 	return span
 }
 
+const mark = (doc: Document) => {
+	const span = icon(doc, 'mark')
+	span.classList.add('mark')
+	return span
+}
+
 // Mounts the box on the page; returns a function that removes it.
 export const mountPromptBox = (
 	doc: Document,
@@ -393,8 +420,8 @@ export const mountPromptBox = (
 		'button',
 		{ className: 'pill', type: 'button' },
 		pillText,
-		// The Obelism mark.
-		element(doc, 'span', { className: 'mark', textContent: '⁜' }),
+		// The Obelism mark (⁜), drawn: the glyph sits low in most fonts.
+		mark(doc),
 	)
 	// Someone signed in who may only read: a note that drafts show, and a
 	// way out.
@@ -650,6 +677,116 @@ export const mountPromptBox = (
 		panel,
 	)
 	shadow.append(element(doc, 'style', { textContent: CSS }), root)
+
+	// Dragged sideways, the box moves to the left, the middle or the right
+	// of the screen, whichever third it is let go (or flicked) in; this
+	// browser remembers where. From the pill, or the open box's bars, not its
+	// fields and buttons.
+	const win = doc.defaultView
+	const readSide = (): Side => {
+		try {
+			const side = win?.localStorage.getItem(SIDE_KEY)
+			return side === 'left' || side === 'right' ? side : 'center'
+		} catch {
+			return 'center'
+		}
+	}
+	const placeAt = (side: Side) => {
+		if (side === 'center') delete root.dataset.side
+		else root.dataset.side = side
+	}
+	placeAt(readSide())
+	let drag: {
+		id: number
+		startX: number
+		x: number
+		velocity: number
+		time: number
+		moved: boolean
+		// How far it may go before it resists, to stay on the screen.
+		min: number
+		max: number
+	} | null = null
+	// A drag that ends on the pill isn't a click on it.
+	let dragged = false
+	root.addEventListener('pointerdown', (event) => {
+		dragged = false
+		if (event.button !== 0 || !event.isPrimary) return
+		const target = event.target as Element
+		const control = target.closest(
+			'button, input, textarea, iframe, a, label, .pages, .form',
+		)
+		if (control && control !== pill) return
+		const { left, right } = root.getBoundingClientRect()
+		drag = {
+			id: event.pointerId,
+			startX: event.clientX,
+			x: event.clientX,
+			velocity: 0,
+			time: event.timeStamp,
+			moved: false,
+			min: Math.min(0, EDGE_PX - left),
+			max: Math.max(0, (win?.innerWidth ?? 0) - EDGE_PX - right),
+		}
+	})
+	root.addEventListener('pointermove', (event) => {
+		if (!drag || event.pointerId !== drag.id) return
+		const dx = event.clientX - drag.startX
+		if (!drag.moved) {
+			if (Math.abs(dx) < DRAG_THRESHOLD_PX) return
+			drag.moved = true
+			root.classList.add('dragging')
+			try {
+				root.setPointerCapture(event.pointerId)
+			} catch {}
+		}
+		const elapsed = event.timeStamp - drag.time
+		if (elapsed > 0) drag.velocity = (event.clientX - drag.x) / elapsed
+		drag.x = event.clientX
+		drag.time = event.timeStamp
+		// Past the edge, a third as far.
+		const clamped = Math.min(Math.max(dx, drag.min), drag.max)
+		root.style.translate = `${clamped + (dx - clamped) / 3}px 0`
+	})
+	const drop = (event: PointerEvent) => {
+		if (!drag || event.pointerId !== drag.id) return
+		const { moved, x, velocity } = drag
+		drag = null
+		if (!moved) return
+		dragged = true
+		// Springs from where it was let go to its new place.
+		const before = root.getBoundingClientRect().left
+		const width = win?.innerWidth ?? 0
+		const projected = x + velocity * FLICK_MS
+		const side: Side =
+			projected < width / 3
+				? 'left'
+				: projected > (width * 2) / 3
+					? 'right'
+					: 'center'
+		placeAt(side)
+		root.style.translate = ''
+		const after = root.getBoundingClientRect().left
+		root.style.translate = `${before - after}px 0`
+		void root.offsetWidth
+		root.classList.remove('dragging')
+		root.style.translate = ''
+		try {
+			win?.localStorage.setItem(SIDE_KEY, side)
+		} catch {}
+	}
+	root.addEventListener('pointerup', drop)
+	root.addEventListener('pointercancel', drop)
+	root.addEventListener(
+		'click',
+		(event) => {
+			if (!dragged) return
+			dragged = false
+			event.preventDefault()
+			event.stopPropagation()
+		},
+		true,
+	)
 
 	let open = false
 	let minimized = false
@@ -1007,6 +1144,19 @@ export const mountPromptBox = (
 		refresh()
 		if (!minimized) (form ? minimize : input).focus()
 	})
+	// Any other button of the minimized box expands it first (capture, so
+	// its own handler then sees the box open), e.g. the pages or New page.
+	panel.addEventListener(
+		'click',
+		(event) => {
+			if (!minimized) return
+			const button = (event.target as Element).closest('button')
+			if (!button || button === minimize || button === close) return
+			minimized = false
+			refresh()
+		},
+		true,
+	)
 	save.addEventListener('click', () => void store('save'))
 	publish.addEventListener('click', () => void store('publish'))
 	signOut.addEventListener('click', () => bridge.signOut())
