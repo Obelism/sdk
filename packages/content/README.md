@@ -158,10 +158,10 @@ await bridge.createPage('/pricing', 'Our plans, for agencies') // or your own UI
 On a product route, mark the Shopify product the page shows. When the
 product has no product page yet (nothing on the page is `editable(entry)`),
 the box offers **Add a product page**: the CMS makes a draft of the space's
-product page type for it (its handle as slug, under `products` when the
-space has that page or folder) and the page reloads, now finding it. The
-page list opens product pages at `productPath` (default
-`/products/<handle>`):
+product page type for it (its handle as slug, in the `products` folder)
+and the page reloads, now finding it. The page list opens product pages at the environment's product path (Settings →
+Preview URL in the CMS, `/products/{handle}` by default), or at your own
+`productPath`:
 
 ```tsx
 import { editable, editableProduct } from '@obelism/content'
@@ -317,8 +317,8 @@ const xml = sitemapXml(pages, {
 
 ## Links
 
-A `link` field goes to a page of the space, to any address, or to a product
-of the space's Shopify store, each with an optional query and anchor. It is
+A `link` field goes to a page of the space, to any address, or (with
+`products: true`) to a product of the space's Shopify store, each with an optional query and anchor. It is
 delivered as `Link`: the page's `id`, `title`, `slug` and `path` (never its
 fields), the `url`, or the `product` (`{ id, handle }`) with its product
 page as `entry` (`null` when it has none), plus `query` and `hash` without

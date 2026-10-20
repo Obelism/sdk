@@ -55,6 +55,9 @@ export const readSiteEditing = (doc: Document): string | null => {
 
 type SessionInfo = {
 	features: string[]
+	// Where product pages are on the site, with {handle}: the environment's
+	// setting in the CMS (from 2026-10-20).
+	productPath?: string
 	space: { defaultLocale: string; locales: { code: string }[] }
 }
 
@@ -91,7 +94,8 @@ export type SiteBridgeOptions = {
 	// Default: `/` + path.
 	pagePath?: ((path: string, locale: string) => string) | undefined
 	// Where a product page is on the site, by its product's handle: your
-	// product route. Default: `/products/` + handle.
+	// product route. Default: the environment's product path in the CMS
+	// (Settings), else `/products/` + handle.
 	productPath?: ((handle: string, locale: string) => string) | undefined
 }
 
@@ -100,7 +104,7 @@ export const createSiteBridge = (
 	basePath: string,
 	{
 		pagePath = (path) => `/${path}`,
-		productPath = (handle) => `/products/${handle}`,
+		productPath: ownProductPath,
 	}: SiteBridgeOptions = {},
 ): ContentBridge => {
 	const doc = win.document
@@ -112,6 +116,13 @@ export const createSiteBridge = (
 	// Entries changed here since the last publish.
 	const touched = new Set<string>()
 	let session: SessionInfo | null = null
+	const productPath = (handle: string, locale: string) =>
+		ownProductPath
+			? ownProductPath(handle, locale)
+			: (session?.productPath ?? '/products/{handle}').replaceAll(
+					'{handle}',
+					encodeURIComponent(handle),
+				)
 	// The open form's, if any; and when the form last changed content, for
 	// undo steps (-Infinity: the next edit starts a new step).
 	let closeForm: (() => void) | null = null

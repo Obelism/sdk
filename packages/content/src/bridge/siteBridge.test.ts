@@ -755,4 +755,28 @@ describe('createSiteBridge', () => {
 			'Nothing on this page is marked as a product',
 		)
 	})
+
+	it("opens product pages at the environment's product path", async () => {
+		const { win } = site({
+			session: () => ({ ...SESSION, productPath: '/shop/{handle}' }),
+			pages: () => ({
+				pages: [
+					{
+						entryId: 'entry_mug',
+						name: 'Mug',
+						contentType: 'productPage',
+						status: 'draft',
+						paths: { en: 'products/mug' },
+						product: { id: 'gid://shopify/Product/42', handle: 'mug' },
+					},
+				],
+			}),
+		})
+		const bridge = createSiteBridge(win, '/cms')
+		await vi.waitFor(() =>
+			expect(bridge.getState().features).toContain('prompt'),
+		)
+		const [page] = await bridge.pages()
+		expect(page?.url).toBe('/shop/mug')
+	})
 })

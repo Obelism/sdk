@@ -47,7 +47,8 @@ export type BridgeOptions = {
 	pagePath?: ((path: string, locale: string) => string) | undefined
 	// Editing on the site: where a product page is on the site, by its
 	// product's handle, in a locale: your product route, which looks its page
-	// up by product. Default: `/products/` + handle.
+	// up by product. Default: the environment's product path in the CMS
+	// (Settings → Preview URL), `/products/{handle}` unless changed.
 	productPath?: ((handle: string, locale: string) => string) | undefined
 }
 

@@ -238,6 +238,8 @@ export type FieldDefinition = BaseField &
 				type: 'link'
 				// The page types it may go to; any page type when left out.
 				contentTypes?: string[]
+				// It may also go to a product of the space's Shopify store.
+				products?: boolean
 		  }
 		| {
 				type: 'blocks'
