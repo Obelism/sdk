@@ -1,5 +1,7 @@
 export const UID_ATTRIBUTE = 'data-cms-uid'
 export const ENTRY_ATTRIBUTE = 'data-cms-entry'
+export const PRODUCT_ATTRIBUTE = 'data-cms-product'
+export const PRODUCT_HANDLE_ATTRIBUTE = 'data-cms-product-handle'
 
 type Editable = { 'data-cms-uid'?: string; 'data-cms-entry'?: string }
 
@@ -24,3 +26,26 @@ export const editable = (
 	}
 	return {}
 }
+
+type EditableProduct = {
+	'data-cms-product'?: string
+	'data-cms-product-handle'?: string
+}
+
+// The Shopify product a page shows, on a product route: editing on the site
+// then offers "Add a product page" when the page has no product page yet
+// (no `editable(entry)`), and makes one for this product.
+//
+//   <main {...editableProduct(product)} {...editable(page)}>…</main>
+//
+// `product` is the store's (its GID and handle), from the Storefront API or
+// a Shopify field.
+export const editableProduct = (
+	product: { id: string; handle: string } | null | undefined,
+): EditableProduct =>
+	product?.id
+		? {
+				'data-cms-product': product.id,
+				'data-cms-product-handle': product.handle,
+			}
+		: {}

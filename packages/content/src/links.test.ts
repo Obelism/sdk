@@ -53,4 +53,28 @@ describe('linkHref', () => {
 		expect(linkHref(undefined)).toBeNull()
 		expect(linkHref(page(null))).toBeNull()
 	})
+
+	it('puts a product at /products/<handle>, or where `product` says', () => {
+		const product = (extras: Partial<Link> = {}): Link => ({
+			type: 'product',
+			product: { id: 'gid://shopify/Product/42', handle: 'mug' },
+			entry: null,
+			query: null,
+			hash: null,
+			...(extras as object),
+		})
+		expect(linkHref(product({ hash: 'reviews' }))).toBe('/products/mug#reviews')
+		const withPage = product({
+			entry: { id: 'entry_9', title: 'Mug', slug: 'mug', path: 'shop/mug' },
+		})
+		expect(
+			linkHref(withPage, {
+				product: ({ handle }, page) =>
+					page ? `/${page.path}` : `/shop/${handle}`,
+			}),
+		).toBe('/shop/mug')
+		expect(
+			linkHref(product(), { product: ({ handle }) => `/p/${handle}` }),
+		).toBe('/p/mug')
+	})
 })

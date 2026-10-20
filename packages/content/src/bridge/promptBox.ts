@@ -58,6 +58,10 @@ export type PromptLabels = {
 	pageCurrent: string
 	pageDraft: string
 	pageChanged: string
+	addProductPage: string
+	addingProductPage: string
+	addedProductPage: string
+	productPageHint: string
 }
 
 export const DEFAULT_PROMPT_LABELS: PromptLabels = {
@@ -102,6 +106,11 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 	pageCurrent: 'This page',
 	pageDraft: 'Draft',
 	pageChanged: 'Changed',
+	addProductPage: 'Add a product page',
+	addingProductPage: 'Making the product page…',
+	addedProductPage: 'Opening the product page…',
+	productPageHint:
+		'This product has no page yet. Add one for what the store doesn’t say.',
 }
 
 export type PromptBoxOptions = {
@@ -467,6 +476,15 @@ export const mountPromptBox = (
 		icon(doc, 'newPage'),
 		labels.newPage,
 	)
+	// A product the site marks (editableProduct) without a page of its own:
+	// one click makes its product page, which the page then shows.
+	const addProduct = element(
+		doc,
+		'button',
+		{ className: 'action chip product', type: 'button' },
+		icon(doc, 'newPage'),
+		labels.addProductPage,
+	)
 	const cancelNew = element(doc, 'button', {
 		type: 'button',
 		title: labels.newPageCancel,
@@ -532,6 +550,7 @@ export const mountPromptBox = (
 		newScope,
 		modes,
 		undo,
+		addProduct,
 		newPage,
 		element(doc, 'span', { className: 'spacer' }),
 		minimize,
@@ -666,7 +685,9 @@ export const mountPromptBox = (
 		// A page of the site that isn't an entry (no `editable(entry)`, like a
 		// hand-written /about) has nothing to edit: only New page.
 		const pageless = site && bridge.entryId === null
-		const onlyNew = pageless && canCreate
+		// …unless it shows a product: then Add a product page first.
+		const productHere = pageless && canCreate && bridge.product !== null
+		const onlyNew = pageless && canCreate && !productHere
 		if (!canCreate) creating = false
 		if (onlyNew) creating = true
 		if (creating || pageless || !site) form = false
@@ -674,16 +695,23 @@ export const mountPromptBox = (
 		const showForm = open && available && form
 		if (showForm && !formHandle) mountForm()
 		else if (!showForm && formHandle) unmountForm()
-		pillText.textContent = onlyNew ? labels.newPage : labels.open
+		const offerProduct = productHere && !creating
+		pillText.textContent = offerProduct
+			? labels.addProductPage
+			: onlyNew
+				? labels.newPage
+				: labels.open
 		cancelNew.hidden = onlyNew
-		scope.hidden = creating
+		scope.hidden = creating || offerProduct
 		newScope.hidden = !creating
+		addProduct.hidden = !offerProduct
+		addProduct.disabled = busy
 		newPage.hidden = creating || form || !canCreate
 		newPage.disabled = busy
 		if (minimized) picking = false
 		pathRow.hidden = !creating || picking || minimized
 		pathInput.disabled = busy
-		input.hidden = form || picking || minimized
+		input.hidden = form || picking || minimized || offerProduct
 		formBox.hidden = !form || picking || minimized
 		formBox.classList.toggle('loading', formLoading)
 		toolbar.hidden = picking
@@ -708,8 +736,8 @@ export const mountPromptBox = (
 		undo.hidden = creating || !state.canUndo
 		undo.disabled = busy
 		// The form applies edits as they are made.
-		send.hidden = form || minimized
-		divider.hidden = form || minimized
+		send.hidden = form || minimized || offerProduct
+		divider.hidden = form || minimized || offerProduct
 		const toggleLabel = minimized ? labels.expand : labels.minimize
 		minimize.title = toggleLabel
 		minimize.setAttribute('aria-label', toggleLabel)
@@ -740,13 +768,17 @@ export const mountPromptBox = (
 		const note = state.prompting
 			? creating
 				? labels.creating
-				: labels.working
+				: offerProduct
+					? labels.addingProductPage
+					: labels.working
 			: loadingForm
 				? labels.formLoading
 				: (message?.text ??
-					(site && !creating && !picking && !state.selectedUid
-						? labels.selectHint
-						: ''))
+					(offerProduct
+						? labels.productPageHint
+						: site && !creating && !picking && !state.selectedUid
+							? labels.selectHint
+							: ''))
 		status.textContent = note
 		status.hidden = !note || minimized
 		status.className = `status${working ? ' working' : ''}${!busy && !loadingForm && message?.error ? ' error' : ''}`
@@ -981,6 +1013,17 @@ export const mountPromptBox = (
 	pillSignOut.addEventListener('click', () => bridge.signOut())
 	clearBlock.addEventListener('click', () => bridge.select(null))
 	newPage.addEventListener('click', () => setCreating(true))
+	addProduct.addEventListener('click', async () => {
+		message = null
+		try {
+			// The bridge reloads the page; this shows until it does.
+			await bridge.createProductPage()
+			message = { text: labels.addedProductPage, error: false }
+		} catch (error) {
+			message = failure(error)
+		}
+		refresh()
+	})
 	cancelNew.addEventListener('click', () => setCreating(false))
 	promptMode.addEventListener('click', () => setForm(false))
 	formMode.addEventListener('click', () => setForm(true))

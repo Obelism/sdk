@@ -19,6 +19,7 @@ const PAGES = [
 		status: 'published' as const,
 		path: '',
 		url: '/',
+		product: null,
 	},
 	{
 		entryId: 'entry_2',
@@ -27,6 +28,7 @@ const PAGES = [
 		status: 'changed' as const,
 		path: 'pricing',
 		url: '/pricing',
+		product: null,
 	},
 	{
 		entryId: 'entry_3',
@@ -35,6 +37,7 @@ const PAGES = [
 		status: 'draft' as const,
 		path: 'solutions/agencies',
 		url: '/solutions/agencies',
+		product: null,
 	},
 ]
 
@@ -63,6 +66,13 @@ const fakeBridge = (mode: 'editor' | 'site' = 'editor') => {
 					}
 				}),
 		),
+		product: null as { id: string; handle: string } | null,
+		createProductPage: vi.fn(async () => {
+			setState({ prompting: true })
+			await Promise.resolve()
+			setState({ prompting: false })
+			return { entryId: 'entry_mug', path: 'products/mug', created: true }
+		}),
 		createPage: vi.fn(async () => {
 			setState({ prompting: true })
 			await Promise.resolve()
@@ -290,6 +300,39 @@ describe('mountPromptBox', () => {
 		expect($<HTMLButtonElement>('.scope:not([hidden]) button').hidden).toBe(
 			true,
 		)
+	})
+
+	it('offers a product page on a product without one', async () => {
+		const { bridge, setState } = fakeBridge('site')
+		const product = {
+			...bridge,
+			entryId: null,
+			product: { id: 'gid://shopify/Product/42', handle: 'mug' },
+		}
+		unmount = mountPromptBox(document, product)
+		setState({ features: ['prompt', 'create', 'save', 'publish'] })
+		expect($('.pill').textContent).toContain('Add a product page')
+		$<HTMLButtonElement>('.pill').click()
+		expect($<HTMLTextAreaElement>('textarea').hidden).toBe(true)
+		expect($('.status').textContent).toContain('This product has no page yet')
+
+		const add = [...shadow().querySelectorAll('button')].find(
+			(button) => button.textContent === 'Add a product page',
+		)!
+		expect(add.hidden).toBe(false)
+		add.click()
+		expect(bridge.createProductPage).toHaveBeenCalled()
+		await vi.waitFor(() =>
+			expect($('.status').textContent).toBe('Opening the product page…'),
+		)
+
+		// New page is still there, for a page written from a prompt.
+		const newPage = [...shadow().querySelectorAll('button')].find(
+			(button) => button.textContent === 'New page',
+		)!
+		newPage.click()
+		expect(add.hidden).toBe(true)
+		expect($<HTMLTextAreaElement>('textarea').hidden).toBe(false)
 	})
 
 	it('shows readers on the site that drafts show, and a way out', () => {

@@ -1,6 +1,6 @@
 import { UID_ATTRIBUTE } from '../editable'
 import { PREVIEW_PARAMS } from '../preview'
-import type { Entry } from '../types'
+import type { Entry, ShopifyItem } from '../types'
 import {
 	type BlockStats,
 	mountStatsOverlay,
@@ -80,6 +80,14 @@ export type CreatePageResult = {
 	url: string
 }
 
+// A product page made from the site (`createProductPage`): the new one, or
+// the one the product had already (`created: false`).
+export type CreateProductPageResult = {
+	entryId: string
+	path: string
+	created: boolean
+}
+
 export type ApplyJsonResult = {
 	// The fields (apiIds) the JSON changed; empty when it changed nothing.
 	changed: string[]
@@ -112,8 +120,12 @@ export type SitePage = {
 	// The CMS path in the page's locale (`solutions/agencies`, '' for the
 	// home page; the default locale's, or any, when it has none there)…
 	path: string
-	// …and where it is on the site (`pagePath`).
+	// …and where it is on the site (`pagePath`, or `productPath` for a
+	// product page).
 	url: string
+	// A product page's product (a page whose type has a unique product
+	// field), else null.
+	product: ShopifyItem | null
 }
 
 export type ContentBridge = {
@@ -125,6 +137,9 @@ export type ContentBridge = {
 	// The entry being edited (on the site: the page's, see `editable`).
 	readonly entryId: string | null
 	readonly environment: string | null
+	// Editing on the site: the Shopify product the page shows (marked with
+	// `editableProduct`), else null.
+	readonly product: ShopifyItem | null
 	// Returns a function that removes the listener. While no `update` listener
 	// is registered the page reloads after every save, to show the draft.
 	on<E extends BridgeEvent>(event: E, listener: BridgeListener<E>): () => void
@@ -142,6 +157,11 @@ export type ContentBridge = {
 	// existing page), written from `prompt` like the page it is on, and
 	// stored as a draft straight away. Then opens it.
 	createPage(path: string, prompt: string): Promise<CreatePageResult>
+	// Editing on the site: a product page for `product` (the page's, see
+	// `editableProduct`), stored as a draft of the space's product page type
+	// with the product's handle as slug, or the one it has already. Then
+	// reloads the page, which now finds it.
+	createProductPage(product?: ShopifyItem): Promise<CreateProductPageResult>
 	// Editing on the site: the entry — or the block `uid`, the selected one
 	// by default — as JSON, the way a language model sees it: one locale,
 	// rich text as Markdown, blocks with `_uid` and `_type`. With the changes
@@ -249,6 +269,8 @@ export const INERT_METHODS = {
 	prompt: inertPrompt,
 	createPage: () =>
 		Promise.reject(new Error('New pages are made on the site itself')),
+	createProductPage: () =>
+		Promise.reject(new Error('Product pages are made on the site itself')),
 	view: onlyWhileEditingSite,
 	applyJson: onlyWhileEditingSite,
 	openForm: (_container: HTMLElement, options: FormOptions = {}) => {
@@ -312,6 +334,7 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 		mode: isEditing ? 'editor' : null,
 		entryId: params.get(PREVIEW_PARAMS.entry),
 		environment: params.get(PREVIEW_PARAMS.environment),
+		product: null,
 		on: emitter.on,
 		getState: () => state,
 		...INERT_METHODS,
@@ -526,6 +549,7 @@ export const wrapScriptBridge = (
 		mode: script.isEditing ? 'editor' : null,
 		entryId: script.entryId,
 		environment: params.get(PREVIEW_PARAMS.environment),
+		product: null,
 		on: (event, listener) => {
 			if (event === 'update' && !forwardingUpdates) {
 				forwardingUpdates = true

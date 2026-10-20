@@ -7,7 +7,14 @@ export type {
 	RequestOptions,
 } from './client'
 export { DEFAULT_URL } from './config'
-export { editable, ENTRY_ATTRIBUTE, UID_ATTRIBUTE } from './editable'
+export {
+	editable,
+	editableProduct,
+	ENTRY_ATTRIBUTE,
+	PRODUCT_ATTRIBUTE,
+	PRODUCT_HANDLE_ATTRIBUTE,
+	UID_ATTRIBUTE,
+} from './editable'
 export { ContentApiError } from './errors'
 export { imageSrcSet, imageUrl } from './images'
 export { IMPROVE_BLOCK, isImproveBlock, pickImproveVariant } from './improve'
