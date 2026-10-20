@@ -130,6 +130,25 @@ const shadow = () =>
 const $ = <T extends Element>(selector: string) =>
 	shadow().querySelector<T>(selector)!
 
+// Dispatches pointer events `step` ms apart: jsdom's own timestamps tick
+// in whole milliseconds, and a flick is worked out from them.
+const makePointer = () => {
+	let now = 0
+	return (type: string, target: Element, clientX: number, step = 1) => {
+		const event = new PointerEvent(type, {
+			bubbles: true,
+			composed: true,
+			isPrimary: true,
+			pointerId: 1,
+			button: 0,
+			clientX,
+		})
+		now += step
+		Object.defineProperty(event, 'timeStamp', { value: now })
+		return target.dispatchEvent(event)
+	}
+}
+
 let unmount = () => {}
 afterEach(() => unmount())
 
@@ -484,23 +503,37 @@ describe('mountPromptBox', () => {
 		expect($<HTMLElement>('.panel').hidden).toBe(true)
 	})
 
+	it('flicks to a side, but not after standing still', () => {
+		const { bridge, setState } = fakeBridge('site')
+		unmount = mountPromptBox(document, bridge)
+		setState({ features: ['prompt'] })
+		$<HTMLButtonElement>('.pill').click()
+		const root = $<HTMLElement>('.root')
+		const toolbar = $<HTMLElement>('.toolbar')
+		const pointer = makePointer()
+		const middle = window.innerWidth / 2
+
+		// Let go in the middle third, standing still a while: it stays.
+		pointer('pointerdown', toolbar, middle)
+		pointer('pointermove', toolbar, middle + 150, 1)
+		pointer('pointerup', toolbar, middle + 150, 200)
+		expect(root.dataset.side).toBeUndefined()
+
+		// Let go there while moving fast: on to the right.
+		pointer('pointerdown', toolbar, middle)
+		pointer('pointermove', toolbar, middle + 150, 1)
+		pointer('pointerup', toolbar, middle + 150, 1)
+		expect(root.dataset.side).toBe('right')
+		localStorage.clear()
+	})
+
 	it('moves to a side of the screen when dragged, and stays there', () => {
 		const { bridge, setState } = fakeBridge('site')
 		unmount = mountPromptBox(document, bridge)
 		setState({ features: ['prompt'] })
 		const root = $<HTMLElement>('.root')
 		const pill = $<HTMLButtonElement>('.pill')
-		const pointer = (type: string, target: Element, clientX: number) =>
-			target.dispatchEvent(
-				new PointerEvent(type, {
-					bubbles: true,
-					composed: true,
-					isPrimary: true,
-					pointerId: 1,
-					button: 0,
-					clientX,
-				}),
-			)
+		const pointer = makePointer()
 		const width = window.innerWidth
 
 		// A drag from the pill to the right third: not a click on it.

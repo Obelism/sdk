@@ -123,6 +123,11 @@ const SIDE_KEY = 'obelism-content-prompt-side'
 const DRAG_THRESHOLD_PX = 6
 // How far ahead a flick carries the box: its speed for this long.
 const FLICK_MS = 150
+// …at most this far, so one coarse pointer event isn't a flick across the
+// screen…
+const FLICK_MAX_PX = 120
+// …and none when the pointer stood still this long before letting go.
+const FLICK_STALE_MS = 80
 // Its distance from the side of the screen, as in the CSS.
 const EDGE_PX = 16
 
@@ -750,14 +755,18 @@ export const mountPromptBox = (
 	})
 	const drop = (event: PointerEvent) => {
 		if (!drag || event.pointerId !== drag.id) return
-		const { moved, x, velocity } = drag
+		const { moved, x, velocity, time } = drag
 		drag = null
 		if (!moved) return
 		dragged = true
 		// Springs from where it was let go to its new place.
 		const before = root.getBoundingClientRect().left
 		const width = win?.innerWidth ?? 0
-		const projected = x + velocity * FLICK_MS
+		const flick =
+			event.timeStamp - time > FLICK_STALE_MS
+				? 0
+				: Math.min(Math.max(velocity * FLICK_MS, -FLICK_MAX_PX), FLICK_MAX_PX)
+		const projected = x + flick
 		const side: Side =
 			projected < width / 3
 				? 'left'
