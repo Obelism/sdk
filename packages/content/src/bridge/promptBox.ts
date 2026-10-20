@@ -265,7 +265,20 @@ textarea::placeholder { color: rgb(var(--theme-foreground-muted-rgb)); }
 	display: block; width: 100%; height: min(560px, 60vh); border: none; border-radius: 12px;
 	background: rgb(var(--theme-background-actions-rgb) / .45);
 }
-.form.loading iframe { visibility: hidden; }
+/* Loading, it keeps the form's own height, the spinner in the middle,
+   whatever the form says meanwhile; the frame shows once the form does. */
+.form.loading { position: relative; height: calc(min(560px, 60vh) + 12px); }
+.form.loading iframe { position: absolute; visibility: hidden; }
+.form-loader {
+	position: absolute; inset: 12px 12px 0; display: flex; align-items: center; justify-content: center;
+	gap: 10px; border-radius: 12px; color: rgb(var(--theme-foreground-muted-rgb));
+	background: rgb(var(--theme-background-actions-rgb) / .45);
+}
+.form-loader::before {
+	content: ''; width: 16px; height: 16px; flex: none; border-radius: 50%;
+	border: 2px solid rgb(var(--theme-border-rgb) / .3); border-top-color: rgb(var(--theme-accent-rgb));
+	animation: spin .7s linear infinite;
+}
 /* New page: where it goes, above what it is for. */
 .path {
 	display: flex; align-items: center; gap: 10px; padding: 16px 22px 0;
@@ -451,7 +464,12 @@ export const mountPromptBox = (
 	})
 	input.setAttribute('aria-label', labels.open)
 	// Form mode (on the site): the CMS's form, mounted while shown.
-	const formBox = element(doc, 'div', { className: 'form' })
+	const formLoader = element(doc, 'div', {
+		className: 'form-loader',
+		textContent: labels.formLoading,
+	})
+	formLoader.setAttribute('role', 'status')
+	const formBox = element(doc, 'div', { className: 'form' }, formLoader)
 
 	// What the prompt acts on: the whole page, or the selected block with a
 	// way back to the page.
@@ -860,6 +878,7 @@ export const mountPromptBox = (
 		input.hidden = form || picking || minimized || offerProduct
 		formBox.hidden = !form || picking || minimized
 		formBox.classList.toggle('loading', formLoading)
+		formLoader.hidden = !formLoading
 		toolbar.hidden = picking
 		pagesSection.hidden = !picking
 		input.placeholder = creating
@@ -910,7 +929,8 @@ export const mountPromptBox = (
 			pages?.find(({ entryId }) => entryId === bridge.entryId)?.name ??
 			labels.pages
 		const loadingForm = form && formLoading && !picking
-		const working = state.prompting || loadingForm
+		const working = state.prompting
+		// A form opening says so in its own place.
 		const note = state.prompting
 			? creating
 				? labels.creating
@@ -918,7 +938,7 @@ export const mountPromptBox = (
 					? labels.addingProductPage
 					: labels.working
 			: loadingForm
-				? labels.formLoading
+				? ''
 				: (message?.text ??
 					(offerProduct
 						? labels.productPageHint

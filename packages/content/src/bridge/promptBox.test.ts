@@ -385,9 +385,11 @@ describe('mountPromptBox', () => {
 		expect(form.hidden).toBe(false)
 		expect(form.querySelector('iframe')!.title).toBe('The content form')
 		expect($<HTMLTextAreaElement>('textarea').hidden).toBe(true)
-		expect($('.status').textContent).toBe('Opening the form…')
-		expect($('.status').className).toContain('working')
+		// Opening: the box's own spinner, in the form's place.
+		expect($<HTMLElement>('.status').hidden).toBe(true)
 		expect(form.className).toContain('loading')
+		expect($<HTMLElement>('.form-loader').hidden).toBe(false)
+		expect($('.form-loader').textContent).toBe('Opening the form…')
 		// Edits apply live: no Apply, and no New page; the footer stays.
 		expect($<HTMLButtonElement>('.primary').hidden).toBe(true)
 		expect(visible()).not.toContain('New page')
@@ -397,6 +399,7 @@ describe('mountPromptBox', () => {
 
 		forms[0]!.options.onReady!()
 		expect(form.className).not.toContain('loading')
+		expect($<HTMLElement>('.form-loader').hidden).toBe(true)
 		expect($('.status').textContent).toBe(
 			'Click a block to change only that block',
 		)
@@ -417,7 +420,7 @@ describe('mountPromptBox', () => {
 		expect(bridge.openForm).toHaveBeenCalledTimes(2)
 		// A late answer from the first form changes nothing.
 		forms[0]!.options.onReady!()
-		expect($('.status').textContent).toBe('Opening the form…')
+		expect(form.className).toContain('loading')
 
 		// Closing the box removes it too; opening it shows a fresh one.
 		$<HTMLButtonElement>('.close').click()
