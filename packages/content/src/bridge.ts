@@ -107,13 +107,20 @@ export const getContentBridge = ({
 		if (sitePath)
 			bridge = createSiteBridge(win, sitePath, { pagePath, productPath })
 		if (bridge.isEditing && prompt) {
-			const unmount = mountPromptBox(
-				win.document,
-				bridge,
-				prompt === true ? {} : prompt,
-			)
+			const doc = win.document
+			let unmount = () => {}
+			let destroyed = false
+			const mount = () => {
+				if (destroyed) return
+				unmount = mountPromptBox(doc, bridge, prompt === true ? {} : prompt)
+			}
+			// A script tag in <head> runs before there is a body to mount into.
+			if (doc.body) mount()
+			else doc.addEventListener('DOMContentLoaded', mount, { once: true })
 			const destroy = bridge.destroy
 			bridge.destroy = () => {
+				destroyed = true
+				doc.removeEventListener('DOMContentLoaded', mount)
 				unmount()
 				destroy()
 			}
