@@ -26,6 +26,9 @@ export type PromptLabels = {
 	minimize: string
 	expand: string
 	scopeEntry: string
+	// The scope with no page to act on (no entry), like Content's canvas
+	// with nothing selected.
+	scopeNoPage: string
 	scopeBlock: string
 	clearBlock: string
 	working: string
@@ -77,6 +80,7 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 	minimize: 'Minimize, to see the page',
 	expand: 'Expand',
 	scopeEntry: 'Whole page',
+	scopeNoPage: 'Whole page',
 	scopeBlock: 'Selected block',
 	clearBlock: 'Edit the whole page instead',
 	working: 'Working on it…',
@@ -937,7 +941,9 @@ export const mountPromptBox = (
 			: labels.placeholder
 		scopeText.textContent = state.selectedUid
 			? labels.scopeBlock
-			: labels.scopeEntry
+			: pageless
+				? labels.scopeNoPage
+				: labels.scopeEntry
 		clearBlock.hidden = !state.selectedUid
 		pageIcon.hidden = !!state.selectedUid
 		blockIcon.hidden = !state.selectedUid
