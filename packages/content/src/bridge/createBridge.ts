@@ -6,6 +6,7 @@ import {
 	mountStatsOverlay,
 	type StatsOverlay,
 } from './statsOverlay'
+import { createViewportUnits } from './viewportUnits'
 
 // The site's half of the visual editor (the CMS's public/bridge.js, as a
 // module). Inside the editor's iframe it outlines blocks, tells the editor
@@ -18,7 +19,7 @@ import {
 //   'size' | 'select' | 'prompt' | 'undo', uid?, id?, prompt?, height? }
 // - editor → site: { source: 'obelism-content-editor', type: 'connect' |
 //   'update' | 'select' | 'saved' | 'published' | 'features' |
-//   'promptResult' | 'promptState' | 'stats', … }
+//   'promptResult' | 'promptState' | 'stats' | 'viewport', … }
 
 export const BRIDGE_SOURCE = 'obelism-content-bridge'
 export const EDITOR_SOURCE = 'obelism-content-editor'
@@ -468,6 +469,9 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 		}
 	})
 
+	const viewportUnits = createViewportUnits(doc)
+	cleanup.push(() => viewportUnits.destroy())
+
 	const onMessage = (event: MessageEvent) => {
 		if (event.origin !== cmsOrigin || event.source !== win.parent) return
 		const data = event.data as {
@@ -484,6 +488,7 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 			canUndo?: unknown
 			stats?: unknown
 			visible?: unknown
+			height?: unknown
 		} | null
 		if (!data || data.source !== EDITOR_SOURCE) return
 
@@ -517,6 +522,10 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 				statsVisible: data.visible !== false,
 			})
 			showStats()
+		} else if (data.type === 'viewport' && typeof data.height === 'number') {
+			// The canvas: the frame is as tall as the page (`size`), so `vh`
+			// sizes are fixed at the screen height it stands for.
+			viewportUnits.freeze(data.height)
 		} else if (data.type === 'promptState') {
 			setState({ canUndo: data.canUndo === true })
 		} else if (data.type === 'promptResult' && typeof data.id === 'string') {
