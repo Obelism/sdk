@@ -6,7 +6,7 @@
 //
 // Sites tag a block's clickable element with `data-numbers-id={block._uid}`
 // and load Obelism numbers' script; the CMS reads the rates from numbers
-// (the CMS's content/docs/guides/visual-editor.mdx, "Click rates").
+// (the CMS's content/docs/guides/canvas.mdx, "Click rates").
 
 export type BlockStats = {
 	clicks: number
