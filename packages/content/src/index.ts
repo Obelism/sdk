@@ -9,6 +9,7 @@ export type {
 export { DEFAULT_URL } from './config'
 export {
 	editable,
+	editableCollection,
 	editableProduct,
 	ENTRY_ATTRIBUTE,
 	PRODUCT_ATTRIBUTE,

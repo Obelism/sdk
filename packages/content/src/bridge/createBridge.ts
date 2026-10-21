@@ -81,13 +81,15 @@ export type CreatePageResult = {
 	url: string
 }
 
-// A product page made from the site (`createProductPage`): the new one, or
-// the one the product had already (`created: false`).
+// A product (collection) page made from the site (`createProductPage`,
+// `createCollectionPage`): the new one, or the one the product (collection)
+// had already (`created: false`).
 export type CreateProductPageResult = {
 	entryId: string
 	path: string
 	created: boolean
 }
+export type CreateCollectionPageResult = CreateProductPageResult
 
 export type ApplyJsonResult = {
 	// The fields (apiIds) the JSON changed; empty when it changed nothing.
@@ -122,11 +124,13 @@ export type SitePage = {
 	// home page; the default locale's, or any, when it has none there)…
 	path: string
 	// …and where it is on the site (`pagePath`, or `productPath` for a
-	// product page).
+	// product page, `collectionPath` for a collection page).
 	url: string
 	// A product page's product (a page whose type has a unique product
 	// field), else null.
 	product: ShopifyItem | null
+	// A collection page's collection (a unique collection field), else null.
+	collection: ShopifyItem | null
 }
 
 export type ContentBridge = {
@@ -141,6 +145,8 @@ export type ContentBridge = {
 	// Editing on the site: the Shopify product the page shows (marked with
 	// `editableProduct`), else null.
 	readonly product: ShopifyItem | null
+	// …and the collection (marked with `editableCollection`), else null.
+	readonly collection: ShopifyItem | null
 	// Returns a function that removes the listener. While no `update` listener
 	// is registered the page reloads after every save, to show the draft.
 	on<E extends BridgeEvent>(event: E, listener: BridgeListener<E>): () => void
@@ -163,6 +169,11 @@ export type ContentBridge = {
 	// with the product's handle as slug, or the one it has already. Then
 	// reloads the page, which now finds it.
 	createProductPage(product?: ShopifyItem): Promise<CreateProductPageResult>
+	// The same for a collection (the page's, see `editableCollection`), as a
+	// draft of the space's collection page type.
+	createCollectionPage(
+		collection?: ShopifyItem,
+	): Promise<CreateCollectionPageResult>
 	// Editing on the site: the entry — or the block `uid`, the selected one
 	// by default — as JSON, the way a language model sees it: one locale,
 	// rich text as Markdown, blocks with `_uid` and `_type`. With the changes
@@ -272,6 +283,8 @@ export const INERT_METHODS = {
 		Promise.reject(new Error('New pages are made on the site itself')),
 	createProductPage: () =>
 		Promise.reject(new Error('Product pages are made on the site itself')),
+	createCollectionPage: () =>
+		Promise.reject(new Error('Collection pages are made on the site itself')),
 	view: onlyWhileEditingSite,
 	applyJson: onlyWhileEditingSite,
 	openForm: (_container: HTMLElement, options: FormOptions = {}) => {
@@ -336,6 +349,7 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 		entryId: params.get(PREVIEW_PARAMS.entry),
 		environment: params.get(PREVIEW_PARAMS.environment),
 		product: null,
+		collection: null,
 		on: emitter.on,
 		getState: () => state,
 		...INERT_METHODS,
@@ -582,6 +596,7 @@ export const wrapScriptBridge = (
 		entryId: script.entryId,
 		environment: params.get(PREVIEW_PARAMS.environment),
 		product: null,
+		collection: null,
 		on: (event, listener) => {
 			if (event === 'update' && !forwardingUpdates) {
 				forwardingUpdates = true

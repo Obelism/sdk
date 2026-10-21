@@ -15,6 +15,7 @@ export type {
 	BridgeState,
 	ContentBridge,
 	CreatePageResult,
+	CreateCollectionPageResult,
 	CreateProductPageResult,
 	FormHandle,
 	FormOptions,
@@ -50,6 +51,10 @@ export type BridgeOptions = {
 	// up by product. Default: the environment's product path in the CMS
 	// (Settings → Preview URL), `/products/{handle}` unless changed.
 	productPath?: ((handle: string, locale: string) => string) | undefined
+	// The same for a collection page: your collection route. Default: the
+	// environment's collection path in the CMS, `/collections/{handle}`
+	// unless changed.
+	collectionPath?: ((handle: string, locale: string) => string) | undefined
 }
 
 // Kept on the window, so two copies of this package on one page still share
@@ -85,6 +90,7 @@ export const getContentBridge = ({
 	prompt = true,
 	pagePath,
 	productPath,
+	collectionPath,
 }: BridgeOptions = {}): ContentBridge => {
 	if (typeof window === 'undefined') return SERVER_BRIDGE
 	const win = window as BridgeWindow
@@ -105,7 +111,11 @@ export const getContentBridge = ({
 				? null
 				: readSiteEditing(win.document)
 		if (sitePath)
-			bridge = createSiteBridge(win, sitePath, { pagePath, productPath })
+			bridge = createSiteBridge(win, sitePath, {
+				pagePath,
+				productPath,
+				collectionPath,
+			})
 		if (bridge.isEditing && prompt) {
 			const doc = win.document
 			let unmount = () => {}
