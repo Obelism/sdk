@@ -26,6 +26,9 @@ export type PromptLabels = {
 	minimize: string
 	expand: string
 	scopeEntry: string
+	// The scope with no page to act on (no entry), like Content's canvas
+	// with nothing selected.
+	scopeNoPage: string
 	scopeBlock: string
 	clearBlock: string
 	working: string
@@ -77,6 +80,7 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 	minimize: 'Minimize, to see the page',
 	expand: 'Expand',
 	scopeEntry: 'Whole page',
+	scopeNoPage: 'Whole page',
 	scopeBlock: 'Selected block',
 	clearBlock: 'Edit the whole page instead',
 	working: 'Working on it…',
@@ -124,6 +128,13 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 
 export type PromptBoxOptions = {
 	labels?: Partial<PromptLabels> | undefined
+	// Controls of your own in the box (Content's canvas puts its zoom there):
+	// an element of the page, shown next to the closed box and in the open
+	// box's footer, by a `<slot>`, so the page's own CSS styles it.
+	actions?: HTMLElement | undefined
+	// `false` leaves Sign out out (where signing out is the page's own
+	// business, like a dashboard). Default: shown on the site.
+	signOut?: boolean | undefined
 }
 
 type Side = 'left' | 'center' | 'right'
@@ -219,7 +230,7 @@ button:disabled { cursor: not-allowed; }
 button:focus-visible { outline: 2px solid rgb(var(--theme-accent-rgb)); outline-offset: 2px; }
 
 /* Closed: one floating pill that reads like an empty field, with the mark. */
-.bar { display: flex; justify-content: center; }
+.bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; }
 .pill {
 	display: flex; align-items: center; gap: 12px; width: min(560px, 100%); height: 56px;
 	padding: 0 22px 0 26px; border-radius: var(--border-radius-pill);
@@ -350,7 +361,7 @@ button.chip:disabled { opacity: .5; }
 
 /* On the site: storing the draft, and the way out. */
 .footer {
-	display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 22px;
+	display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px 10px 22px;
 	border-top: 1px solid rgb(var(--theme-border-rgb) / .2);
 	background: rgb(var(--theme-background-actions-rgb) / .45);
 }
@@ -660,6 +671,17 @@ export const mountPromptBox = (
 		pagesNote,
 	)
 
+	// The page's own controls (`actions`), in the footer while open and next
+	// to the pill while closed.
+	const actionsInFooter = element(doc, 'slot')
+	actionsInFooter.name = 'actions-footer'
+	const actionsInBar = element(doc, 'slot')
+	actionsInBar.name = 'actions-bar'
+	if (options.actions) {
+		options.actions.slot = 'actions-bar'
+		host.appendChild(options.actions)
+	}
+
 	const unsaved = element(doc, 'span', { className: 'unsaved' })
 	unsaved.appendChild(element(doc, 'span', { className: 'dot' }))
 	unsaved.appendChild(doc.createTextNode(labels.unsaved))
@@ -685,6 +707,7 @@ export const mountPromptBox = (
 		pageChip,
 		unsaved,
 		element(doc, 'span', { className: 'spacer' }),
+		actionsInFooter,
 		signOut,
 		save,
 		publish,
@@ -706,7 +729,7 @@ export const mountPromptBox = (
 		doc,
 		'div',
 		{ className: 'root' },
-		element(doc, 'div', { className: 'bar' }, pill, viewing),
+		element(doc, 'div', { className: 'bar' }, pill, viewing, actionsInBar),
 		panel,
 	)
 	shadow.append(element(doc, 'style', { textContent: CSS }), root)
@@ -747,7 +770,7 @@ export const mountPromptBox = (
 		if (event.button !== 0 || !event.isPrimary) return
 		const target = event.target as Element
 		const control = target.closest(
-			'button, input, textarea, iframe, a, label, .pages, .form',
+			'button, input, textarea, select, iframe, a, label, .pages, .form',
 		)
 		if (control && control !== pill) return
 		const { left, right } = root.getBoundingClientRect()
@@ -918,7 +941,9 @@ export const mountPromptBox = (
 			: labels.placeholder
 		scopeText.textContent = state.selectedUid
 			? labels.scopeBlock
-			: labels.scopeEntry
+			: pageless
+				? labels.scopeNoPage
+				: labels.scopeEntry
 		clearBlock.hidden = !state.selectedUid
 		pageIcon.hidden = !!state.selectedUid
 		blockIcon.hidden = !state.selectedUid
@@ -952,7 +977,12 @@ export const mountPromptBox = (
 		publish.hidden = !state.features.includes('publish') || pageless
 		publish.disabled = busy
 		publish.textContent = state.publishing ? labels.publishing : labels.publish
-		signOut.hidden = !site
+		signOut.hidden = !site || options.signOut === false
+		pillSignOut.hidden = options.signOut === false
+		if (options.actions) {
+			options.actions.slot =
+				open && available ? 'actions-footer' : 'actions-bar'
+		}
 		footer.hidden = !site
 		unsaved.hidden = !state.unsaved
 		pageChip.hidden = !site
