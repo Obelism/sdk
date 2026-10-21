@@ -1,0 +1,21 @@
+{
+	"name": "obelism",
+	"version": "0.1.0",
+	"description": "Content, improve and numbers in Claude: import a Claude Design page into Content, connect a site, run an A/B test on a block and read its numbers.",
+	"author": {
+		"name": "Obelism",
+		"email": "hello@obelism.studio",
+		"url": "https://www.obelism.studio"
+	},
+	"homepage": "https://www.obelism.studio",
+	"repository": "https://github.com/Obelism/sdk",
+	"license": "MIT",
+	"keywords": [
+		"cms",
+		"headless-cms",
+		"ab-testing",
+		"feature-flags",
+		"analytics",
+		"claude-design"
+	]
+}

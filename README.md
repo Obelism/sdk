@@ -15,6 +15,17 @@ product shares). One repository, so a change that crosses SDKs ships together.
 | `packages/content`       | `@obelism/content`           | The delivery API client, the visual editor bridge, rich text and image helpers, webhooks, the improve block helper and the `content` CLI |
 | `packages/content-react` | `@obelism/content-react`     | Live preview hooks for the visual editor and `<RichText>`                                                                                |
 
+## Claude plugin
+
+`plugin/` is the Obelism plugin for Claude: Content, improve and numbers as
+MCP servers, with skills to import a Claude Design page into Content, connect
+a site and A/B test a block. See [its README](plugin/README.md).
+
+```
+/plugin marketplace add Obelism/sdk
+/plugin install obelism@obelism
+```
+
 ## Examples
 
 - `improve-html`: a static site with the improve JS SDK; [preview](https://html.improve.obelism.studio)
