@@ -175,6 +175,22 @@ getContentBridge({ productPath: (handle, locale) => `/${locale}/p/${handle}` })
 await bridge.createProductPage() // or your own UI; bridge.product says which
 ```
 
+A collection route works the same with `editableCollection(collection)`:
+**Add a collection page** makes a draft of the space's collection page type
+(in the `collections` folder), and the page list opens collection pages at
+the environment's collection path (`/collections/{handle}` by default), or
+at your own `collectionPath`:
+
+```tsx
+import { editable, editableCollection } from '@obelism/content'
+
+;<main {...editableCollection(collection)} {...editable(collectionPage)}>
+	…
+</main>
+
+await bridge.createCollectionPage() // bridge.collection says which
+```
+
 There the box also switches between **Prompt** and **Form**. Form shows the
 CMS's own form for the page — or for the entry around the selected block —
 right in the box: the fields, and blocks as cards to open and add,
@@ -402,6 +418,16 @@ is none:
 const productPage = await content.getFirstEntry({
 	contentType: 'productPage',
 	fields: { product: product.id }, // gid://shopify/Product/…
+})
+```
+
+A page type with a unique collection field is a collection page type, found
+the same way on your collection route:
+
+```ts
+const collectionPage = await content.getFirstEntry({
+	contentType: 'collectionPage',
+	fields: { collection: collection.id }, // gid://shopify/Collection/…
 })
 ```
 

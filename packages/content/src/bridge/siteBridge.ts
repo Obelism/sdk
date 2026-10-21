@@ -1,4 +1,6 @@
 import {
+	COLLECTION_ATTRIBUTE,
+	COLLECTION_HANDLE_ATTRIBUTE,
 	ENTRY_ATTRIBUTE,
 	PRODUCT_ATTRIBUTE,
 	PRODUCT_HANDLE_ATTRIBUTE,
@@ -12,6 +14,7 @@ import {
 	type BridgeState,
 	type ContentBridge,
 	type CreatePageResult,
+	type CreateCollectionPageResult,
 	type CreateProductPageResult,
 	createEmitter,
 	type FormHandle,
@@ -58,6 +61,8 @@ type SessionInfo = {
 	// Where product pages are on the site, with {handle}: the environment's
 	// setting in the CMS (from 2026-10-20).
 	productPath?: string
+	// …and collection pages (from 2026-10-21).
+	collectionPath?: string
 	space: { defaultLocale: string; locales: { code: string }[] }
 }
 
@@ -71,6 +76,8 @@ type PagesAnswer = {
 		paths: Record<string, string>
 		// A product page's product (CMS versions from 2026-10-20).
 		product?: ShopifyItem | null
+		// A collection page's collection (from 2026-10-21).
+		collection?: ShopifyItem | null
 	}[]
 }
 
@@ -97,6 +104,9 @@ export type SiteBridgeOptions = {
 	// product route. Default: the environment's product path in the CMS
 	// (Settings), else `/products/` + handle.
 	productPath?: ((handle: string, locale: string) => string) | undefined
+	// The same for a collection page. Default: the environment's collection
+	// path in the CMS, else `/collections/` + handle.
+	collectionPath?: ((handle: string, locale: string) => string) | undefined
 }
 
 export const createSiteBridge = (
@@ -105,6 +115,7 @@ export const createSiteBridge = (
 	{
 		pagePath = (path) => `/${path}`,
 		productPath: ownProductPath,
+		collectionPath: ownCollectionPath,
 	}: SiteBridgeOptions = {},
 ): ContentBridge => {
 	const doc = win.document
@@ -120,6 +131,13 @@ export const createSiteBridge = (
 		ownProductPath
 			? ownProductPath(handle, locale)
 			: (session?.productPath ?? '/products/{handle}').replaceAll(
+					'{handle}',
+					encodeURIComponent(handle),
+				)
+	const collectionPath = (handle: string, locale: string) =>
+		ownCollectionPath
+			? ownCollectionPath(handle, locale)
+			: (session?.collectionPath ?? '/collections/{handle}').replaceAll(
 					'{handle}',
 					encodeURIComponent(handle),
 				)
@@ -183,6 +201,14 @@ export const createSiteBridge = (
 		const element = doc.querySelector(`[${PRODUCT_ATTRIBUTE}]`)
 		const id = element?.getAttribute(PRODUCT_ATTRIBUTE)
 		const handle = element?.getAttribute(PRODUCT_HANDLE_ATTRIBUTE)
+		return id && handle ? { id, handle } : null
+	}
+
+	// The collection the page shows (editableCollection), if it marks one.
+	const pageCollection = (): ShopifyItem | null => {
+		const element = doc.querySelector(`[${COLLECTION_ATTRIBUTE}]`)
+		const id = element?.getAttribute(COLLECTION_ATTRIBUTE)
+		const handle = element?.getAttribute(COLLECTION_HANDLE_ATTRIBUTE)
 		return id && handle ? { id, handle } : null
 	}
 
@@ -315,6 +341,9 @@ export const createSiteBridge = (
 		get product() {
 			return pageProduct()
 		},
+		get collection() {
+			return pageCollection()
+		},
 		environment: null,
 		on: emitter.on,
 		getState: () => state,
@@ -395,6 +424,32 @@ export const createSiteBridge = (
 					product: { id: product.id, handle: product.handle },
 				})
 				// The site's product route finds its page now (drafts, while
+				// editing): show it.
+				win.location.reload()
+				return made
+			} finally {
+				setState({ prompting: false })
+			}
+		},
+
+		async createCollectionPage(
+			collection = pageCollection() ?? undefined,
+		): Promise<CreateCollectionPageResult> {
+			if (!collection) {
+				throw new Error(
+					'Nothing on this page is marked as a collection: add editableCollection(collection)',
+				)
+			}
+			if (!has('create')) throw new Error('You may not add pages here')
+			if (state.unsaved) {
+				throw new Error('Save or undo your changes before adding a page')
+			}
+			setState({ prompting: true })
+			try {
+				const made = await api<CreateCollectionPageResult>('collection-pages', {
+					collection: { id: collection.id, handle: collection.handle },
+				})
+				// The site's collection route finds its page now (drafts, while
 				// editing): show it.
 				win.location.reload()
 				return made
@@ -562,8 +617,11 @@ export const createSiteBridge = (
 						path,
 						url: page.product
 							? productPath(page.product.handle, code)
-							: pagePath(path, code),
+							: page.collection
+								? collectionPath(page.collection.handle, code)
+								: pagePath(path, code),
 						product: page.product ?? null,
+						collection: page.collection ?? null,
 					},
 				]
 			})

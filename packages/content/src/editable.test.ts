@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { editable, editableProduct } from './editable'
+import { editable, editableCollection, editableProduct } from './editable'
 
 describe('editable', () => {
 	it('marks a block with its uid', () => {
@@ -18,5 +18,17 @@ describe('editableProduct', () => {
 			'data-cms-product-handle': 'mug',
 		})
 		expect(editableProduct(null)).toEqual({})
+	})
+})
+
+describe('editableCollection', () => {
+	it('marks the collection a page shows', () => {
+		expect(
+			editableCollection({ id: 'gid://shopify/Collection/7', handle: 'sale' }),
+		).toEqual({
+			'data-cms-collection': 'gid://shopify/Collection/7',
+			'data-cms-collection-handle': 'sale',
+		})
+		expect(editableCollection(null)).toEqual({})
 	})
 })

@@ -300,6 +300,7 @@ describe('prompts', () => {
 				path: 'e',
 				url: '/e',
 				product: null,
+				collection: null,
 			}),
 		).not.toThrow()
 		bridge.destroy()

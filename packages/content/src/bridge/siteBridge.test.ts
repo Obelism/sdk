@@ -406,6 +406,7 @@ describe('createSiteBridge', () => {
 				path: '',
 				url: '/nl/',
 				product: null,
+				collection: null,
 			},
 			{
 				entryId: 'entry_agencies',
@@ -415,6 +416,7 @@ describe('createSiteBridge', () => {
 				path: 'solutions/agencies',
 				url: '/en/solutions/agencies',
 				product: null,
+				collection: null,
 			},
 			{
 				entryId: 'entry_de',
@@ -424,6 +426,7 @@ describe('createSiteBridge', () => {
 				path: 'nur',
 				url: '/de/nur',
 				product: null,
+				collection: null,
 			},
 		])
 
@@ -753,6 +756,69 @@ describe('createSiteBridge', () => {
 		expect(bridge.product).toBeNull()
 		await expect(bridge.createProductPage()).rejects.toThrow(
 			'Nothing on this page is marked as a product',
+		)
+	})
+
+	it('makes a collection page for the collection the page shows', async () => {
+		document.body.innerHTML = `<main data-cms-collection="gid://shopify/Collection/7" data-cms-collection-handle="sale"></main>`
+		const { win, calls, reload } = site({
+			session: () => ({
+				...SESSION,
+				features: ['prompt', 'create'],
+				collectionPath: '/shop/{handle}',
+			}),
+			'collection-pages': () => ({
+				entryId: 'entry_sale',
+				path: 'collections/sale',
+				created: true,
+			}),
+			pages: () => ({
+				pages: [
+					{
+						entryId: 'entry_sale',
+						name: 'Sale',
+						contentType: 'collectionPage',
+						status: 'draft',
+						paths: { en: 'collections/sale' },
+						product: null,
+						collection: { id: 'gid://shopify/Collection/7', handle: 'sale' },
+					},
+				],
+			}),
+		})
+		const bridge = createSiteBridge(win, '/cms')
+		await vi.waitFor(() =>
+			expect(bridge.getState().features).toContain('create'),
+		)
+		expect(bridge.product).toBeNull()
+		expect(bridge.collection).toEqual({
+			id: 'gid://shopify/Collection/7',
+			handle: 'sale',
+		})
+
+		expect(await bridge.createCollectionPage()).toEqual({
+			entryId: 'entry_sale',
+			path: 'collections/sale',
+			created: true,
+		})
+		expect(calls.at(-1)).toMatchObject({
+			path: 'collection-pages',
+			body: {
+				collection: { id: 'gid://shopify/Collection/7', handle: 'sale' },
+			},
+		})
+		expect(reload).toHaveBeenCalled()
+
+		// At the environment's collection path.
+		const [page] = await bridge.pages()
+		expect(page).toMatchObject({
+			url: '/shop/sale',
+			collection: { id: 'gid://shopify/Collection/7', handle: 'sale' },
+		})
+
+		document.body.innerHTML = '<main></main>'
+		await expect(bridge.createCollectionPage()).rejects.toThrow(
+			'Nothing on this page is marked as a collection',
 		)
 	})
 

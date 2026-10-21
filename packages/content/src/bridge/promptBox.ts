@@ -62,6 +62,10 @@ export type PromptLabels = {
 	addingProductPage: string
 	addedProductPage: string
 	productPageHint: string
+	addCollectionPage: string
+	addingCollectionPage: string
+	addedCollectionPage: string
+	collectionPageHint: string
 }
 
 export const DEFAULT_PROMPT_LABELS: PromptLabels = {
@@ -111,6 +115,11 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 	addedProductPage: 'Opening the product page…',
 	productPageHint:
 		'This product has no page yet. Add one for what the store doesn’t say.',
+	addCollectionPage: 'Add a collection page',
+	addingCollectionPage: 'Making the collection page…',
+	addedCollectionPage: 'Opening the collection page…',
+	collectionPageHint:
+		'This collection has no page yet. Add one for what goes around its products.',
 }
 
 export type PromptBoxOptions = {
@@ -526,8 +535,9 @@ export const mountPromptBox = (
 		icon(doc, 'newPage'),
 		labels.newPage,
 	)
-	// A product the site marks (editableProduct) without a page of its own:
-	// one click makes its product page, which the page then shows.
+	// A product (collection) the site marks (editableProduct,
+	// editableCollection) without a page of its own: one click makes its
+	// page, which the page then shows.
 	const addProduct = element(
 		doc,
 		'button',
@@ -849,8 +859,30 @@ export const mountPromptBox = (
 		// A page of the site that isn't an entry (no `editable(entry)`, like a
 		// hand-written /about) has nothing to edit: only New page.
 		const pageless = site && bridge.entryId === null
-		// …unless it shows a product: then Add a product page first.
-		const productHere = pageless && canCreate && bridge.product !== null
+		// …unless it shows a product (collection): then Add a product
+		// (collection) page first.
+		const shopHere =
+			!pageless || !canCreate
+				? null
+				: bridge.product
+					? ('product' as const)
+					: bridge.collection
+						? ('collection' as const)
+						: null
+		const productHere = shopHere !== null
+		const shopCopy =
+			shopHere === 'collection'
+				? {
+						add: labels.addCollectionPage,
+						adding: labels.addingCollectionPage,
+						hint: labels.collectionPageHint,
+					}
+				: {
+						add: labels.addProductPage,
+						adding: labels.addingProductPage,
+						hint: labels.productPageHint,
+					}
+		addProduct.lastChild!.textContent = shopCopy.add
 		const onlyNew = pageless && canCreate && !productHere
 		if (!canCreate) creating = false
 		if (onlyNew) creating = true
@@ -861,7 +893,7 @@ export const mountPromptBox = (
 		else if (!showForm && formHandle) unmountForm()
 		const offerProduct = productHere && !creating
 		pillText.textContent = offerProduct
-			? labels.addProductPage
+			? shopCopy.add
 			: onlyNew
 				? labels.newPage
 				: labels.open
@@ -935,13 +967,13 @@ export const mountPromptBox = (
 			? creating
 				? labels.creating
 				: offerProduct
-					? labels.addingProductPage
+					? shopCopy.adding
 					: labels.working
 			: loadingForm
 				? ''
 				: (message?.text ??
 					(offerProduct
-						? labels.productPageHint
+						? shopCopy.hint
 						: site && !creating && !picking && !state.selectedUid
 							? labels.selectHint
 							: ''))
@@ -1196,8 +1228,13 @@ export const mountPromptBox = (
 		message = null
 		try {
 			// The bridge reloads the page; this shows until it does.
-			await bridge.createProductPage()
-			message = { text: labels.addedProductPage, error: false }
+			if (bridge.product) {
+				await bridge.createProductPage()
+				message = { text: labels.addedProductPage, error: false }
+			} else {
+				await bridge.createCollectionPage()
+				message = { text: labels.addedCollectionPage, error: false }
+			}
 		} catch (error) {
 			message = failure(error)
 		}

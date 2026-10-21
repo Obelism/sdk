@@ -20,6 +20,7 @@ const PAGES = [
 		path: '',
 		url: '/',
 		product: null,
+		collection: null,
 	},
 	{
 		entryId: 'entry_2',
@@ -29,6 +30,7 @@ const PAGES = [
 		path: 'pricing',
 		url: '/pricing',
 		product: null,
+		collection: null,
 	},
 	{
 		entryId: 'entry_3',
@@ -38,6 +40,7 @@ const PAGES = [
 		path: 'solutions/agencies',
 		url: '/solutions/agencies',
 		product: null,
+		collection: null,
 	},
 ]
 
@@ -67,11 +70,18 @@ const fakeBridge = (mode: 'editor' | 'site' = 'editor') => {
 				}),
 		),
 		product: null as { id: string; handle: string } | null,
+		collection: null as { id: string; handle: string } | null,
 		createProductPage: vi.fn(async () => {
 			setState({ prompting: true })
 			await Promise.resolve()
 			setState({ prompting: false })
 			return { entryId: 'entry_mug', path: 'products/mug', created: true }
+		}),
+		createCollectionPage: vi.fn(async () => {
+			setState({ prompting: true })
+			await Promise.resolve()
+			setState({ prompting: false })
+			return { entryId: 'entry_sale', path: 'collections/sale', created: true }
 		}),
 		createPage: vi.fn(async () => {
 			setState({ prompting: true })
@@ -318,6 +328,32 @@ describe('mountPromptBox', () => {
 		// No way back to editing a page that isn't there.
 		expect($<HTMLButtonElement>('.scope:not([hidden]) button').hidden).toBe(
 			true,
+		)
+	})
+
+	it('offers a collection page on a collection without one', async () => {
+		const { bridge, setState } = fakeBridge('site')
+		const collection = {
+			...bridge,
+			entryId: null,
+			collection: { id: 'gid://shopify/Collection/7', handle: 'sale' },
+		}
+		unmount = mountPromptBox(document, collection)
+		setState({ features: ['prompt', 'create', 'save', 'publish'] })
+		expect($('.pill').textContent).toContain('Add a collection page')
+		$<HTMLButtonElement>('.pill').click()
+		expect($('.status').textContent).toContain(
+			'This collection has no page yet',
+		)
+		const add = [...shadow().querySelectorAll('.toolbar button')].find(
+			(button) => button.textContent === 'Add a collection page',
+		) as HTMLButtonElement
+		expect(add.hidden).toBe(false)
+		add.click()
+		expect(bridge.createCollectionPage).toHaveBeenCalled()
+		expect(bridge.createProductPage).not.toHaveBeenCalled()
+		await vi.waitFor(() =>
+			expect($('.status').textContent).toBe('Opening the collection page…'),
 		)
 	})
 

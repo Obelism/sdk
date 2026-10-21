@@ -54,8 +54,9 @@ export const ContentBridge = ({
 	prompt,
 	pagePath,
 	productPath,
+	collectionPath,
 }: ContentBridgeProps) => {
-	useBridge({ url, prompt, pagePath, productPath })
+	useBridge({ url, prompt, pagePath, productPath, collectionPath })
 	return null
 }
 
