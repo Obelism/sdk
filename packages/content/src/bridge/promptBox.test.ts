@@ -266,6 +266,33 @@ describe('mountPromptBox', () => {
 		expect(bridge.signOut).toHaveBeenCalled()
 	})
 
+	it('shows the page’s own controls next to the pill, then in the footer', () => {
+		const { bridge, setState } = fakeBridge('site')
+		const actions = document.createElement('div')
+		actions.innerHTML = '<button type="button">Fit</button>'
+		unmount = mountPromptBox(document, bridge, { actions, signOut: false })
+		setState({ features: ['prompt', 'save', 'publish'] })
+
+		// In the page, not the shadow root, so the page's CSS styles it.
+		const host = document.querySelector('[data-obelism-content-prompt]')!
+		expect(actions.parentElement).toBe(host)
+		expect(actions.slot).toBe('actions-bar')
+		expect($('.bar slot[name="actions-bar"]')).not.toBeNull()
+
+		$<HTMLButtonElement>('.pill').click()
+		expect(actions.slot).toBe('actions-footer')
+		expect($('.footer slot[name="actions-footer"]')).not.toBeNull()
+
+		const exit = [...shadow().querySelectorAll('button')].find(
+			(button) => button.textContent === 'Exit editing',
+		)!
+		expect(exit.hidden).toBe(true)
+
+		unmount()
+		unmount = () => {}
+		expect(actions.isConnected).toBe(false)
+	})
+
 	it('makes a new page on the site, from a path and a prompt', async () => {
 		const { bridge, setState } = fakeBridge('site')
 		unmount = mountPromptBox(document, bridge)

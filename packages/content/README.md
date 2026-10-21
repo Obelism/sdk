@@ -127,6 +127,16 @@ const bridge = getContentBridge({ prompt: false })
 const unmount = mountPromptBox(document, bridge, { labels: { open: 'Ask' } })
 ```
 
+`actions` puts controls of your own in the box: an element of your page,
+shown next to the closed box and in the open box's footer (by a `<slot>`, so
+your CSS styles it). `signOut: false` leaves Sign out out. Content's canvas
+uses both for its zoom and screen controls.
+
+```ts
+const controls = document.createElement('div')
+mountPromptBox(document, bridge, { actions: controls, signOut: false })
+```
+
 Inside the visual editor, people who may edit get a prompt box at the bottom
 of the page: they type what to change and it shows on the page right away,
 unsaved, with undo. It acts on the selected block, or the whole entry. The
