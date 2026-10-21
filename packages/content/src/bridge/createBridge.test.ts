@@ -88,6 +88,7 @@ describe('createBridge', () => {
 				source: 'obelism-content-bridge',
 				type: 'ready',
 				url: 'https://site.test/home?cms_preview=1&cms_entry=entry_1&cms_environment=develop',
+				height: 0,
 			},
 			CMS,
 		)
@@ -95,6 +96,43 @@ describe('createBridge', () => {
 		receive(fromEditor('connect'))
 		expect(parent.postMessage).toHaveBeenCalledTimes(2)
 		bridge.destroy()
+	})
+
+	it('tells the editor when the page’s height changes', () => {
+		const { win, parent } = frame()
+		const observers: { callback: () => void; disconnect: () => void }[] = []
+		;(win as unknown as { ResizeObserver: unknown }).ResizeObserver = class {
+			callback: () => void
+			disconnect = vi.fn()
+			constructor(callback: () => void) {
+				this.callback = callback
+				observers.push(this)
+			}
+			observe() {}
+		}
+		let height = 900
+		Object.defineProperty(document.documentElement, 'scrollHeight', {
+			configurable: true,
+			get: () => height,
+		})
+		const bridge = createBridge(win, CMS)
+		expect(parent.postMessage).toHaveBeenLastCalledWith(
+			expect.objectContaining({ type: 'ready', height: 900 }),
+			CMS,
+		)
+
+		observers[0]!.callback()
+		expect(parent.postMessage).toHaveBeenCalledTimes(1)
+		height = 2400
+		observers[0]!.callback()
+		expect(parent.postMessage).toHaveBeenLastCalledWith(
+			{ source: 'obelism-content-bridge', type: 'size', height: 2400 },
+			CMS,
+		)
+
+		bridge.destroy()
+		expect(observers[0]!.disconnect).toHaveBeenCalled()
+		delete (document.documentElement as { scrollHeight?: number }).scrollHeight
 	})
 
 	it('hands live entries to listeners, and ignores other origins and windows', () => {

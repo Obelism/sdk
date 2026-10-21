@@ -15,7 +15,7 @@ import {
 // Messages are only exchanged with the CMS origin, and only with the parent
 // window:
 // - site → editor: { source: 'obelism-content-bridge', type: 'ready' |
-//   'select' | 'prompt' | 'undo', uid?, id?, prompt? }
+//   'size' | 'select' | 'prompt' | 'undo', uid?, id?, prompt?, height? }
 // - editor → site: { source: 'obelism-content-editor', type: 'connect' |
 //   'update' | 'select' | 'saved' | 'published' | 'features' |
 //   'promptResult' | 'promptState' | 'stats', … }
@@ -384,7 +384,30 @@ export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
 	doc.addEventListener('click', onClick, true)
 	cleanup.push(() => doc.removeEventListener('click', onClick, true))
 
-	const ready = () => send('ready', { url: win.location.href })
+	// The page's height, which an editor on another origin can't read: the
+	// canvas makes its frame as tall as the page. With `ready`, and as `size`
+	// whenever it changes.
+	const pageHeight = () =>
+		Math.ceil(
+			Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight ?? 0),
+		)
+	let sentHeight = 0
+	const ready = () => {
+		sentHeight = pageHeight()
+		send('ready', { url: win.location.href, height: sentHeight })
+	}
+	const Observer = (win as Window & typeof globalThis).ResizeObserver
+	if (typeof Observer === 'function') {
+		const observer = new Observer(() => {
+			const height = pageHeight()
+			if (height === sentHeight) return
+			sentHeight = height
+			send('size', { height })
+		})
+		observer.observe(doc.documentElement)
+		if (doc.body) observer.observe(doc.body)
+		cleanup.push(() => observer.disconnect())
+	}
 
 	// Prompts waiting for the editor's answer, by id.
 	const pending = new Map<
