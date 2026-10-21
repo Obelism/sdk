@@ -1,5 +1,23 @@
 # @obelism/content
 
+## 0.20.0
+
+### Minor Changes
+
+- a949269: For Content's canvas, which shows whole pages side by side:
+
+  - The bridge tells the editor the page's height, with `ready` and as a `size` message whenever it changes.
+  - On a `viewport` message, it rewrites `vh`, `svh`, `lvh` and `dvh` sizes in the page's stylesheets as pixels of the screen height the frame stands for. Without that, a `100vh` section would grow with a frame that is as tall as the page.
+  - The bridge's script tag works in `<head>`: the prompt box mounts once there is a body, instead of the script failing and leaving `window.ObelismBridge` unset.
+
+- a6d3d0e: Collection pages, like product pages (ADR 0022 in Obelism/obelism):
+
+  - `editableCollection(collection)` marks the Shopify collection a page shows.
+  - On a collection route without a page, the prompt box offers **Add a collection page**, and `bridge.createCollectionPage()` makes one.
+  - `bridge.collection` is the collection the page shows, and each page from `pages()` has a `collection`.
+  - The page list opens collection pages at the environment's collection path, or at your own `collectionPath` (an option of `getContentBridge` and `<ContentBridge>`).
+  - The site handler passes `POST collection-pages` through to the CMS.
+
 ## 0.19.2
 
 ### Patch Changes
