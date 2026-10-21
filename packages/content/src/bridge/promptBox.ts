@@ -135,6 +135,10 @@ export type PromptBoxOptions = {
 	// `false` leaves Sign out out (where signing out is the page's own
 	// business, like a dashboard). Default: shown on the site.
 	signOut?: boolean | undefined
+	// `true` keeps the prompt where the bridge has no page (`entryId` null):
+	// the bridge's `prompt` says what it acts on (a canvas: the whole site),
+	// with New page beside it. Default: such a page offers only New page.
+	promptWithoutPage?: boolean | undefined
 }
 
 type Side = 'left' | 'center' | 'right'
@@ -906,7 +910,8 @@ export const mountPromptBox = (
 						hint: labels.productPageHint,
 					}
 		addProduct.lastChild!.textContent = shopCopy.add
-		const onlyNew = pageless && canCreate && !productHere
+		const onlyNew =
+			pageless && canCreate && !productHere && !options.promptWithoutPage
 		if (!canCreate) creating = false
 		if (onlyNew) creating = true
 		if (creating || pageless || !site) form = false
