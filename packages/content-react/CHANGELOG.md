@@ -1,5 +1,23 @@
 # @obelism/content-react
 
+## 0.4.0
+
+### Minor Changes
+
+- a6d3d0e: Collection pages, like product pages (ADR 0022 in Obelism/obelism):
+
+  - `editableCollection(collection)` marks the Shopify collection a page shows.
+  - On a collection route without a page, the prompt box offers **Add a collection page**, and `bridge.createCollectionPage()` makes one.
+  - `bridge.collection` is the collection the page shows, and each page from `pages()` has a `collection`.
+  - The page list opens collection pages at the environment's collection path, or at your own `collectionPath` (an option of `getContentBridge` and `<ContentBridge>`).
+  - The site handler passes `POST collection-pages` through to the CMS.
+
+### Patch Changes
+
+- Updated dependencies [a949269]
+- Updated dependencies [a6d3d0e]
+  - @obelism/content@0.20.0
+
 ## 0.3.1
 
 ### Patch Changes
