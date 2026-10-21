@@ -358,6 +358,46 @@ describe('mountPromptBox', () => {
 		)
 	})
 
+	it('prompts with no page when asked to, with New page beside it', async () => {
+		const { bridge, setState, answer } = fakeBridge('site')
+		const pageless = { ...bridge, entryId: null }
+		unmount = mountPromptBox(document, pageless, {
+			promptWithoutPage: true,
+			labels: { scopeNoPage: 'Whole site' },
+		})
+		setState({ features: ['prompt', 'create', 'save', 'publish'] })
+		expect($('.pill').textContent).toContain('Edit with a prompt')
+		$<HTMLButtonElement>('.pill').click()
+
+		const button = (text: string) =>
+			[...shadow().querySelectorAll('button')].find(
+				(button) => button.textContent === text,
+			)!
+		expect($('.path').closest('[hidden]')).not.toBeNull()
+		expect($('.scope:not([hidden])').textContent).toContain('Whole site')
+		expect(button('New page').hidden).toBe(false)
+		// Nothing to save or publish without a page.
+		expect(button('Save').closest('[hidden]')).not.toBeNull()
+		expect(button('Publish').closest('[hidden]')).not.toBeNull()
+
+		const input = $<HTMLTextAreaElement>('textarea')
+		input.value = 'Shorter heroes everywhere'
+		input.dispatchEvent(new Event('input'))
+		input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+		expect(bridge.prompt).toHaveBeenCalledWith('Shorter heroes everywhere')
+		answer({ summary: 'Changed 3 pages' })
+		await vi.waitFor(() =>
+			expect($('.status').textContent).toBe('Changed 3 pages'),
+		)
+
+		// New page, and back to the prompt.
+		button('New page').click()
+		expect($('.path').closest('[hidden]')).toBeNull()
+		$<HTMLButtonElement>('.scope:not([hidden]) button').click()
+		expect($('.path').closest('[hidden]')).not.toBeNull()
+		expect(input.placeholder).not.toContain('Describe the new page')
+	})
+
 	it('offers a collection page on a collection without one', async () => {
 		const { bridge, setState } = fakeBridge('site')
 		const collection = {

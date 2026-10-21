@@ -129,12 +129,19 @@ const unmount = mountPromptBox(document, bridge, { labels: { open: 'Ask' } })
 
 `actions` puts controls of your own in the box: an element of your page,
 shown next to the closed box and in the open box's footer (by a `<slot>`, so
-your CSS styles it). `signOut: false` leaves Sign out out. Content's canvas
-uses both for its zoom and screen controls.
+your CSS styles it). `signOut: false` leaves Sign out out. A bridge with no
+page (`entryId` null) normally offers only **New page**; `promptWithoutPage:
+true` keeps the prompt there too, for a bridge whose `prompt` acts on
+something else (Content's canvas: the whole site), with New page beside it.
+Content's canvas uses all three, with Save all in `actions`.
 
 ```ts
 const controls = document.createElement('div')
-mountPromptBox(document, bridge, { actions: controls, signOut: false })
+mountPromptBox(document, bridge, {
+	actions: controls,
+	signOut: false,
+	promptWithoutPage: true,
+})
 ```
 
 Inside the visual editor, people who may edit get a prompt box at the bottom
