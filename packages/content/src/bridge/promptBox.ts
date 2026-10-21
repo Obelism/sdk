@@ -226,7 +226,7 @@ button:disabled { cursor: not-allowed; }
 button:focus-visible { outline: 2px solid rgb(var(--theme-accent-rgb)); outline-offset: 2px; }
 
 /* Closed: one floating pill that reads like an empty field, with the mark. */
-.bar { display: flex; justify-content: center; align-items: center; gap: 8px; }
+.bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; }
 .pill {
 	display: flex; align-items: center; gap: 12px; width: min(560px, 100%); height: 56px;
 	padding: 0 22px 0 26px; border-radius: var(--border-radius-pill);
@@ -357,7 +357,7 @@ button.chip:disabled { opacity: .5; }
 
 /* On the site: storing the draft, and the way out. */
 .footer {
-	display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 22px;
+	display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px 10px 22px;
 	border-top: 1px solid rgb(var(--theme-border-rgb) / .2);
 	background: rgb(var(--theme-background-actions-rgb) / .45);
 }
