@@ -1,0 +1,16 @@
+{
+	"mcpServers": {
+		"obelism-content": {
+			"type": "http",
+			"url": "https://content.obelism.studio/mcp"
+		},
+		"obelism-improve": {
+			"type": "http",
+			"url": "https://improve.obelism.studio/mcp"
+		},
+		"obelism-numbers": {
+			"type": "http",
+			"url": "https://numbers.obelism.studio/mcp"
+		}
+	}
+}

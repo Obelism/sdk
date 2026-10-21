@@ -27,6 +27,15 @@ npx turbo run build lint test:ci --filter=@obelism/improve-sdk...   # one packag
   `@obelism/improve-sdk-next`
 - `packages/content` → `@obelism/content`, `packages/content-react` →
   `@obelism/content-react`
+- `plugin/` → the Obelism Claude plugin (www's docs/adr/0011 in
+  `../obelism`): Content's, improve's and numbers' MCP servers
+  (`plugin/.mcp.json`) and skills for the jobs that span them
+  (`plugin/skills/*/SKILL.md`). Listed by `.claude-plugin/marketplace.json`
+  at the root, so `/plugin marketplace add Obelism/sdk` installs it. Not an
+  npm package and not in changesets: bump `version` in
+  `plugin/.claude-plugin/plugin.json` and the marketplace entry together
+  (`claude plugin validate .` checks both), and name only tools the servers
+  have.
 - `packages/typescript-config` (private): `base.json` and
   `react-library.json`, strict (`noUncheckedIndexedAccess`,
   `exactOptionalPropertyTypes`), for every package and example. Public option
