@@ -7,6 +7,10 @@
 export const SECRET_PREFIX = 'whsec_'
 // Seconds a request's timestamp may be off, against replays.
 export const DEFAULT_TOLERANCE = 5 * 60
+// Each signature costs an HMAC over the whole body, and the header is the
+// sender's: a rotation needs two, so anything near this many is not the CMS.
+const MAX_SIGNATURES = 5
+const SIGNATURE_BYTES = 32
 
 export type SignedMessage = {
 	body: string
@@ -31,9 +35,12 @@ export const verifySignature = async (
 ) => {
 	if (!id || !timestamp || !signatures) fail('Missing signature headers')
 	const seconds = Number(timestamp)
-	if (!Number.isFinite(seconds) || Math.abs(now / 1000 - seconds) > tolerance) {
+	// Written so a NaN tolerance rejects rather than skips the check.
+	if (!(Math.abs(now / 1000 - seconds) <= tolerance)) {
 		fail('Timestamp outside the tolerance')
 	}
+	const candidates = signatures!.split(' ')
+	if (candidates.length > MAX_SIGNATURES) fail('Too many signatures')
 
 	const key = await crypto.subtle.importKey(
 		'raw',
@@ -44,7 +51,7 @@ export const verifySignature = async (
 	)
 	const signed = new TextEncoder().encode(`${id}.${timestamp}.${body}`)
 	let valid = false
-	for (const signature of signatures!.split(' ')) {
+	for (const signature of candidates) {
 		const [version, value] = signature.split(',')
 		if (version !== 'v1' || !value) continue
 		let bytes: Uint8Array<ArrayBuffer>
@@ -53,6 +60,7 @@ export const verifySignature = async (
 		} catch {
 			continue
 		}
+		if (bytes.length !== SIGNATURE_BYTES) continue
 		// crypto.subtle.verify compares in constant time.
 		if (await crypto.subtle.verify('HMAC', key, bytes, signed)) valid = true
 	}
