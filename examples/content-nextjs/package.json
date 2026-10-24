@@ -10,7 +10,7 @@
 		"clean": "rm -rf node_modules && rm -rf .next && rm -rf .turbo"
 	},
 	"dependencies": {
-		"@anthropic-ai/sdk": "^0.134.0",
+		"@anthropic-ai/sdk": "^0.137.0",
 		"@obelism/content": "^0.22.0",
 		"@obelism/content-react": "^0.4.2",
 		"next": "^16.4.1",
