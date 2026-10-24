@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import { ImproveServerSDK } from './server'
 import { diff } from './utils/diff'
@@ -134,4 +134,47 @@ test('getFlagValue assigns, keeps the assignment and returns null for a flag wit
 	expect(sdk.getFlagValue('new-checkout', 'visi_1', UA)).toBe('on')
 	expect(sdk.getFlagValue('new-checkout', 'visi_1', UA)).toBe('on')
 	expect(sdk.getFlagValue('no-options', 'visi_1', UA)).toBeNull()
+})
+
+test('a __proto__ user agent does not touch other visitors', () => {
+	const improveSDK = new ImproveServerSDK({
+		organizationId: 'test',
+		environment: 'staging',
+		config: TEST_CONFIG,
+	})
+
+	improveSDK.getTestValue('startpage-visual', 'visi_attacker', '__proto__', {
+		country: 'XX',
+	})
+	expect(Object.hasOwn(Object.prototype, 'startpage-visual')).toBe(false)
+	expect(Object.hasOwn(Object.prototype, 'country')).toBe(false)
+
+	const outcomes = new Set<string | null>()
+	for (let i = 0; i < 200; i++) {
+		outcomes.add(improveSDK.getTestValue('startpage-visual', `visi_${i}`, UA))
+	}
+	expect(outcomes).toEqual(new Set(['control', 'variation']))
+})
+
+test('keeps a bounded number of user agents per visitor', () => {
+	const improveSDK = new ImproveServerSDK({
+		organizationId: 'test',
+		environment: 'staging',
+		config: TEST_CONFIG,
+	})
+	const random = vi.spyOn(Math, 'random')
+
+	random.mockReturnValue(0)
+	expect(improveSDK.getTestValue('startpage-visual', 'visi_1', `${UA} 0`)).toBe(
+		'control',
+	)
+	for (let i = 1; i <= 100; i++) {
+		improveSDK.getTestValue('startpage-visual', 'visi_1', `${UA} ${i}`)
+	}
+	// Evicted, so the first user agent is assigned again.
+	random.mockReturnValue(0.99)
+	expect(improveSDK.getTestValue('startpage-visual', 'visi_1', `${UA} 0`)).toBe(
+		'variation',
+	)
+	random.mockRestore()
 })

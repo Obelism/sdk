@@ -6,14 +6,19 @@ import { type TokenSource, resolveToken } from './tokenSource'
 import { ImproveConfiguration, ImproveSetupArgs } from './types'
 
 const DEFAULT_MAX_VISITORS = 10_000
+// One visitor id with endless user agents would otherwise grow without bound.
+const MAX_USER_AGENTS_PER_VISITOR = 10
 
 type Visitor = ParsedUserAgent & {
 	[testSlug: string]: string
 }
 
-type VisitorData = {
-	[userAgent: string]: Visitor
-}
+// A Map, not an object: the user agent is the request's, and `__proto__`
+// would be Object.prototype.
+type VisitorData = Map<string, Visitor>
+
+const assignment = (visitor: Visitor, slug: string) =>
+	Object.hasOwn(visitor, slug) ? visitor[slug] : undefined
 
 type ImproveServerSetupArgs =
 	| (Omit<ImproveSetupArgs, 'config' | 'baseUrl'> & {
@@ -67,12 +72,17 @@ export class ImproveServerSDK extends BaseImproveSDK {
 				const oldest = this.#visitors.keys().next().value
 				if (oldest) this.#visitors.delete(oldest)
 			}
-			visitor = {}
+			visitor = new Map()
 			this.#visitors.set(visitorId, visitor)
 		}
-		const parsed = visitor[userAgent] || parseUserAgent(userAgent)
+		const known = visitor.get(userAgent)
+		if (known) return known
+		const parsed = parseUserAgent(userAgent)
 		if (!parsed) return null
-		visitor[userAgent] = parsed
+		if (visitor.size >= MAX_USER_AGENTS_PER_VISITOR) {
+			visitor.delete(visitor.keys().next().value!)
+		}
+		visitor.set(userAgent, parsed)
 		return parsed
 	}
 
@@ -95,7 +105,7 @@ export class ImproveServerSDK extends BaseImproveSDK {
 		if (!visitor) return defaultValue
 		if (geo?.country) visitor.country = geo.country
 
-		const assigned = visitor[flagSlug]
+		const assigned = assignment(visitor, flagSlug)
 		if (assigned) return assigned
 
 		const visitorMatchesAudience = getVisitorMatchesAudience(
@@ -131,7 +141,7 @@ export class ImproveServerSDK extends BaseImproveSDK {
 		if (!visitor) return testConfig.defaultValue
 		if (geo?.country) visitor.country = geo.country
 
-		const assigned = visitor[testSlug]
+		const assigned = assignment(visitor, testSlug)
 		if (assigned) return assigned
 
 		const visitorMatchesAudience = getVisitorMatchesAudience(
