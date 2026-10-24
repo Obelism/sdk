@@ -79,6 +79,16 @@ The browser client of Obelism numbers (`../obelism/apps/numbers`, whose
 - React SDK uses a factory function (`generateImproveProvider`) that creates a Context + hooks bundle
 - Next.js SDK generates middleware that handles bot detection, route matching, cookie management, and URL rewriting
 
+### Host tokens (`./oidc`)
+
+`token` in `ImproveServerSDK` (and Content's `ContentClient`) is a
+`TokenSource` (`src/tokenSource.ts`): a string or a function giving one per
+request. `./oidc` has `vercelOidc()` (`@vercel/oidc`, an optional peer
+dependency, so only that entry imports it) and `githubOidc()` (the Actions
+token endpoint), for a deployment a space trusts (Obelism's www
+docs/adr/0014). Each package has its own copy with its own default
+audience; keep them in step. The main entries must never import `./oidc`.
+
 ### Backend API (https://improve.obelism.studio)
 
 The SDK communicates with two endpoints (see `packages/improve/src/config/urls.ts`):

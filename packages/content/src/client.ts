@@ -5,6 +5,7 @@ import {
 	normalizeUrl,
 } from './config'
 import { ContentApiError } from './errors'
+import { type TokenSource, resolveToken } from './tokenSource'
 import type {
 	Entry,
 	EntryList,
@@ -16,8 +17,14 @@ import type {
 
 export type ContentClientOptions = {
 	// A delivery token (`cms_d_…`, published content) or preview token
-	// (`cms_p_…`, drafts too). Keep preview tokens server-side.
-	token: string
+	// (`cms_p_…`, drafts too). Keep preview tokens server-side. Or a function
+	// giving one per request, like `vercelOidc()` from
+	// `@obelism/content/oidc` (a host token a trust policy lets in).
+	token: TokenSource
+	// With a host token matching trust policies in several spaces or
+	// environments: the one to read.
+	space?: string | undefined
+	environment?: string | undefined
 	// The CMS. Default: https://content.obelism.studio
 	url?: string | undefined
 	// Defaults for every request; each can be overridden per call.
@@ -97,7 +104,8 @@ const trimSlashes = (path: string) => path.replace(/^\/+|\/+$/g, '')
 //   const page = await content.getPage('blog/hello', { locale: 'nl' })
 export class ContentClient {
 	readonly url: string
-	#token: string
+	#token: TokenSource
+	#place: Record<string, string>
 	#defaults: Pick<RequestOptions, 'locale' | 'depth' | 'richText'>
 	#timeout: number
 	#init: RequestInit | undefined
@@ -105,6 +113,8 @@ export class ContentClient {
 
 	constructor({
 		token,
+		space,
+		environment,
 		url,
 		locale,
 		depth,
@@ -115,6 +125,10 @@ export class ContentClient {
 	}: ContentClientOptions) {
 		this.url = normalizeUrl(url || DEFAULT_URL)
 		this.#token = token
+		this.#place = {
+			...(space && { 'Obelism-Space': space }),
+			...(environment && { 'Obelism-Environment': environment }),
+		}
 		this.#defaults = { locale, depth, richText }
 		this.#timeout = timeout ?? DEFAULT_TIMEOUT
 		this.#init = init
@@ -287,7 +301,8 @@ export class ContentClient {
 				// Not `Authorization`: Cloudflare never caches a request that
 				// carries it, and this header lets the API answer a delivery
 				// token from its edge cache.
-				'Obelism-Token': this.#token,
+				'Obelism-Token': await resolveToken(this.#token),
+				...this.#place,
 			},
 			signal: merged.signal
 				? AbortSignal.any([merged.signal, timeout])

@@ -141,6 +141,23 @@ getTestValue = (testSlug: string, visitorId: string, userAgent: string) =>
 
 Based on the slug, visitorId and userAgent this method gives you back what version of the AB test this visitor should get. If no config is loaded yet or no AB test with the given slug is found it returns `null`. When the userAgent of the visitor doesn't match the audience of the Test it will always return the control value. If the visitor does match the audience it will then check the allocation. If that's lower than 100% it will based on randomization check if this visitor should get the AB test. After that it will receive a random version of the test based on the randomization using the odds setup in the split.
 
+### Without a stored token
+
+On Vercel, or in GitHub Actions, the server SDK can send the identity token its host gives it instead of an API token: nothing to store or rotate. Trust the deployment first, under **Deployments without tokens** on the space's page on www.obelism.studio, then pass a token source:
+
+```ts
+import { ImproveServerSDK } from '@obelism/improve-sdk/server'
+import { vercelOidc } from '@obelism/improve-sdk/oidc' // needs @vercel/oidc installed
+
+const improve = new ImproveServerSDK({
+	organizationId: 'org_…',
+	environment: 'production',
+	token: vercelOidc(), // or githubOidc() in a workflow with `permissions: id-token: write`
+})
+```
+
+`token` takes any function that gives a token per request. The tokens are requested for `https://improve.obelism.studio`; for events sent straight to numbers, use `vercelOidc({ audience: 'https://numbers.obelism.studio' })`.
+
 ## Client
 
 ### setupVisitor
