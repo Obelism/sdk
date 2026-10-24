@@ -14,9 +14,16 @@ export const delivery = new ContentClient({
 	init: { next: { revalidate: 60, tags: ['content'] } },
 })
 
-// Drafts with a token of the person editing, never cached.
+// Drafts with a token of the person editing, never cached. Naming the space
+// and environment makes a token someone made for another space read nothing.
 const drafts = (token: string) =>
-	new ContentClient({ token, url, init: { cache: 'no-store' } })
+	new ContentClient({
+		token,
+		url,
+		space: process.env.CONTENT_SPACE_ID,
+		environment: process.env.CONTENT_ENVIRONMENT,
+		init: { cache: 'no-store' },
+	})
 
 // The client for this request: drafts in the visual editor, with the token it
 // adds to the URL for the person editing (`cms_token`; `cms_preview` alone

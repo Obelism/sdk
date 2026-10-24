@@ -46,6 +46,11 @@ const ENV_VARIABLES = [
 	['CONTENT_DELIVERY_TOKEN', 'reads published content (cms_d_…)'],
 	['CONTENT_PREVIEW_TOKEN', 'also reads drafts, server-side only (cms_p_…)'],
 	[
+		'CONTENT_SPACE_ID',
+		"the space the tokens are for (space_…): the editor's cms_token for any other reads nothing",
+	],
+	['CONTENT_ENVIRONMENT', 'the environment the tokens are for'],
+	[
 		'CONTENT_MANAGEMENT_TOKEN',
 		'changes the content model: content model pull|plan|apply (cms_m_…)',
 	],
@@ -212,6 +217,7 @@ export const runInitCommand = async ({
 			'',
 			'Next:',
 			'- Create a delivery token in Space settings and set CONTENT_DELIVERY_TOKEN (a preview token only if the site builds from drafts; the visual editor brings its own, as cms_token).',
+			'- Set CONTENT_SPACE_ID and CONTENT_ENVIRONMENT, and pass them as space and environment to the ContentClient you read cms_token with, so a cms_token for another space reads nothing.',
 			'- Fetch content with ContentClient from @obelism/content; the examples show what each type looks like.',
 			...(improve.enabled
 				? [
