@@ -19,12 +19,15 @@ export type ContentClientOptions = {
 	// A delivery token (`cms_d_…`, published content) or preview token
 	// (`cms_p_…`, drafts too). Keep preview tokens server-side. Or a function
 	// giving one per request, like `vercelOidc()` from
-	// `@obelism/content/oidc` (a host token a trust policy lets in).
+	// `@obelism/content/oidc` (a host token of a connected deployment).
 	token: TokenSource
-	// With a host token matching trust policies in several spaces or
-	// environments: the one to read.
+	// With a host token: read drafts, when its connection's rule has them.
+	// Without, it reads published content, so pages and preview can share
+	// one deployment.
+	drafts?: boolean | undefined
+	// With a host token of a deployment connected to several spaces: the one
+	// to read.
 	space?: string | undefined
-	environment?: string | undefined
 	// The CMS. Default: https://content.obelism.studio
 	url?: string | undefined
 	// Defaults for every request; each can be overridden per call.
@@ -47,6 +50,8 @@ export type RequestOptions = {
 	depth?: number | undefined
 	// Rich text as ProseMirror JSON (default) or rendered HTML strings.
 	richText?: RichTextFormat | undefined
+	// Overrides the client's `drafts` for this request.
+	drafts?: boolean | undefined
 	// Merged over the client's `init` for this request.
 	init?: RequestInit | undefined
 }
@@ -98,23 +103,24 @@ export type PageLookup<TEntry extends Entry = Entry> =
 const trimSlashes = (path: string) => path.replace(/^\/+|\/+$/g, '')
 
 // Reads one space environment's content through the delivery API. The token
-// decides the space, the environment and whether drafts are visible.
+// decides the space, the environment and whether drafts are visible (for a
+// host token, with `drafts`).
 //
 //   const content = new ContentClient({ token: process.env.CONTENT_TOKEN })
 //   const page = await content.getPage('blog/hello', { locale: 'nl' })
 export class ContentClient {
 	readonly url: string
 	#token: TokenSource
-	#place: Record<string, string>
-	#defaults: Pick<RequestOptions, 'locale' | 'depth' | 'richText'>
+	#space: string | undefined
+	#defaults: Pick<RequestOptions, 'locale' | 'depth' | 'richText' | 'drafts'>
 	#timeout: number
 	#init: RequestInit | undefined
 	#fetch: typeof fetch
 
 	constructor({
 		token,
+		drafts,
 		space,
-		environment,
 		url,
 		locale,
 		depth,
@@ -125,11 +131,8 @@ export class ContentClient {
 	}: ContentClientOptions) {
 		this.url = normalizeUrl(url || DEFAULT_URL)
 		this.#token = token
-		this.#place = {
-			...(space && { 'Obelism-Space': space }),
-			...(environment && { 'Obelism-Environment': environment }),
-		}
-		this.#defaults = { locale, depth, richText }
+		this.#space = space
+		this.#defaults = { locale, depth, richText, drafts }
 		this.#timeout = timeout ?? DEFAULT_TIMEOUT
 		this.#init = init
 		this.#fetch = fetchImpl ?? ((...args) => fetch(...args))
@@ -279,7 +282,7 @@ export class ContentClient {
 		// Checked here rather than in the constructor, so a module creating a
 		// client still loads (and a build still runs) without the variable.
 		if (!this.#token) throw new Error('ContentClient needs a token')
-		const { locale, depth, richText } = {
+		const { locale, depth, richText, drafts } = {
 			...(defaults && this.#defaults),
 			...withoutUndefined(options),
 		}
@@ -302,7 +305,8 @@ export class ContentClient {
 				// carries it, and this header lets the API answer a delivery
 				// token from its edge cache.
 				'Obelism-Token': await resolveToken(this.#token),
-				...this.#place,
+				...(this.#space && { 'Obelism-Space': this.#space }),
+				...(drafts && { 'Obelism-Drafts': 'true' }),
 			},
 			signal: merged.signal
 				? AbortSignal.any([merged.signal, timeout])

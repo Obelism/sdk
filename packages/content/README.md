@@ -43,15 +43,17 @@ await content.getEntries({
 await content.getContentModel() //          the model file
 ```
 
-Each method takes `{ locale, depth, richText, init }` to override the
+Each method takes `{ locale, depth, richText, drafts, init }` to override the
 defaults.
 
 ### Without a stored token
 
 On Vercel, or in GitHub Actions, the client can send the identity token its
-host gives it instead of a delivery or preview token. Trust the deployment
-first, under **Deployments without tokens** on the space's page on
-www.obelism.studio, then pass a token source:
+host gives it instead of a delivery or preview token. Connect the deployment
+first, under **Connected deployments** on the space's page on
+www.obelism.studio: each of its environments (Vercel's production, preview,
+development) maps to one environment of the space, with published content,
+drafts too, or management. Then pass a token source:
 
 ```ts
 import { ContentClient } from '@obelism/content'
@@ -59,10 +61,15 @@ import { vercelOidc } from '@obelism/content/oidc' // needs @vercel/oidc install
 
 const content = new ContentClient({
 	token: vercelOidc(), // or githubOidc() in a workflow
-	// space: 'space_…', environment: 'production', // when the deployment is trusted in several
+	// space: 'space_…', // when the deployment is connected to several spaces
 })
+
+// A preview route: drafts, when the connection's rule has them
+const draft = await content.getPage(path, { drafts: true })
 ```
 
+A host token reads published content unless the client or the request sets
+`drafts: true`, so a site's pages and its preview can share one deployment.
 `token` takes any function that gives a token per request. Requests with a
 host token skip the edge cache, since the token changes every hour or two.
 
@@ -510,8 +517,8 @@ Options: `--file`, `--url` (or `$CONTENT_URL`), `--prune`, and for `apply`
 dashboard, the agent API and MCP) or `--unlock`. In GitHub Actions
 the plan is also written to the job summary, and without
 `CONTENT_MANAGEMENT_TOKEN` the job's own token is used, when the job has
-`permissions: id-token: write` and the space trusts the repository as a
-management token.
+`permissions: id-token: write` and the repository is connected to the space
+with management for its environment.
 
 ### Types
 
