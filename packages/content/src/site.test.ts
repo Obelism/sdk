@@ -190,6 +190,12 @@ describe('createSiteEditing', () => {
 		expect(cookieValue(response, SITE_TOKEN_COOKIE)).toBe('')
 		expect(cookieValue(response, SITE_EDITING_COOKIE)).toBe('')
 	})
+
+	it('does not leave the site through a tab in return_to', async () => {
+		const { handler } = setup(() => Response.json({}))
+		const response = await handler(get('/cms/logout?return_to=/%09/evil.test'))
+		expect(response.headers.get('Location')).toBe('/')
+	})
 })
 
 describe('readSiteToken', () => {
@@ -207,8 +213,16 @@ describe('readSiteToken', () => {
 
 describe('safeReturnTo', () => {
 	it('only returns to a path on the site', () => {
-		expect(safeReturnTo('/a?b=1')).toBe('/a?b=1')
-		for (const value of ['//evil.test', 'https://evil.test', '/\\evil', null]) {
+		expect(safeReturnTo('/a?b=1#c')).toBe('/a?b=1#c')
+		for (const value of [
+			'//evil.test',
+			'https://evil.test',
+			'/\\evil',
+			'/\t/evil.test',
+			'/\n/evil.test',
+			'/\r/evil.test',
+			null,
+		]) {
 			expect(safeReturnTo(value)).toBe('/')
 		}
 	})

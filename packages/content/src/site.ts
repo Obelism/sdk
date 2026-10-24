@@ -136,14 +136,17 @@ export const pkceChallenge = async (verifier: string) =>
 		),
 	)
 
-// Only a path on this site: never an open redirect.
-export const safeReturnTo = (value: string | null | undefined) =>
-	value &&
-	value.startsWith('/') &&
-	!value.startsWith('//') &&
-	!value.includes('\\')
-		? value
+const PLACEHOLDER_ORIGIN = 'https://site.invalid'
+
+// Only a path on this site: never an open redirect. Resolved the way a
+// browser reads Location, which drops tabs and newlines and reads \ as /.
+export const safeReturnTo = (value: string | null | undefined) => {
+	if (!value?.startsWith('/')) return '/'
+	const url = new URL(value, PLACEHOLDER_ORIGIN)
+	return url.origin === PLACEHOLDER_ORIGIN
+		? `${url.pathname}${url.search}${url.hash}`
 		: '/'
+}
 
 const normalizeBasePath = (basePath: string) =>
 	`/${basePath.replace(/^\/+|\/+$/g, '')}`
