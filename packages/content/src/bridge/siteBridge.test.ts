@@ -71,8 +71,15 @@ describe('readSiteEditing', () => {
 		expect(readSiteEditing(document)).toBeNull()
 		document.cookie = `${SITE_EDITING_COOKIE}=${encodeURIComponent('/cms')}`
 		expect(readSiteEditing(document)).toBe('/cms')
-		document.cookie = `${SITE_EDITING_COOKIE}=${encodeURIComponent('//evil')}`
-		expect(readSiteEditing(document)).toBeNull()
+		for (const basePath of [
+			'//evil',
+			'/\\evil.test',
+			'/\t/evil.test',
+			'/\n/evil.test',
+		]) {
+			document.cookie = `${SITE_EDITING_COOKIE}=${encodeURIComponent(basePath)}`
+			expect(readSiteEditing(document)).toBeNull()
+		}
 	})
 })
 
@@ -444,6 +451,11 @@ describe('createSiteBridge', () => {
 		expect(assign).toHaveBeenLastCalledWith('/nl/')
 		// Asked once: leaving doesn't ask again.
 		expect(bridge.getState().unsaved).toBe(false)
+
+		expect(() =>
+			bridge.openPage({ ...pages[1]!, url: 'javascript:alert(1)//h' }),
+		).toThrow()
+		expect(assign).toHaveBeenLastCalledWith('/nl/')
 	})
 
 	describe('openForm', () => {

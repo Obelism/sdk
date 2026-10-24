@@ -39,6 +39,20 @@ import { type FormContent, type FormFrame, mountFormFrame } from './formFrame'
 // then `applyJson`: the raw alternative), and lists the space's pages to go
 // to one.
 
+// Plain path segments only: the URL parser drops tabs and newlines and reads
+// \ as /, so anything looser can resolve to another origin.
+const BASE_PATH = /^(?:\/[\w.~-]+)+$/
+
+// Page addresses come from the CMS's session and pages: never a javascript:
+// or data: URL.
+const webUrl = (url: string) => {
+	const { protocol } = new URL(url, 'https://site.invalid')
+	if (protocol !== 'https:' && protocol !== 'http:') {
+		throw new Error(`Not a page address: ${url}`)
+	}
+	return url
+}
+
 // The base path of the site's handler while signed in to edit, else null.
 export const readSiteEditing = (doc: Document): string | null => {
 	for (const part of doc.cookie.split(';')) {
@@ -46,9 +60,7 @@ export const readSiteEditing = (doc: Document): string | null => {
 		if (name !== SITE_EDITING_COOKIE) continue
 		try {
 			const basePath = decodeURIComponent(value.join('='))
-			return basePath.startsWith('/') && !basePath.startsWith('//')
-				? basePath
-				: null
+			return BASE_PATH.test(basePath) ? basePath : null
 		} catch {
 			return null
 		}
@@ -113,7 +125,7 @@ export const createSiteBridge = (
 	win: Window,
 	basePath: string,
 	{
-		pagePath = (path) => `/${path}`,
+		pagePath = (path) => `/${path.replace(/^\/+/, '')}`,
 		productPath: ownProductPath,
 		collectionPath: ownCollectionPath,
 	}: SiteBridgeOptions = {},
@@ -394,7 +406,7 @@ export const createSiteBridge = (
 					from: pageEntryId(),
 				})
 				const url = pagePath(created.path, locale() ?? '')
-				win.location.assign(url)
+				win.location.assign(webUrl(url))
 				return {
 					summary: created.summary,
 					entryId: created.entryId,
@@ -638,7 +650,7 @@ export const createSiteBridge = (
 			working.clear()
 			history.length = 0
 			refreshUnsaved()
-			win.location.assign(page.url)
+			win.location.assign(webUrl(page.url))
 		},
 
 		undo() {
