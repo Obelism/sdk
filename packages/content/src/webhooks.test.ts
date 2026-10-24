@@ -110,6 +110,22 @@ describe('verifyWebhook', () => {
 		await expect(
 			verifyWebhook(signed({ timestamp }), secret, { tolerance: 900 }),
 		).resolves.toEqual(event)
+		await expect(
+			verifyWebhook(signed(), secret, { tolerance: Number.NaN }),
+		).rejects.toThrow('tolerance')
+	})
+
+	it('refuses a header full of signatures before hashing them', async () => {
+		const verify = vi.spyOn(crypto.subtle, 'verify')
+		await expect(
+			verifyWebhook(signed({ extraSignature: 'v1,AA '.repeat(1000) }), secret),
+		).rejects.toThrow('Too many signatures')
+		await expect(
+			verifyWebhook(signed({ extraSignature: 'v1,AA v1,AA ' }), secret),
+		).resolves.toEqual(event)
+		// The two short ones are skipped without an HMAC.
+		expect(verify).toHaveBeenCalledTimes(1)
+		verify.mockRestore()
 	})
 })
 
