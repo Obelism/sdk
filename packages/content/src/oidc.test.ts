@@ -30,7 +30,7 @@ describe('host tokens for Content', () => {
 		)
 	})
 
-	it('go out per request, with the space when given', async () => {
+	it('go out per request, with the space and environment when given', async () => {
 		const fetchMock = vi.fn<typeof fetch>(
 			async () =>
 				new Response(JSON.stringify({ entry: null }), { status: 404 }),
@@ -42,6 +42,7 @@ describe('host tokens for Content', () => {
 		const content = new ContentClient({
 			token,
 			space: 'space_site',
+			environment: 'production',
 			fetch: fetchMock,
 		})
 
@@ -53,6 +54,7 @@ describe('host tokens for Content', () => {
 		expect(headers(0)).toMatchObject({
 			'Obelism-Token': 'first.host.token',
 			'Obelism-Space': 'space_site',
+			'Obelism-Environment': 'production',
 		})
 		expect(headers(0)).not.toHaveProperty('Obelism-Drafts')
 		expect(headers(1)['Obelism-Token']).toBe('second.host.token')

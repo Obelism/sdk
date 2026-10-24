@@ -61,7 +61,8 @@ import { vercelOidc } from '@obelism/content/oidc' // needs @vercel/oidc install
 
 const content = new ContentClient({
 	token: vercelOidc(), // or githubOidc() in a workflow
-	// space: 'space_…', // when the deployment is connected to several spaces
+	space: process.env.CONTENT_SPACE_ID, // picks one when the deployment is connected to several
+	environment: process.env.CONTENT_ENVIRONMENT, // refused if the rule maps it elsewhere
 })
 
 // A preview route: drafts, when the connection's rule has them

@@ -25,9 +25,12 @@ export type ContentClientOptions = {
 	// Without, it reads published content, so pages and preview can share
 	// one deployment.
 	drafts?: boolean | undefined
-	// With a host token of a deployment connected to several spaces: the one
-	// to read.
+	// The space and environment this site reads: a token for another one is
+	// refused, like a `cms_token` someone made for their own space. `space`
+	// also picks one for a host token of a deployment connected to several;
+	// a host token's environment comes from its connection's rule.
 	space?: string | undefined
+	environment?: string | undefined
 	// The CMS. Default: https://content.obelism.studio
 	url?: string | undefined
 	// Defaults for every request; each can be overridden per call.
@@ -111,7 +114,7 @@ const trimSlashes = (path: string) => path.replace(/^\/+|\/+$/g, '')
 export class ContentClient {
 	readonly url: string
 	#token: TokenSource
-	#space: string | undefined
+	#place: Record<string, string>
 	#defaults: Pick<RequestOptions, 'locale' | 'depth' | 'richText' | 'drafts'>
 	#timeout: number
 	#init: RequestInit | undefined
@@ -121,6 +124,7 @@ export class ContentClient {
 		token,
 		drafts,
 		space,
+		environment,
 		url,
 		locale,
 		depth,
@@ -131,7 +135,10 @@ export class ContentClient {
 	}: ContentClientOptions) {
 		this.url = normalizeUrl(url || DEFAULT_URL)
 		this.#token = token
-		this.#space = space
+		this.#place = {
+			...(space && { 'Obelism-Space': space }),
+			...(environment && { 'Obelism-Environment': environment }),
+		}
 		this.#defaults = { locale, depth, richText, drafts }
 		this.#timeout = timeout ?? DEFAULT_TIMEOUT
 		this.#init = init
@@ -305,7 +312,7 @@ export class ContentClient {
 				// carries it, and this header lets the API answer a delivery
 				// token from its edge cache.
 				'Obelism-Token': await resolveToken(this.#token),
-				...(this.#space && { 'Obelism-Space': this.#space }),
+				...this.#place,
 				...(drafts && { 'Obelism-Drafts': 'true' }),
 			},
 			signal: merged.signal
