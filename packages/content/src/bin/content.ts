@@ -2,6 +2,7 @@
 import { parseArgs } from 'node:util'
 
 import { DEFAULT_URL, normalizeUrl } from '../config'
+import { githubOidc } from '../oidc'
 import { runInitCommand } from '../cli/init'
 import { CliError, runModelCommand } from '../cli/model'
 import { runTypesCommand } from '../cli/typesCommand'
@@ -32,7 +33,9 @@ const USAGE = `Usage: content init [--dir content] [--url origin] [--skip-instal
   --unlock        apply also gives the model back to the dashboard
 
 Needs CONTENT_MANAGEMENT_TOKEN: a management token from Space settings
-(not for types --file).`
+(not for types --file). In GitHub Actions with \`permissions: id-token:
+write\`, the job's own token works instead, once the space trusts the
+repository (Deployments without tokens, on its page on www.obelism.studio).`
 
 const main = async () => {
 	let parsed
@@ -69,7 +72,11 @@ const main = async () => {
 			: null
 	if (!isInit && !isTypes && !modelCommand) throw new CliError(USAGE, 2)
 
-	const token = process.env.CONTENT_MANAGEMENT_TOKEN
+	const token =
+		process.env.CONTENT_MANAGEMENT_TOKEN ||
+		(process.env.ACTIONS_ID_TOKEN_REQUEST_URL
+			? await githubOidc()()
+			: undefined)
 	const url = normalizeUrl(values.url ?? process.env.CONTENT_URL ?? DEFAULT_URL)
 
 	// With --file, types needs no token.

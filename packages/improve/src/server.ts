@@ -2,6 +2,7 @@ import { ParsedUserAgent, parseUserAgent } from './utils/parseUserAgent'
 import { getVisitorMatchesAudience } from './utils/getVisitorMatchesAudience'
 import { getRandomTestValue } from './utils/getRandomTestValue'
 import { BaseImproveSDK } from './base'
+import { type TokenSource, resolveToken } from './tokenSource'
 import { ImproveConfiguration, ImproveSetupArgs } from './types'
 
 const DEFAULT_MAX_VISITORS = 10_000
@@ -20,14 +21,16 @@ type ImproveServerSetupArgs =
 			maxVisitors?: number
 	  })
 	| (Omit<ImproveSetupArgs, 'config'> & {
-			token: string
+			// An API token (`imp_…`), or a function giving one per request,
+			// like `vercelOidc()` from `@obelism/improve-sdk/oidc`.
+			token: TokenSource
 			maxVisitors?: number
 	  })
 
 export class ImproveServerSDK extends BaseImproveSDK {
 	#visitors: Map<string, VisitorData> = new Map()
 	#maxVisitors: number
-	#token: string
+	#token: TokenSource
 
 	// @ts-ignore It could be there
 	constructor({ token, maxVisitors, ...args }: ImproveServerSetupArgs) {
@@ -41,7 +44,7 @@ export class ImproveServerSDK extends BaseImproveSDK {
 			...config,
 			headers: {
 				...config?.headers,
-				token: this.#token,
+				token: await resolveToken(this.#token),
 			},
 		})
 	}

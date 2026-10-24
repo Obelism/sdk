@@ -73,6 +73,16 @@
 				"types": "./dist/webhooks.d.ts",
 				"default": "./dist/webhooks.js"
 			}
+		},
+		"./oidc": {
+			"import": {
+				"types": "./dist/oidc.d.mts",
+				"default": "./dist/oidc.mjs"
+			},
+			"require": {
+				"types": "./dist/oidc.d.ts",
+				"default": "./dist/oidc.js"
+			}
 		}
 	},
 	"scripts": {
@@ -91,6 +101,7 @@
 		"@rollup/plugin-node-resolve": "^16.0.3",
 		"@types/node": "^24.0.0",
 		"@typescript/typescript6": "^6.0.2",
+		"@vercel/oidc": "4.0.0",
 		"bunchee": "^7.0.2",
 		"jsdom": "^30.1.2",
 		"npm-run-all2": "^9.0.2",
@@ -102,5 +113,13 @@
 	},
 	"engines": {
 		"node": ">=20"
+	},
+	"peerDependencies": {
+		"@vercel/oidc": "^4.0.0"
+	},
+	"peerDependenciesMeta": {
+		"@vercel/oidc": {
+			"optional": true
+		}
 	}
 }

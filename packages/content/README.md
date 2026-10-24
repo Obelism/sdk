@@ -46,6 +46,26 @@ await content.getContentModel() //          the model file
 Each method takes `{ locale, depth, richText, init }` to override the
 defaults.
 
+### Without a stored token
+
+On Vercel, or in GitHub Actions, the client can send the identity token its
+host gives it instead of a delivery or preview token. Trust the deployment
+first, under **Deployments without tokens** on the space's page on
+www.obelism.studio, then pass a token source:
+
+```ts
+import { ContentClient } from '@obelism/content'
+import { vercelOidc } from '@obelism/content/oidc' // needs @vercel/oidc installed
+
+const content = new ContentClient({
+	token: vercelOidc(), // or githubOidc() in a workflow
+	// space: 'space_…', environment: 'production', // when the deployment is trusted in several
+})
+```
+
+`token` takes any function that gives a token per request. Requests with a
+host token skip the edge cache, since the token changes every hour or two.
+
 Pages and folders can have a slug per locale. `getPage` looks the path up
 in the requested locale's paths, `entry.path` is the path in that locale and
 `entry.paths` the path in every locale (`{ en: 'about-us', nl: 'over-ons' }`),
@@ -481,7 +501,10 @@ npx @obelism/content model apply   # apply it, all or nothing
 Options: `--file`, `--url` (or `$CONTENT_URL`), `--prune`, and for `apply`
 `--lock` (the environment's model becomes managed in code: read-only in the
 dashboard, the agent API and MCP) or `--unlock`. In GitHub Actions
-the plan is also written to the job summary.
+the plan is also written to the job summary, and without
+`CONTENT_MANAGEMENT_TOKEN` the job's own token is used, when the job has
+`permissions: id-token: write` and the space trusts the repository as a
+management token.
 
 ### Types
 
