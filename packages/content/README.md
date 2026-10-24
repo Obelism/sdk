@@ -83,8 +83,10 @@ with generics: `content.getPage<Entry<{ title: string }>>('home')`.
 The visual editor loads your site with
 `?cms_preview=1&cms_entry=…&cms_environment=…&cms_token=…`. `cms_token` is
 made for the person editing and reads drafts for 8 hours; read the page with
-it, server-side. Never show drafts because `cms_preview` is there: anyone can
-add it to a URL.
+it, server-side, naming your space and environment: anyone with a space of
+their own can make a `cms_token` for it, and only a request that names yours
+refuses one for another. Never show drafts because `cms_preview` is there:
+anyone can add it to a URL.
 
 ```ts
 import {
@@ -95,11 +97,16 @@ import {
 
 const preview = readPreviewParams(request.url)
 const content = preview?.token
-	? new ContentClient({ token: preview.token, init: { cache: 'no-store' } })
+	? new ContentClient({
+			token: preview.token,
+			space: process.env.CONTENT_SPACE_ID,
+			environment: process.env.CONTENT_ENVIRONMENT,
+			init: { cache: 'no-store' },
+		})
 	: deliveryClient
 
 const page = await content.getPage(path).catch((error) => {
-	// A made-up or expired token: show what's published.
+	// A made-up, expired or other space's token: show what's published.
 	if (error instanceof ContentApiError && error.status === 401) {
 		return deliveryClient.getPage(path)
 	}

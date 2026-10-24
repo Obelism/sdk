@@ -103,6 +103,8 @@ describe('runInitCommand', () => {
 		)
 		const env = await readFile(join(cwd, '.env.example'), 'utf8')
 		expect(env).toContain('CONTENT_DELIVERY_TOKEN=\n')
+		expect(env).toContain('CONTENT_SPACE_ID=\n')
+		expect(env).toContain('CONTENT_ENVIRONMENT=\n')
 		expect(env).toContain('CONTENT_URL=https://cms.test')
 		expect(env).not.toContain('cms_m_x')
 	})

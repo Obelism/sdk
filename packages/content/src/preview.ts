@@ -46,11 +46,13 @@ const toSearchParams = (input: SearchParamsInput) => {
 //
 //   const preview = readPreviewParams(request.url)
 //   const content = preview?.token
-//   	? new ContentClient({ token: preview.token, init: { cache: 'no-store' } })
+//   	? new ContentClient({ token: preview.token, space, environment })
 //   	: deliveryClient
 //
-// A made-up or expired token makes the client throw a ContentApiError with
-// status 401: answer with `deliveryClient` then.
+// `space` and `environment` are the site's own: anyone can make a cms_token
+// for a space of theirs, and naming yours makes such a token read nothing. A
+// made-up, expired or other space's token makes the client throw a
+// ContentApiError with status 401: answer with `deliveryClient` then.
 export const readPreviewParams = (
 	input: SearchParamsInput,
 ): PreviewParams | null => {
