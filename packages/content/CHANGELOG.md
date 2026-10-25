@@ -1,5 +1,19 @@
 # @obelism/content
 
+## 0.23.0
+
+### Minor Changes
+
+- 25ef5ae: `ContentClient` takes `drafts`, on the client or per request: with a host token, drafts are read only when asked for (`Obelism-Drafts: true`), so a site's pages and its preview can share one connected deployment. `space` also picks the space of a deployment connected to several; a host token's environment comes from its connection's rule, and naming another `environment` is refused.
+- 79af2e7: `token` takes a function too, and `./oidc` has `vercelOidc()` and `githubOidc()`: a deployment on Vercel or in GitHub Actions sends its host's identity token instead of a stored API token, once the deployment is connected to the space. The CLI uses the job's token in GitHub Actions when `CONTENT_MANAGEMENT_TOKEN` isn't set.
+
+### Patch Changes
+
+- 5a8e4c9: The preview docs and the Next.js example pass the site's `space` and `environment` to the client that reads `cms_token`, and `content init` adds `CONTENT_SPACE_ID` and `CONTENT_ENVIRONMENT` to `.env.example`. With Content's delivery API refusing a token for another space than the one a request names, a `cms_token` someone made for their own space can no longer put that space's drafts on your site.
+- f1e60ca: `safeReturnTo` resolves `return_to` as a URL and keeps it only when it stays on the site, so `/cms/logout` and the sign-in callback can no longer redirect to another host through a tab or newline (`/%09/evil.test`).
+- d7c8181: The site bridge takes the editing cookie's base path only when it is plain path segments, so an injected `obelism_content_editing` cookie such as `/\evil.test` or `/%09/evil.test` can no longer point it at another origin. It only goes to http(s) page addresses, never a `javascript:` URL, and the default `pagePath` drops a leading slash so a page path can't become `//host`.
+- 44b7abd: Webhook and prompt verification refuses a `webhook-signature` header with more than 5 signatures and skips any that isn't 32 bytes before computing an HMAC, so an unsigned request can no longer make the endpoint hash its body thousands of times. A `tolerance` of `NaN` now rejects instead of turning the timestamp check off.
+
 ## 0.22.0
 
 ### Minor Changes

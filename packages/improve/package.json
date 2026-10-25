@@ -1,7 +1,7 @@
 {
 	"name": "@obelism/improve-sdk",
 	"description": "Obelism Improve SDK",
-	"version": "3.2.0",
+	"version": "3.3.0",
 	"keywords": [
 		"ab-tests",
 		"feature-flags",

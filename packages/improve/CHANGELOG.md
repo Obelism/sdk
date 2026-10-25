@@ -1,5 +1,15 @@
 # @obelism/improve-sdk
 
+## 3.3.0
+
+### Minor Changes
+
+- 79af2e7: `token` takes a function too, and `./oidc` has `vercelOidc()` and `githubOidc()`: a deployment on Vercel or in GitHub Actions sends its host's identity token instead of a stored API token, once the deployment is connected to the space. The CLI uses the job's token in GitHub Actions when `CONTENT_MANAGEMENT_TOKEN` isn't set.
+
+### Patch Changes
+
+- bede5db: `ImproveServerSDK` keeps each visitor's user agents in a `Map` and reads assignments as own properties, so a request with the user agent `__proto__` can no longer write a test or flag assignment (and the country) onto `Object.prototype` and force every later visitor into the same variant. A visitor keeps at most 10 user agents, so one visitor id with ever-changing user agents no longer grows memory without bound.
+
 ## 3.2.0
 
 ### Minor Changes
