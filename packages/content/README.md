@@ -74,6 +74,12 @@ A host token reads published content unless the client or the request sets
 `token` takes any function that gives a token per request. Requests with a
 host token skip the edge cache, since the token changes every hour or two.
 
+Locally, `vercelOidc()` works after `vercel link` and `vercel login`: it takes
+the token `vercel env pull` wrote, or asks Vercel for a new one with your
+sign-in. That token's environment is `development`, so the connection needs a
+rule for it, and `environment` names the space environment that rule maps to.
+Anyone outside the Vercel team uses a delivery token.
+
 Pages and folders can have a slug per locale. `getPage` looks the path up
 in the requested locale's paths, `entry.path` is the path in that locale and
 `entry.paths` the path in every locale (`{ en: 'about-us', nl: 'over-ons' }`),

@@ -158,6 +158,8 @@ const improve = new ImproveServerSDK({
 
 `token` takes any function that gives a token per request. The tokens are requested for `https://improve.obelism.studio`; for events sent straight to numbers, use `vercelOidc({ audience: 'https://numbers.obelism.studio' })`.
 
+Locally, `vercelOidc()` works after `vercel link` and `vercel login`: it takes the token `vercel env pull` wrote, or asks Vercel for a new one with your sign-in. That token's environment is `development`, so the connection needs a rule for it with Improve on, and `environment` names the space environment that rule maps to. Anyone outside the Vercel team uses an API token.
+
 ## Client
 
 ### setupVisitor
