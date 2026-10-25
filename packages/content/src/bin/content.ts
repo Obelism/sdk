@@ -34,8 +34,9 @@ const USAGE = `Usage: content init [--dir content] [--url origin] [--skip-instal
 
 Needs CONTENT_MANAGEMENT_TOKEN: a management token from Space settings
 (not for types --file). In GitHub Actions with \`permissions: id-token:
-write\`, the job's own token works instead, once the space trusts the
-repository (Deployments without tokens, on its page on www.obelism.studio).`
+write\`, the job's own token works instead, once the repository is connected
+to the space with management (Connected deployments, on its page on
+www.obelism.studio).`
 
 const main = async () => {
 	let parsed

@@ -1,7 +1,7 @@
 // A deployment's host OIDC token instead of a stored API token
-// (Obelism's www docs/adr/0014): pass one of these as `token`. The space
-// needs a trust policy for the Vercel project or GitHub repository, on its
-// page on www.obelism.studio. Same as improve's packages/improve/src/oidc.ts.
+// (Obelism's www docs/adr/0016): pass one of these as `token`. The space
+// needs the Vercel project or GitHub repository connected, under Connected
+// deployments on its page on www.obelism.studio. Same as improve's packages/improve/src/oidc.ts.
 //
 //   import { vercelOidc } from '@obelism/content/oidc'
 //   token: vercelOidc()

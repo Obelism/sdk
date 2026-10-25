@@ -143,7 +143,7 @@ Based on the slug, visitorId and userAgent this method gives you back what versi
 
 ### Without a stored token
 
-On Vercel, or in GitHub Actions, the server SDK can send the identity token its host gives it instead of an API token: nothing to store or rotate. Trust the deployment first, under **Deployments without tokens** on the space's page on www.obelism.studio, then pass a token source:
+On Vercel, or in GitHub Actions, the server SDK can send the identity token its host gives it instead of an API token: nothing to store or rotate. Connect the deployment first, under **Connected deployments** on the space's page on www.obelism.studio, with Improve on for the environments it runs in (each maps to one environment of the space, which has to be the one the client asks for), then pass a token source:
 
 ```ts
 import { ImproveServerSDK } from '@obelism/improve-sdk/server'
