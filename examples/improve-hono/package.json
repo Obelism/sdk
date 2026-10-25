@@ -9,7 +9,7 @@
 	},
 	"dependencies": {
 		"@obelism/improve-sdk": "^3.3.0",
-		"hono": "^4.13.13"
+		"hono": "^4.13.14"
 	},
 	"devDependencies": {
 		"@types/node": "^26.6.5",
