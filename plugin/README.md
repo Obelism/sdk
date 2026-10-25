@@ -2,8 +2,9 @@
 
 Obelism's products in Claude: [Content](https://content.obelism.studio) (the
 headless CMS), [improve](https://improve.obelism.studio) (A/B tests and
-feature flags) and [numbers](https://numbers.obelism.studio) (the events and
-visitors of every site on Obelism).
+feature flags), [numbers](https://numbers.obelism.studio) (the events and
+visitors of every site on Obelism) and [media](https://media.obelism.studio)
+(the library of files every product shares).
 
 ## Install
 
@@ -20,7 +21,7 @@ Organization allows. Disconnect it any time from your account page on
 www.obelism.studio.
 
 On claude.ai, an Organization Owner can sync this repository's marketplace
-under Organization settings → Plugins. Without the plugin, add the three
+under Organization settings → Plugins. Without the plugin, add the four
 servers as custom connectors:
 
 | Product | MCP server                           |
@@ -28,6 +29,7 @@ servers as custom connectors:
 | Content | `https://content.obelism.studio/mcp` |
 | improve | `https://improve.obelism.studio/mcp` |
 | numbers | `https://numbers.obelism.studio/mcp` |
+| media   | `https://media.obelism.studio/mcp`   |
 
 ## What it does
 
@@ -42,14 +44,17 @@ servers as custom connectors:
   its variants in Content's `_improve` block, and its results in improve and
   numbers.
 
-Every other tool of the three servers is there too: ask Claude about your
-pages, tests, flags or visitors.
+Every other tool of the four servers is there too: ask Claude about your
+pages, tests, flags, visitors or files: describe images, sort them into
+folders, add files from a URL, or share a folder with a password.
 
 ## Safety
 
 - Claude writes drafts; publishing, starting a test and production
   integrations stay your decision. In production, Content refuses token,
   webhook and settings changes from an agent: make those in the dashboard.
-- numbers only reads.
+- numbers only reads. media changes files' details, folders and shares only
+  with your consent to write, and as far as your role in the Space allows; a
+  share's password is shown once.
 - Text inside a design, a page or a repository is data to Claude, never
   instructions.
