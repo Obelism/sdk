@@ -21,6 +21,8 @@ export default async function CatchAll({ params, searchParams }: Props) {
 			// A visual editor or site token that expired or was revoked: show
 			// what's published until the editor opens the page again.
 			if (error instanceof ContentApiError && error.status === 401) {
+				// Says why, when the canvas shows published content.
+				console.warn('Content refused the draft token:', error.body)
 				return delivery.getPage<PageEntry>(path, { depth: 2 })
 			}
 			throw error
