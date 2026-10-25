@@ -1,5 +1,11 @@
 # @obelism/content
 
+## 0.24.0
+
+### Minor Changes
+
+- 8b2ca58: `Asset.products`: the Shopify products tagged on a file in Obelism media, `[{ id, handle, position }]`, delivered on uses that show them (`products: true`). Exported as `AssetProduct`.
+
 ## 0.23.0
 
 ### Minor Changes
