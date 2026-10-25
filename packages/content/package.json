@@ -99,7 +99,7 @@
 	"devDependencies": {
 		"@obelism/sdk-typescript-config": "^0.0.0",
 		"@rollup/plugin-node-resolve": "^16.0.3",
-		"@types/node": "^24.19.2",
+		"@types/node": "^26.6.5",
 		"@typescript/typescript6": "^6.0.2",
 		"@vercel/oidc": "4.0.3",
 		"bunchee": "^7.0.2",
