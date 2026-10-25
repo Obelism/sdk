@@ -23,6 +23,18 @@ export type Asset = {
 	// Where crops should keep the image, fractions from the top left; null
 	// when not set. imageUrl passes it on for `cover` and `crop`.
 	focalPoint: { x: number; y: number } | null
+	// The Shopify products tagged on the file in Obelism media, in the order
+	// they were tagged, where this use shows them (`products: true`); absent
+	// otherwise. `position` is the product's point, as `focalPoint`. Read
+	// prices and stock from the Storefront API by `id`.
+	products?: AssetProduct[]
+}
+
+export type AssetProduct = {
+	// The product's GID, `gid://shopify/Product/…`.
+	id: string
+	handle: string
+	position: { x: number; y: number } | null
 }
 
 // A page or data entry. Every field of its content type is present in
