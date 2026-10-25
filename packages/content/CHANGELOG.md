@@ -1,5 +1,11 @@
 # @obelism/content
 
+## 0.25.0
+
+### Minor Changes
+
+- 3c0733a: Webhook events for the space's Shopify store: `product.updated`, `product.deleted`, `collection.updated` and `collection.deleted`, each with the item, a product's `collections`, the published `entries` that name them and cache `tags`, typed in `WebhookEvent`.
+
 ## 0.24.0
 
 ### Minor Changes

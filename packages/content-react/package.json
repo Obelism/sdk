@@ -1,7 +1,7 @@
 {
 	"name": "@obelism/content-react",
 	"description": "Obelism Content React SDK: live preview in the visual editor and rich text",
-	"version": "0.4.4",
+	"version": "0.4.5",
 	"keywords": [
 		"cms",
 		"headless-cms",
@@ -46,7 +46,7 @@
 		"react": ">=18.0.0"
 	},
 	"dependencies": {
-		"@obelism/content": "^0.24.0"
+		"@obelism/content": "^0.25.0"
 	},
 	"devDependencies": {
 		"@obelism/sdk-typescript-config": "^0.0.0",
