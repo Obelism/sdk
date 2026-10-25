@@ -5,14 +5,14 @@
 		"email": "hello@obelism.studio"
 	},
 	"metadata": {
-		"description": "Obelism's Claude plugin: Content, improve and numbers in Claude."
+		"description": "Obelism's Claude plugin: Content, improve, numbers and media in Claude."
 	},
 	"plugins": [
 		{
 			"name": "obelism",
 			"source": "./plugin",
-			"description": "Content, improve and numbers in Claude: import a Claude Design page into Content, connect a site, run an A/B test on a block and read its numbers.",
-			"version": "0.1.0",
+			"description": "Content, improve, numbers and media in Claude: import a Claude Design page into Content, connect a site, run an A/B test on a block, read its numbers, and keep a Space's files.",
+			"version": "0.2.0",
 			"category": "productivity",
 			"homepage": "https://www.obelism.studio"
 		}

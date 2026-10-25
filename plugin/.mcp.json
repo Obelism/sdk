@@ -11,6 +11,10 @@
 		"obelism-numbers": {
 			"type": "http",
 			"url": "https://numbers.obelism.studio/mcp"
+		},
+		"obelism-media": {
+			"type": "http",
+			"url": "https://media.obelism.studio/mcp"
 		}
 	}
 }
