@@ -115,6 +115,47 @@ export type EntryReviewClosedEvent = WebhookEventOf<
 	}
 >
 
+// A product or collection of the space's Shopify store: its GID and handle
+// (null once a product is deleted).
+export type WebhookShopifyItem = { id: string; handle: string | null }
+
+// What a store's change touches: the published pages that name the item
+// (or a product's collections), up to 100, and cache tags
+// (`shopify:product:<number>`, `shopify:collection:<number>`) for what a
+// site fetched from Shopify itself.
+type StoreChange = { entries: WebhookEntry[]; tags: string[] }
+
+// A product is created or changed (price, images, title, variants), or a
+// variant goes in or out of stock. `collections` are the ones it is in.
+export type ProductUpdatedEvent = WebhookEventOf<
+	'product.updated',
+	StoreChange & {
+		product: WebhookShopifyItem
+		collections: WebhookShopifyItem[]
+	}
+>
+
+// A product is deleted in the store (`collections` is empty).
+export type ProductDeletedEvent = WebhookEventOf<
+	'product.deleted',
+	StoreChange & {
+		product: WebhookShopifyItem
+		collections: WebhookShopifyItem[]
+	}
+>
+
+// A collection is created or changed, products added or removed included.
+export type CollectionUpdatedEvent = WebhookEventOf<
+	'collection.updated',
+	StoreChange & { collection: WebhookShopifyItem }
+>
+
+// A collection is deleted in the store.
+export type CollectionDeletedEvent = WebhookEventOf<
+	'collection.deleted',
+	StoreChange & { collection: WebhookShopifyItem }
+>
+
 // **Send test** in Space settings.
 export type WebhookTestEvent = WebhookEventOf<
 	'webhook.test',
@@ -131,6 +172,10 @@ export type WebhookEvent =
 	| LocalesChangedEvent
 	| EntryReviewRequestedEvent
 	| EntryReviewClosedEvent
+	| ProductUpdatedEvent
+	| ProductDeletedEvent
+	| CollectionUpdatedEvent
+	| CollectionDeletedEvent
 	| WebhookTestEvent
 
 export type WebhookEventType = WebhookEvent['type']
