@@ -281,6 +281,9 @@ export type ContentTypeDefinition = {
 	// What the type is for. Required in the CMS; null (or missing) from a
 	// CMS from before that.
 	description: string | null
+	// A picture of the type for the CMS's block picker: an https URL or a
+	// media asset id (`asset_…`).
+	previewImage?: string | null
 	fields: FieldDefinition[]
 }
 
