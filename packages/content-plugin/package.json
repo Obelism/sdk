@@ -1,7 +1,7 @@
 {
 	"name": "@obelism/content-plugin",
 	"description": "Build Obelism Content plugins: a field's input or a dashboard page in a frame, and verifying their context tokens",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"keywords": [
 		"cms",
 		"headless-cms",
