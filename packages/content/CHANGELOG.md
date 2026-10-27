@@ -1,5 +1,11 @@
 # @obelism/content
 
+## 0.26.0
+
+### Minor Changes
+
+- 75bc0ba: `ContentTypeDefinition` has `previewImage`: a block type's picture for the CMS's block picker, an https URL or a media asset id.
+
 ## 0.25.0
 
 ### Minor Changes
