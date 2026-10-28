@@ -264,7 +264,30 @@ typing at a time. Hovered blocks show their name; Escape goes from a block
 back to the whole page. The header names the page and opens every page of
 the space, drafts included, to go to one (at `pagePath`, in the page's
 language when it has a path there), and shows the environment. A launcher
-at the bottom left minimizes the panel, hides the outlines and exits:
+at the bottom left minimizes the panel, hides the outlines and exits. Its
+words are `labels` (`SiteEditorLabels`, defaults in
+`DEFAULT_SITE_EDITOR_LABELS`).
+
+The site makes room for the panel with a margin on `<html>`, which moves
+everything in the page's flow. Elements with `position: fixed` (or `sticky`)
+stay on the viewport, so a fixed header or cart button would sit under the
+panel. Give them the room yourself with the `--obelism-dock` custom property
+the editor sets on `<html>` (`436px` while docked, `0px` otherwise), or add
+`data-obelism-dock` to the element and the editor sets its `right` and
+`max-width` while docked:
+
+```css
+.site-header {
+	position: fixed;
+	right: var(--obelism-dock, 0px);
+}
+```
+
+```html
+<button class="cart" data-obelism-dock>Cart</button>
+```
+
+The form, the pages and saving work as below:
 
 ```ts
 const form = bridge.openForm(element, { onReady, onError }) // an iframe

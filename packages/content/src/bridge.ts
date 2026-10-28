@@ -5,6 +5,7 @@ import {
 } from './bridge/createBridge'
 import { mountPromptBox, type PromptBoxOptions } from './bridge/promptBox'
 import { createSiteBridge, readSiteEditing } from './bridge/siteBridge'
+import type { PromptLabels, SiteEditorLabels } from './bridge/labels'
 import { mountSiteEditor } from './bridge/siteEditor'
 import { DEFAULT_URL, normalizeUrl } from './config'
 
@@ -25,14 +26,21 @@ export type {
 } from './bridge/createBridge'
 export { INITIAL_STATE } from './bridge/createBridge'
 export { DEFAULT_PROMPT_LABELS, mountPromptBox } from './bridge/promptBox'
+export { DEFAULT_SITE_EDITOR_LABELS } from './bridge/labels'
 export { mountSiteEditor } from './bridge/siteEditor'
+export type { SiteEditorOptions } from './bridge/siteEditor'
 export { DEFAULT_STATS_LABELS, mountStatsOverlay } from './bridge/statsOverlay'
 export type {
 	BlockStats,
 	StatsLabels,
 	StatsOverlay,
 } from './bridge/statsOverlay'
-export type { PromptBoxOptions, PromptLabels } from './bridge/promptBox'
+export type { PromptBoxOptions } from './bridge/promptBox'
+export type {
+	PromptLabels,
+	SharedLabels,
+	SiteEditorLabels,
+} from './bridge/labels'
 
 export type BridgeOptions = {
 	// The CMS the editor runs on; the only origin the bridge talks to.
@@ -43,7 +51,13 @@ export type BridgeOptions = {
 	// on the site, the editor docked beside it (`mountSiteEditor`). `false`
 	// leaves it out, e.g. to build your own with `bridge.prompt()`. Default:
 	// shown.
-	prompt?: boolean | PromptBoxOptions | undefined
+	prompt?:
+		| boolean
+		| (Omit<PromptBoxOptions, 'labels'> & {
+				// The prompt box's words, and on the site the editor's.
+				labels?: Partial<PromptLabels & SiteEditorLabels> | undefined
+		  })
+		| undefined
 	// Editing on the site: where a CMS path (`solutions/agencies`) in a
 	// locale is on the site, to open a page made with "New page" or picked
 	// from the pages (the path is the one in that locale). Default: `/` +

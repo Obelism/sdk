@@ -171,6 +171,7 @@ export const createSiteBridge = (
 				({ content, saved }) => !same(content, saved),
 			),
 			canUndo: history.length > 0,
+			undoSteps: history.length,
 		})
 
 	const api = async <T>(path: string, body?: unknown): Promise<T> => {
@@ -520,7 +521,7 @@ export const createSiteBridge = (
 		},
 
 		openForm(container, options = {}): FormHandle {
-			const { title = 'Content form', onReady, onError } = options
+			const { title = 'Content form', onReady, onError, onEscape } = options
 			closeForm?.()
 			let closed = false
 			let frame: FormFrame | null = null
@@ -604,6 +605,7 @@ export const createSiteBridge = (
 					onReady: () => onReady?.(),
 					onChange: change,
 					onError: (message) => onError?.(message),
+					onEscape: () => onEscape?.(),
 				})
 				unsubscribe = emitter.on('change', show)
 				show()

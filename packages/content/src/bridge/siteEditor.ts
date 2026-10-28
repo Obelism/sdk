@@ -3,15 +3,26 @@ import {
 	blockSelector,
 	type BridgeState,
 	type ContentBridge,
-	type FormHandle,
-	type SitePage,
 } from './createBridge'
-import { element, fill, MARKS, svgSpan } from './dom'
 import {
-	DEFAULT_PROMPT_LABELS,
-	type PromptBoxOptions,
-	type PromptLabels,
-} from './promptBox'
+	element,
+	fill,
+	icon as drawIcon,
+	MARKS,
+	svgSpan,
+	type ICONS,
+} from './dom'
+import { createFormSlot } from './formSlot'
+import { DEFAULT_SITE_EDITOR_LABELS, type SiteEditorLabels } from './labels'
+import { createPagesPicker } from './pagesPicker'
+import type { PromptBoxOptions } from './promptBox'
+import {
+	addShopPage,
+	failure,
+	pageContext,
+	shopCopy,
+	storeChanges,
+} from './siteActions'
 
 // The on-site editor: editing a site signed in to edit (siteBridge.ts) from
 // a panel docked on the right, the site reflowed beside it. Ask (prompts,
@@ -21,6 +32,10 @@ import {
 // DOM in a shadow root, like the prompt box, which the visual editor and
 // Content's canvas keep using.
 
+export type SiteEditorOptions = Omit<PromptBoxOptions, 'labels'> & {
+	labels?: Partial<SiteEditorLabels> | undefined
+}
+
 // What the site gives up beside the panel: its 404px and a 16px gap on
 // either side.
 export const DOCK_WIDTH_PX = 436
@@ -29,23 +44,6 @@ const DOCK_QUERY = '(min-width: 768px)'
 const OPEN_KEY = 'obelism-content-editor'
 // Changed fields an answer shows; the rest are counted.
 const MAX_DIFFS = 3
-
-const ICONS = {
-	chevrons: '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
-	minimise: '<path d="M5 12h14"/>',
-	eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
-	eyeOff:
-		'<path d="M10.7 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.2"/><path d="M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="m2 2 20 20"/>',
-	send: '<path d="M12 19V5"/><path d="m5 12 7-7 7 7"/>',
-	undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
-	search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
-	check: '<path d="M20 6 9 17l-5-5"/>',
-	plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
-	scope:
-		'<rect x="3" y="3" width="18" height="18" rx="3" stroke-dasharray="3 3"/>',
-	alert:
-		'<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
-}
 
 // Obelism's tokens (the design system's foundation/tokens.css), copied: a
 // shadow root can't reach the site's, nor the site's fonts but Geist's
@@ -221,6 +219,10 @@ button:disabled { cursor: not-allowed; }
 }
 .note button::after { content: ''; position: absolute; inset: -13px -6px; }
 .intro { color: rgb(var(--muted)); font-size: 13px; }
+.gate {
+	display: grid; gap: 8px; margin: 10px 14px 0; padding: 10px 12px; border-radius: 12px;
+	background: rgb(var(--coral-wash)); color: rgb(var(--coral-ink)); font-size: 12px; line-height: 18px;
+}
 .shop { display: grid; gap: 10px; justify-items: start; padding: 12px; border-radius: 14px; background: rgb(var(--subtle)); }
 .log { display: flex; flex-direction: column; gap: 14px; }
 .bubble {
@@ -350,6 +352,10 @@ textarea:disabled, .path input:disabled { opacity: .6; }
 .box { position: absolute; border-radius: 4px; }
 .box.hover { border: 1.5px dashed rgb(var(--border)); }
 .box.preview { border: 2px solid rgb(var(--accent)); }
+/* Its own layer, multiplied onto the page (a blend inside the marks layer
+   wouldn't reach it): the wash tints the block's background, not its text. */
+.wash { position: fixed; inset: 0; pointer-events: none; z-index: 2147483644; mix-blend-mode: multiply; }
+.box.fill { background: rgb(255 243 236); }
 .name-tab {
 	position: absolute; height: 20px; padding: 0 8px; border-radius: 6px 6px 0 0; white-space: nowrap;
 	background: rgb(105 100 94); color: rgb(255 255 255); font-size: 11px; font-weight: 500; line-height: 20px;
@@ -368,11 +374,15 @@ textarea:disabled, .path input:disabled { opacity: .6; }
 
 // Outlines on the page: the selection in the accent, hover drawn by the
 // layer instead (only the innermost block, with its name).
+// A site's own fixed or sticky elements stay on the viewport: they make room
+// for the panel with `right: var(--obelism-dock, 0px)` in their CSS, or with
+// the `data-obelism-dock` attribute.
 const pageCss = () => {
 	const block = `[${UID_ATTRIBUTE}]`
 	return (
 		`html[data-obelism-editor]{transition:margin-right .3s cubic-bezier(.2,.8,.2,1)}` +
 		`html[data-obelism-docked]{margin-right:${DOCK_WIDTH_PX}px!important}` +
+		`html[data-obelism-docked] [data-obelism-dock]{right:${DOCK_WIDTH_PX}px!important;max-width:calc(100vw - ${DOCK_WIDTH_PX}px)!important}` +
 		`html[data-obelism-editor][data-cms-selecting] ${block}:hover:not([data-cms-selected]){outline:none}` +
 		`html[data-obelism-editor][data-cms-selecting] ${block}[data-cms-selected]{outline:2px solid rgb(212 130 30);outline-offset:2px}` +
 		`@media (prefers-reduced-motion:reduce){html[data-obelism-editor]{transition:none}}`
@@ -464,10 +474,13 @@ type Answer = {
 	status: 'working' | 'pending' | 'kept' | 'undone' | 'failed'
 	summary: string
 	diffs: FieldDiff[]
+	// The undo step it made (`undoSteps` after it), to know it when the
+	// footer's Undo takes that step back.
+	step: number | null
 	node: HTMLElement
-	// What it was last drawn as: redrawn only when that changes, so the log
-	// doesn't read it out again.
-	drawn: string
+	eyebrow: HTMLElement
+	actions: HTMLElement | null
+	details: HTMLElement[]
 }
 
 const readOpen = (win: Window | null) => {
@@ -482,13 +495,16 @@ const readOpen = (win: Window | null) => {
 export const mountSiteEditor = (
 	doc: Document,
 	bridge: ContentBridge,
-	options: PromptBoxOptions = {},
+	options: SiteEditorOptions = {},
 ) => {
-	const labels: PromptLabels = { ...DEFAULT_PROMPT_LABELS, ...options.labels }
+	const labels: SiteEditorLabels = {
+		...DEFAULT_SITE_EDITOR_LABELS,
+		...options.labels,
+	}
 	const win = doc.defaultView
 	const html = doc.documentElement
 
-	const icon = (name: keyof typeof ICONS) => svgSpan(doc, 'icon', ICONS[name])
+	const icon = (name: keyof typeof ICONS) => drawIcon(doc, name)
 	const mark = () => svgSpan(doc, 'mark', MARKS.obelism)
 	const working = () => svgSpan(doc, 'working', MARKS.working)
 	const button = (className: string, ...children: (Node | string)[]) =>
@@ -525,7 +541,7 @@ export const mountSiteEditor = (
 		}),
 		envText,
 	)
-	const minimise = button('icon-button hit', icon('minimise'))
+	const minimise = button('icon-button hit', icon('dash'))
 	minimise.setAttribute('aria-label', labels.minimize)
 	minimise.title = labels.minimize
 	const head = element(
@@ -540,32 +556,18 @@ export const mountSiteEditor = (
 		minimise,
 	)
 
-	const search = element(doc, 'input', {
-		type: 'text',
-		placeholder: labels.pagesSearch,
-		autocomplete: 'off',
-		spellcheck: false,
+	const picker = createPagesPicker(doc, bridge, labels, {
+		onLoad: () => refresh(),
+		onClose: () => setPicking(false),
 	})
-	search.setAttribute('role', 'combobox')
-	search.setAttribute('aria-label', labels.pagesSearch)
-	search.setAttribute('aria-autocomplete', 'list')
-	search.setAttribute('aria-expanded', 'true')
-	search.setAttribute('aria-controls', 'obelism-pages')
-	const optionList = element(doc, 'ul', {
-		className: 'options',
-		id: 'obelism-pages',
-	})
-	optionList.setAttribute('role', 'listbox')
-	optionList.setAttribute('aria-label', labels.pages)
-	const pagesNote = element(doc, 'p', { className: 'empty' })
 	const newPage = button('button quiet new-page', icon('plus'), labels.newPage)
 	const pagesBox = element(
 		doc,
 		'div',
 		{ className: 'pages' },
-		element(doc, 'label', { className: 'search' }, icon('search'), search),
-		optionList,
-		pagesNote,
+		picker.searchRow,
+		picker.list,
+		picker.note,
 		newPage,
 	)
 
@@ -590,6 +592,18 @@ export const mountSiteEditor = (
 	const tabs = element(doc, 'div', { className: 'tabs' }, askTab, fieldsTab)
 	tabs.setAttribute('role', 'tablist')
 	tabs.setAttribute('aria-label', labels.modes)
+	// Edit fields asked for while a suggestion waits: it's kept or undone
+	// first, never by the switch itself.
+	const gateKeep = button('button primary', labels.keep)
+	const gateUndo = button('button quiet', labels.undo)
+	const gate = element(
+		doc,
+		'div',
+		{ className: 'gate' },
+		element(doc, 'p', { textContent: labels.keepBeforeFields }),
+		element(doc, 'div', { className: 'actions' }, gateKeep, gateUndo),
+	)
+	gate.setAttribute('role', 'alert')
 
 	const noteText = element(doc, 'span')
 	const wholePage = button('', labels.scopeEntry)
@@ -607,11 +621,9 @@ export const mountSiteEditor = (
 		className: 'intro',
 		textContent: labels.askIntro,
 	})
-	// A product (collection) the site marks without a page of its own.
 	const shopText = element(doc, 'p', { className: 'summary' })
-	const shopButton = button('button primary', icon('plus'))
 	const shopButtonText = element(doc, 'span')
-	shopButton.appendChild(shopButtonText)
+	const shopButton = button('button primary', icon('plus'), shopButtonText)
 	const shop = element(doc, 'div', { className: 'shop' }, shopText, shopButton)
 	const log = element(doc, 'div', { className: 'log' })
 	log.setAttribute('role', 'log')
@@ -640,7 +652,7 @@ export const mountSiteEditor = (
 	)
 	const input = element(doc, 'textarea', { rows: 1 })
 	input.setAttribute('aria-label', labels.open)
-	const sendIcon = icon('send')
+	const sendIcon = icon('arrowUp')
 	const sendWorking = working()
 	const send = element(
 		doc,
@@ -682,8 +694,8 @@ export const mountSiteEditor = (
 	const footerActions = element(doc, 'slot')
 	footerActions.name = 'actions-footer'
 	const undo = button('button quiet', icon('undo'), labels.undo)
-	const save = button('button secondary')
-	const publish = button('button primary')
+	const save = button('button secondary', labels.saveDraft)
+	const publish = button('button primary', labels.publish)
 	const foot = element(
 		doc,
 		'div',
@@ -694,6 +706,8 @@ export const mountSiteEditor = (
 		save,
 		publish,
 	)
+	const announcer = element(doc, 'p', { className: 'visually-hidden' })
+	announcer.setAttribute('role', 'status')
 
 	const panel = element(
 		doc,
@@ -702,9 +716,11 @@ export const mountSiteEditor = (
 		head,
 		pagesBox,
 		tabs,
+		gate,
 		ask,
 		fields,
 		foot,
+		announcer,
 	)
 	panel.setAttribute('aria-label', labels.editor)
 
@@ -743,10 +759,13 @@ export const mountSiteEditor = (
 
 	const layer = element(doc, 'div', { className: 'layer' })
 	layer.setAttribute('aria-hidden', 'true')
+	const wash = element(doc, 'div', { className: 'wash' })
+	wash.setAttribute('aria-hidden', 'true')
 	const root = element(
 		doc,
 		'div',
 		{ className: 'root' },
+		wash,
 		layer,
 		panel,
 		launcher,
@@ -755,16 +774,10 @@ export const mountSiteEditor = (
 
 	let open = readOpen(win)
 	let mode: 'ask' | 'fields' = 'ask'
+	let gated = false
 	let creating = false
 	let outlines = true
 	let picking = false
-	let pages: SitePage[] | null = null
-	let pagesLoad: Promise<void> | null = null
-	let pagesError: string | null = null
-	let active = 0
-	let formHandle: FormHandle | null = null
-	let formLoading = false
-	let formError: string | null = null
 	let stored:
 		| { kind: 'saved' | 'published' }
 		| { kind: 'error'; action: 'save' | 'publish'; text: string }
@@ -776,11 +789,15 @@ export const mountSiteEditor = (
 	let hoverUid: string | null = null
 	// Block names by uid, from the views; null when it couldn't be read.
 	const names = new Map<string, string | null>()
+	let pageNames: 'idle' | 'loading' | 'done' = 'idle'
 	let destroyed = false
 
-	const site = bridge.mode === 'site'
-	const failure = (error: unknown) =>
-		error instanceof Error ? error.message : String(error)
+	const formSlot = createFormSlot(bridge, formBox, labels.formTitle, {
+		onReady: () => refresh(),
+		onError: () => refresh(),
+		onEscape: () => stepBack(),
+	})
+
 	const pending = () => answers.filter(({ status }) => status === 'pending')
 	const latestPending = () => pending().slice(-1)[0] ?? null
 	// Decided on while nothing else runs: undo would take the running one's
@@ -788,7 +805,11 @@ export const mountSiteEditor = (
 	const decidable = () =>
 		answers.some(({ status }) => status === 'working') ? null : latestPending()
 
-	let pageNames: 'idle' | 'loading' | 'done' = 'idle'
+	const announce = (text: string) => {
+		announcer.textContent = ''
+		announcer.textContent = text
+	}
+
 	const nameOf = (uid: string) => {
 		if (!names.has(uid) && pageNames !== 'loading') {
 			names.set(uid, null)
@@ -824,21 +845,21 @@ export const mountSiteEditor = (
 		}, done)
 	}
 
-	const currentPage = () =>
-		pages?.find(({ entryId }) => entryId === bridge.entryId) ?? null
-	const pageTitle = () =>
-		currentPage()?.name || doc.title.trim() || labels.pages
+	// The page's own title: its entry's name, else the document's.
+	const knownTitle = () => picker.current()?.name || doc.title.trim()
+	const pageTitle = () => knownTitle() || labels.pages
 
 	let frame: number | null = null
 	const drawMarks = (state: BridgeState) => {
 		layer.replaceChildren()
+		wash.replaceChildren()
 		if (!marksShown(state)) return
 		const rectOf = (selector: string) => {
 			const target = doc.querySelector(selector)
 			const rect = target?.getBoundingClientRect()
 			return rect && (rect.width || rect.height) ? rect : null
 		}
-		const box = (rect: DOMRect, kind: string) => {
+		const box = (rect: DOMRect, kind: string, into = layer) => {
 			const node = element(doc, 'div', { className: `box ${kind}` })
 			Object.assign(node.style, {
 				top: `${rect.top - 3}px`,
@@ -846,7 +867,7 @@ export const mountSiteEditor = (
 				width: `${rect.width + 6}px`,
 				height: `${rect.height + 6}px`,
 			})
-			layer.appendChild(node)
+			into.appendChild(node)
 		}
 		const chips = (rect: DOMRect, ...nodes: HTMLElement[]) => {
 			const row = element(doc, 'div', { className: 'chips' }, ...nodes)
@@ -856,12 +877,20 @@ export const mountSiteEditor = (
 			Object.assign(row.style, { top: `${top}px`, left: `${rect.left - 3}px` })
 			layer.appendChild(row)
 		}
+		const accentChip = (text: string, preview: boolean) => {
+			const chip = element(doc, 'span', { className: 'accent-chip' })
+			if (preview) chip.appendChild(mark())
+			chip.appendChild(doc.createTextNode(text))
+			return chip
+		}
 		const previewing = latestPending()
 		const previewSelector = previewing
 			? previewing.uid
 				? blockSelector(previewing.uid)
 				: `[${ENTRY_ATTRIBUTE}]`
 			: null
+		const previewRect = previewSelector ? rectOf(previewSelector) : null
+		if (previewRect) box(previewRect, 'fill', wash)
 
 		if (hoverUid && hoverUid !== state.selectedUid) {
 			const rect = rectOf(blockSelector(hoverUid))
@@ -885,42 +914,28 @@ export const mountSiteEditor = (
 			const rect = rectOf(blockSelector(state.selectedUid))
 			if (rect) {
 				const name = nameOf(state.selectedUid)
-				const accent = element(doc, 'span', { className: 'accent-chip' })
-				if (selectedPreviewing) accent.appendChild(mark())
-				accent.appendChild(
-					doc.createTextNode(
-						selectedPreviewing ? fill(labels.previewChip, { name }) : name,
-					),
-				)
-				const page = currentPage()
+				const title = knownTitle()
 				chips(
 					rect,
-					accent,
-					...(page
+					accentChip(
+						selectedPreviewing ? fill(labels.previewChip, { name }) : name,
+						selectedPreviewing,
+					),
+					...(title
 						? [
 								element(doc, 'span', {
 									className: 'ink-chip',
-									textContent: page.name,
+									textContent: title,
 								}),
 							]
 						: []),
 				)
 			}
 		}
-		if (previewSelector && !selectedPreviewing) {
-			const rect = rectOf(previewSelector)
-			if (rect) {
-				box(rect, 'preview')
-				const name = previewing!.uid ? nameOf(previewing!.uid) : pageTitle()
-				const accent = element(
-					doc,
-					'span',
-					{ className: 'accent-chip' },
-					mark(),
-					fill(labels.previewChip, { name }),
-				)
-				chips(rect, accent)
-			}
+		if (previewRect && !selectedPreviewing) {
+			box(previewRect, 'preview')
+			const name = previewing!.uid ? nameOf(previewing!.uid) : pageTitle()
+			chips(previewRect, accentChip(fill(labels.previewChip, { name }), true))
 		}
 	}
 	const scheduleMarks = () => {
@@ -936,118 +951,18 @@ export const mountSiteEditor = (
 	const marksShown = (state: BridgeState) =>
 		panelShown(state) && outlines && !creating
 
-	const fetchPages = () => {
-		pagesLoad ??= bridge.pages().then(
-			(list) => {
-				pages = list
-				pagesError = null
-				renderPages()
-				refresh()
-			},
-			(error: unknown) => {
-				pagesLoad = null
-				pagesError = failure(error)
-				renderPages()
-				refresh()
-			},
-		)
-		return pagesLoad
-	}
-
-	const matching = () => {
-		const query = search.value.trim().toLowerCase()
-		return (pages ?? []).filter(
-			(page) =>
-				!query ||
-				page.name.toLowerCase().includes(query) ||
-				page.url.toLowerCase().includes(query) ||
-				`/${page.path}`.toLowerCase().includes(query),
-		)
-	}
-
-	const renderPages = () => {
-		const list = matching()
-		active = Math.max(0, Math.min(active, list.length - 1))
-		optionList.textContent = ''
-		list.forEach((page, index) => {
-			const option = element(
-				doc,
-				'li',
-				{
-					className: `option${index === active ? ' active' : ''}`,
-					id: `obelism-page-${index}`,
-				},
-				element(
-					doc,
-					'span',
-					{ className: 'option-text' },
-					element(doc, 'span', { textContent: page.name }),
-					element(doc, 'span', {
-						className: 'option-path',
-						textContent: page.url,
-					}),
-				),
-			)
-			option.setAttribute('role', 'option')
-			option.setAttribute('aria-selected', String(index === active))
-			if (page.status !== 'published') {
-				option.appendChild(
-					element(doc, 'span', {
-						className: 'badge',
-						textContent:
-							page.status === 'draft' ? labels.pageDraft : labels.pageChanged,
-					}),
-				)
-			}
-			if (page.entryId === bridge.entryId) {
-				option.setAttribute('aria-current', 'page')
-				const check = icon('check')
-				check.removeAttribute('aria-hidden')
-				check.setAttribute('role', 'img')
-				check.setAttribute('aria-label', labels.pageCurrent)
-				option.appendChild(check)
-			}
-			option.addEventListener('click', () => choose(page))
-			optionList.appendChild(option)
+	const value = (text: string) =>
+		element(doc, 'span', {
+			className: `value${text ? '' : ' none'}`,
+			textContent: text || labels.emptyValue,
 		})
-		const activeOption = optionList.children[active]
-		if (activeOption) {
-			search.setAttribute('aria-activedescendant', activeOption.id)
-			activeOption.scrollIntoView?.({ block: 'nearest' })
-		} else {
-			search.removeAttribute('aria-activedescendant')
-		}
-		const text = pagesError ?? (pages ? '' : labels.pagesLoading)
-		pagesNote.textContent = text || (list.length === 0 ? labels.pagesEmpty : '')
-		pagesNote.hidden = !pagesNote.textContent
-		pagesNote.className = `empty${pagesError ? ' error' : ''}`
-	}
 
-	const drawAnswer = (answer: Answer) => {
-		const { node } = answer
-		const deciding = answer === decidable()
-		const drawn = `${answer.status}:${deciding}`
-		if (answer.drawn === drawn) return
-		answer.drawn = drawn
-		node.dataset.status = answer.status
-		const card = element(doc, 'div', { className: 'card' })
-		card.appendChild(
-			element(doc, 'span', {
-				className: 'visually-hidden',
-				textContent: `${labels.obelism}: `,
-			}),
-		)
-		if (answer.status === 'working') {
-			card.appendChild(
-				element(
-					doc,
-					'p',
-					{ className: 'status-line' },
-					working(),
-					creating ? labels.creating : labels.working,
-				),
-			)
-		} else if (answer.status === 'failed') {
+	// Fills an answer's card once it's answered; afterwards only its eyebrow
+	// and actions change, so the log reads out only what's new.
+	const answered = (answer: Answer) => {
+		const card = answer.node.querySelector('.card')!
+		card.querySelector('.status-line')?.remove()
+		if (answer.status === 'failed') {
 			card.appendChild(
 				element(
 					doc,
@@ -1057,95 +972,145 @@ export const mountSiteEditor = (
 					answer.summary,
 				),
 			)
-		} else {
+			return
+		}
+		card.appendChild(answer.eyebrow)
+		if (answer.summary)
+			card.appendChild(
+				element(doc, 'p', {
+					className: 'summary',
+					textContent: answer.summary,
+				}),
+			)
+		for (const diff of answer.diffs.slice(0, MAX_DIFFS)) {
+			const field = element(
+				doc,
+				'div',
+				{ className: 'diff-field' },
+				element(doc, 'span', {
+					className: 'diff-label',
+					textContent: diff.label,
+				}),
+				element(
+					doc,
+					'div',
+					{ className: 'diff' },
+					element(
+						doc,
+						'div',
+						{ className: 'before' },
+						element(doc, 'span', {
+							className: 'tag',
+							textContent: labels.before,
+						}),
+						value(diff.before),
+					),
+					element(
+						doc,
+						'div',
+						{ className: 'after' },
+						element(doc, 'span', {
+							className: 'tag',
+							textContent: labels.after,
+						}),
+						value(diff.after),
+					),
+				),
+			)
+			answer.details.push(field)
+			card.appendChild(field)
+		}
+		if (answer.diffs.length > MAX_DIFFS) {
+			const more = element(doc, 'p', {
+				className: 'more',
+				textContent: fill(labels.moreChanges, {
+					count: answer.diffs.length - MAX_DIFFS,
+				}),
+			})
+			answer.details.push(more)
+			card.appendChild(more)
+		}
+		if (answer.status === 'pending') {
+			const keep = button('button primary', labels.keep)
+			const retry = button('button secondary', labels.retry)
+			const back = button('button quiet', labels.undo)
+			keep.addEventListener('click', () => keepAll())
+			retry.addEventListener('click', () => void tryAnother(answer))
+			back.addEventListener('click', () => undoAnswer(answer))
+			answer.actions = element(
+				doc,
+				'div',
+				{ className: 'actions' },
+				keep,
+				retry,
+				back,
+			)
+			card.appendChild(answer.actions)
+		}
+	}
+
+	// Brings each card's eyebrow, actions and details in line with its
+	// status, touching only what changed.
+	const syncAnswers = () => {
+		const deciding = decidable()
+		for (const answer of answers) {
+			if (answer.status === 'working' || answer.status === 'failed') continue
+			answer.node.dataset.status = answer.status
 			const eyebrow =
 				answer.status === 'pending'
 					? labels.suggested
 					: answer.status === 'kept'
 						? labels.kept
 						: labels.undone
-			card.appendChild(
-				element(doc, 'p', { className: 'eyebrow', textContent: eyebrow }),
-			)
-			if (answer.summary)
-				card.appendChild(
-					element(doc, 'p', {
-						className: 'summary',
-						textContent: answer.summary,
-					}),
-				)
-			if (answer.status !== 'undone') {
-				for (const diff of answer.diffs.slice(0, MAX_DIFFS)) {
-					const value = (text: string) =>
-						element(doc, 'span', {
-							className: `value${text ? '' : ' none'}`,
-							textContent: text || labels.emptyValue,
-						})
-					card.appendChild(
-						element(
-							doc,
-							'div',
-							{ className: 'diff-field' },
-							element(doc, 'span', {
-								className: 'diff-label',
-								textContent: diff.label,
-							}),
-							element(
-								doc,
-								'div',
-								{ className: 'diff' },
-								element(
-									doc,
-									'div',
-									{ className: 'before' },
-									element(doc, 'span', {
-										className: 'tag',
-										textContent: labels.before,
-									}),
-									value(diff.before),
-								),
-								element(
-									doc,
-									'div',
-									{ className: 'after' },
-									element(doc, 'span', {
-										className: 'tag',
-										textContent: labels.after,
-									}),
-									value(diff.after),
-								),
-							),
-						),
-					)
-				}
-				if (answer.diffs.length > MAX_DIFFS)
-					card.appendChild(
-						element(doc, 'p', {
-							className: 'more',
-							textContent: fill(labels.moreChanges, {
-								count: answer.diffs.length - MAX_DIFFS,
-							}),
-						}),
-					)
-			}
-			// Only the newest suggestion is decided on; the ones before it go
-			// with it when it's kept.
-			if (deciding) {
-				const keep = button('button primary', labels.keep)
-				const retry = button('button secondary', labels.retry)
-				const back = button('button quiet', labels.undo)
-				keep.addEventListener('click', keepAll)
-				retry.addEventListener('click', () => void tryAnother(answer))
-				back.addEventListener('click', () => undoAnswer(answer))
-				card.appendChild(
-					element(doc, 'div', { className: 'actions' }, keep, retry, back),
-				)
-			}
+			if (answer.eyebrow.textContent !== eyebrow)
+				answer.eyebrow.textContent = eyebrow
+			if (answer.actions) answer.actions.hidden = answer !== deciding
+			for (const detail of answer.details)
+				detail.hidden = answer.status === 'undone'
 		}
-		const chip = element(doc, 'span', { className: 'chip' }, mark())
-		node.replaceChildren(chip, card)
 	}
-	const drawAnswers = () => answers.forEach(drawAnswer)
+
+	const addAnswer = (prompt: string, uid: string | null) => {
+		const card = element(
+			doc,
+			'div',
+			{ className: 'card' },
+			element(doc, 'span', {
+				className: 'visually-hidden',
+				textContent: `${labels.obelism}: `,
+			}),
+			element(
+				doc,
+				'p',
+				{ className: 'status-line' },
+				working(),
+				creating ? labels.creating : labels.working,
+			),
+		)
+		const node = element(
+			doc,
+			'div',
+			{ className: 'answer' },
+			element(doc, 'span', { className: 'chip' }, mark()),
+			card,
+		)
+		node.dataset.status = 'working'
+		const answer: Answer = {
+			prompt,
+			uid,
+			status: 'working',
+			summary: '',
+			diffs: [],
+			step: null,
+			node,
+			eyebrow: element(doc, 'p', { className: 'eyebrow' }),
+			actions: null,
+			details: [],
+		}
+		answers.push(answer)
+		log.appendChild(node)
+		return answer
+	}
 
 	const render = (state: BridgeState) => {
 		if (destroyed) return
@@ -1153,27 +1118,22 @@ export const mountSiteEditor = (
 		const storing = state.saving || state.publishing
 		const busy = state.prompting || storing
 		const shown = available && open
-		const canCreate = site && state.features.includes('create')
-		// A page of the site that isn't an entry (a hand-written /about) has
-		// nothing to edit: only New page…
-		const pageless = bridge.entryId === null
-		// …unless it shows a product (collection) without a page: then that
-		// first.
-		const shopHere =
-			!pageless || !canCreate
-				? null
-				: bridge.product
-					? ('product' as const)
-					: bridge.collection
-						? ('collection' as const)
-						: null
-		const onlyNew =
-			pageless && canCreate && !shopHere && !options.promptWithoutPage
+		const { site, canCreate, pageless, shopHere, onlyNew } = pageContext(
+			bridge,
+			state,
+			options.promptWithoutPage,
+		)
 		if (!canCreate) creating = false
 		if (onlyNew) creating = true
 		const hasForm =
 			site && !creating && !pageless && state.features.includes('form')
 		if (!hasForm) mode = 'ask'
+		const waiting = pending().length > 0
+		if (!waiting || mode === 'fields') gated = false
+		// Steps undone elsewhere (or saved away) aren't any answer's any more.
+		for (const answer of answers)
+			if (answer.step !== null && answer.step > (state.undoSteps ?? 0))
+				answer.step = null
 
 		root.hidden = !available && !site
 		panel.toggleAttribute('data-closed', !shown)
@@ -1188,17 +1148,19 @@ export const mountSiteEditor = (
 		exit.hidden = options.signOut === false
 
 		// The site beside the panel, wide enough; a sheet over it otherwise.
-		html.toggleAttribute('data-obelism-docked', shown && wide)
+		const docked = shown && wide
+		html.toggleAttribute('data-obelism-docked', docked)
+		html.style.setProperty('--obelism-dock', `${docked ? DOCK_WIDTH_PX : 0}px`)
 		const selecting = shown && outlines && !creating
 		if (state.selecting !== selecting) bridge.setSelecting(selecting)
 
 		const showForm = shown && mode === 'fields'
-		if (showForm && !formHandle) mountForm()
-		else if (!showForm && formHandle) unmountForm()
+		if (showForm && !formSlot.mounted) formSlot.mount()
+		else if (!showForm && formSlot.mounted) formSlot.unmount()
 
 		if (picking && !shown) picking = false
 		pageButtonText.textContent = pageTitle()
-		pageButton.hidden = pages === null && pagesError !== null
+		pageButton.hidden = picker.pages === null && picker.error !== null
 		pageName.hidden = !pageButton.hidden
 		pageName.textContent = pageTitle()
 		pageButton.setAttribute('aria-expanded', String(picking))
@@ -1217,6 +1179,8 @@ export const mountSiteEditor = (
 		askTab.disabled = fieldsTab.disabled = busy
 		askTab.tabIndex = mode === 'ask' ? 0 : -1
 		fieldsTab.tabIndex = mode === 'fields' ? 0 : -1
+		gate.hidden = !gated
+		gateKeep.disabled = gateUndo.disabled = busy
 		ask.hidden = mode !== 'ask'
 		fields.hidden = mode !== 'fields'
 
@@ -1239,22 +1203,11 @@ export const mountSiteEditor = (
 		cancelNew.hidden = !creating || onlyNew
 		intro.hidden = answers.length > 0 || offerShop || creating
 		shop.hidden = !offerShop
-		const shopCopy =
-			shopHere === 'collection'
-				? {
-						add: labels.addCollectionPage,
-						adding: labels.addingCollectionPage,
-						hint: labels.collectionPageHint,
-					}
-				: {
-						add: labels.addProductPage,
-						adding: labels.addingProductPage,
-						hint: labels.productPageHint,
-					}
+		const shopWords = shopCopy(labels, shopHere)
 		shopButtonText.textContent =
-			state.prompting && offerShop ? shopCopy.adding : shopCopy.add
+			state.prompting && offerShop ? shopWords.adding : shopWords.add
 		shopButton.disabled = busy
-		shopText.textContent = shopMessage?.text ?? shopCopy.hint
+		shopText.textContent = shopMessage?.text ?? shopWords.hint
 		shopText.className = shopMessage?.error ? 'failure' : 'summary'
 
 		composer.hidden = offerShop
@@ -1272,15 +1225,12 @@ export const mountSiteEditor = (
 		sendIcon.hidden = state.prompting
 		sendWorking.hidden = !state.prompting
 
-		const waiting = pending().length > 0
 		undo.hidden = waiting || !state.canUndo || creating
 		undo.disabled = busy
 		save.hidden = !state.features.includes('save') || pageless
 		save.disabled = busy || waiting || !state.unsaved
-		save.textContent = labels.saveDraft
 		publish.hidden = !state.features.includes('publish') || pageless
 		publish.disabled = busy || waiting
-		publish.textContent = labels.publish
 		if (options.actions)
 			options.actions.slot = shown ? 'actions-footer' : 'actions-bar'
 		foot.hidden = !site
@@ -1288,7 +1238,7 @@ export const mountSiteEditor = (
 		// New changes make the last save's word stale.
 		if (state.unsaved && !wasUnsaved) stored = null
 		wasUnsaved = state.unsaved
-		const saveIcon: Node | null = storing
+		const saveIcon: Node = storing
 			? working()
 			: stored?.kind === 'error'
 				? icon('alert')
@@ -1310,62 +1260,48 @@ export const mountSiteEditor = (
 								: stored?.kind === 'published'
 									? labels.published
 									: labels.upToDate
-		saveState.dataset.state = storing
+		const saveKind = storing
 			? 'saving'
 			: stored?.kind === 'error'
 				? 'error'
 				: waiting || state.unsaved
 					? 'unsaved'
 					: 'saved'
-		saveState.replaceChildren(
-			...(saveIcon ? [saveIcon] : []),
-			element(doc, 'span', { textContent: saveText }),
-		)
-		if (stored?.kind === 'error' && !storing) {
-			const action = stored.action
-			const retry = button('link', labels.tryAgain)
-			retry.addEventListener('click', () => void store(action))
-			saveState.appendChild(retry)
+		// Rewritten only when it says something new: it's a live region.
+		if (
+			saveState.dataset.state !== saveKind ||
+			saveState.dataset.text !== saveText
+		) {
+			saveState.dataset.state = saveKind
+			saveState.dataset.text = saveText
+			saveState.replaceChildren(
+				saveIcon,
+				element(doc, 'span', { textContent: saveText }),
+			)
+			if (stored?.kind === 'error' && !storing) {
+				const action = stored.action
+				const retry = button('link', labels.tryAgain)
+				retry.addEventListener('click', () => void store(action))
+				saveState.appendChild(retry)
+			}
 		}
 
-		formBox.classList.toggle('loading', formLoading || formError !== null)
-		formNote.hidden = !formLoading && formError === null
-		formNote.className = `form-note${formError !== null ? ' error' : ''}`
-		formNote.textContent = formError ?? labels.formLoading
+		formBox.classList.toggle(
+			'loading',
+			formSlot.loading || formSlot.error !== null,
+		)
+		formNote.hidden = !formSlot.loading && formSlot.error === null
+		formNote.className = `form-note${formSlot.error !== null ? ' error' : ''}`
+		formNote.textContent = formSlot.error ?? labels.formLoading
 
+		syncAnswers()
 		if (shown) {
 			readPageNames()
-			if (pages === null && pagesError === null) void fetchPages()
+			if (picker.pages === null && picker.error === null) void picker.fetch()
 		}
 		scheduleMarks()
 	}
 	const refresh = () => render(bridge.getState())
-
-	const mountForm = () => {
-		formLoading = true
-		formError = null
-		const handle = bridge.openForm(formBox, {
-			title: labels.formTitle,
-			onReady: () => {
-				if (formHandle !== handle) return
-				formLoading = false
-				refresh()
-			},
-			onError: (text) => {
-				if (formHandle !== handle) return
-				formLoading = false
-				formError = text
-				refresh()
-			},
-		})
-		formHandle = handle
-	}
-	const unmountForm = () => {
-		formHandle?.close()
-		formHandle = null
-		formLoading = false
-		formError = null
-	}
 
 	const grow = () => {
 		input.style.height = 'auto'
@@ -1392,14 +1328,17 @@ export const mountSiteEditor = (
 		}
 	}
 
-	const setMode = (next: 'ask' | 'fields', focus = true) => {
-		if (mode === next) return
-		// The form edits what's on the page: what Obelism suggested becomes
-		// the base, so undo stays the form's.
-		if (next === 'fields') keepAll()
+	const setMode = (next: 'ask' | 'fields') => {
+		if (next === 'fields' && pending().length > 0) {
+			gated = true
+			refresh()
+			gateKeep.focus()
+			return
+		}
+		gated = false
+		if (mode === next) return refresh()
 		mode = next
 		refresh()
-		if (focus) (next === 'ask' ? askTab : fieldsTab).focus()
 	}
 
 	const setCreating = (next: boolean) => {
@@ -1412,59 +1351,38 @@ export const mountSiteEditor = (
 
 	const setPicking = (next: boolean) => {
 		picking = next
-		if (picking) {
-			search.value = ''
-			active = Math.max(
-				0,
-				(pages ?? []).findIndex(({ entryId }) => entryId === bridge.entryId),
-			)
-			void fetchPages()
-			renderPages()
-		}
+		if (picking) picker.reset()
 		refresh()
-		;(picking ? search : pageButton).focus()
+		;(picking ? picker.search : pageButton).focus()
 	}
 
-	const choose = (page: SitePage) => {
-		if (page.entryId === bridge.entryId) return setPicking(false)
-		// Asks first when changes aren't saved; stays here if told no.
-		bridge.openPage(page)
+	// Escape, on the page or in the form: from the pages, from a block to the
+	// whole page. True when it did something.
+	const stepBack = () => {
+		const state = bridge.getState()
+		if (!panelShown(state)) return false
+		if (picking) setPicking(false)
+		else if (state.selectedUid) bridge.select(null)
+		else return false
+		return true
 	}
 
-	const keepAll = () => {
+	const keepAll = (focus = true) => {
 		const waiting = pending()
 		if (!waiting.length || !decidable()) return
 		waiting.forEach((answer) => {
 			answer.status = 'kept'
 		})
-		drawAnswers()
 		refresh()
-		input.focus()
+		if (focus) input.focus()
 	}
 
-	const undoAnswer = (answer: Answer) => {
+	const undoAnswer = (answer: Answer, focus = true) => {
 		if (answer !== decidable()) return
 		bridge.undo()
 		answer.status = 'undone'
-		drawAnswers()
 		refresh()
-		input.focus()
-	}
-
-	const addAnswer = (prompt: string, uid: string | null) => {
-		const answer: Answer = {
-			prompt,
-			uid,
-			status: 'working',
-			summary: '',
-			diffs: [],
-			node: element(doc, 'div', { className: 'answer' }),
-			drawn: '',
-		}
-		answers.push(answer)
-		drawAnswer(answer)
-		log.appendChild(answer.node)
-		return answer
+		if (focus) input.focus()
 	}
 
 	// Runs a prompt on `uid` (null: the page) and shows what it changed. The
@@ -1475,6 +1393,7 @@ export const mountSiteEditor = (
 		const before = await bridge.view(scope).catch(() => null)
 		try {
 			const { summary } = await bridge.prompt(text, scope)
+			answer.step = bridge.getState().undoSteps ?? null
 			const after = before ? await bridge.view(scope).catch(() => null) : null
 			answer.summary = summary
 			answer.diffs = before && after ? diffViews(before, after) : []
@@ -1483,7 +1402,7 @@ export const mountSiteEditor = (
 			answer.summary = failure(error)
 			answer.status = 'failed'
 		}
-		drawAnswers()
+		answered(answer)
 		refresh()
 		scrollDown()
 	}
@@ -1493,7 +1412,6 @@ export const mountSiteEditor = (
 		bridge.undo()
 		answer.status = 'undone'
 		const next = addAnswer(answer.prompt, answer.uid)
-		drawAnswers()
 		refresh()
 		scrollDown()
 		input.focus()
@@ -1533,15 +1451,14 @@ export const mountSiteEditor = (
 			try {
 				// The bridge opens the new page; this shows until it does.
 				await bridge.createPage(path, prompt)
-				pages = null
-				pagesLoad = null
+				picker.forget()
 				answer.summary = labels.created
 				answer.status = 'kept'
 			} catch (error) {
 				answer.summary = failure(error)
 				answer.status = 'failed'
 			}
-			drawAnswers()
+			answered(answer)
 			refresh()
 		} else {
 			await runPrompt(answer, prompt)
@@ -1551,29 +1468,10 @@ export const mountSiteEditor = (
 
 	const store = async (action: 'save' | 'publish') => {
 		stored = null
-		try {
-			await bridge[action]()
-			stored = { kind: action === 'save' ? 'saved' : 'published' }
-		} catch (error) {
-			stored = { kind: 'error', action, text: failure(error) }
-		}
-		refresh()
-	}
-
-	const addShopPage = async () => {
-		shopMessage = null
-		try {
-			// The bridge reloads the page; this shows until it does.
-			if (bridge.product) {
-				await bridge.createProductPage()
-				shopMessage = { text: labels.addedProductPage, error: false }
-			} else {
-				await bridge.createCollectionPage()
-				shopMessage = { text: labels.addedCollectionPage, error: false }
-			}
-		} catch (error) {
-			shopMessage = { text: failure(error), error: true }
-		}
+		const error = await storeChanges(bridge, action)
+		stored = error
+			? { kind: 'error', action, text: error }
+			: { kind: action === 'save' ? 'saved' : 'published' }
 		refresh()
 	}
 
@@ -1591,24 +1489,54 @@ export const mountSiteEditor = (
 		bridge.select(null)
 		input.focus()
 	})
-	shopButton.addEventListener('click', () => void addShopPage())
+	shopButton.addEventListener('click', async () => {
+		shopMessage = null
+		shopMessage = await addShopPage(bridge, labels)
+		refresh()
+	})
 	askTab.addEventListener('click', () => setMode('ask'))
 	fieldsTab.addEventListener('click', () => setMode('fields'))
+	// Arrows move focus between the tabs; Enter or Space (a click) opens one.
 	tabs.addEventListener('keydown', (event) => {
 		if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
 		event.preventDefault()
-		const next =
+		const onAsk = shadow.activeElement === askTab
+		const target =
 			event.key === 'Home'
-				? 'ask'
+				? askTab
 				: event.key === 'End'
-					? 'fields'
-					: mode === 'ask'
-						? 'fields'
-						: 'ask'
-		setMode(next)
+					? fieldsTab
+					: onAsk
+						? fieldsTab
+						: askTab
+		target.focus()
+	})
+	gateKeep.addEventListener('click', () => {
+		keepAll(false)
+		setMode('fields')
+		fieldsTab.focus()
+	})
+	gateUndo.addEventListener('click', () => {
+		for (let answer = decidable(); answer; answer = decidable())
+			undoAnswer(answer, false)
+		setMode('fields')
+		fieldsTab.focus()
 	})
 	undo.addEventListener('click', () => {
+		const step = bridge.getState().undoSteps
+		const answer =
+			step === undefined
+				? undefined
+				: answers.find(
+						(candidate) =>
+							candidate.status === 'kept' && candidate.step === step,
+					)
 		bridge.undo()
+		if (answer) {
+			answer.status = 'undone'
+			refresh()
+			announce(`${labels.undone}: ${answer.summary}`)
+		}
 		if (undo.hidden) input.focus()
 	})
 	save.addEventListener('click', () => void store('save'))
@@ -1634,39 +1562,10 @@ export const mountSiteEditor = (
 			input.focus()
 		}
 	})
-	search.addEventListener('input', () => {
-		active = 0
-		renderPages()
-	})
-	search.addEventListener('keydown', (event) => {
-		const count = optionList.children.length
-		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-			event.preventDefault()
-			if (count === 0) return
-			active = (active + (event.key === 'ArrowDown' ? 1 : -1) + count) % count
-			renderPages()
-		} else if (event.key === 'Enter' && !event.isComposing) {
-			event.preventDefault()
-			const page = matching()[active]
-			if (page) choose(page)
-		} else if (event.key === 'Escape') {
-			event.preventDefault()
-			setPicking(false)
-		}
-	})
 
-	// Escape steps back: from the pages, from a block to the whole page.
 	const onKeydown = (event: KeyboardEvent) => {
 		if (event.key !== 'Escape' || event.defaultPrevented) return
-		const state = bridge.getState()
-		if (!panelShown(state)) return
-		if (picking) {
-			event.preventDefault()
-			setPicking(false)
-		} else if (state.selectedUid) {
-			event.preventDefault()
-			bridge.select(null)
-		}
+		if (stepBack()) event.preventDefault()
 	}
 	doc.addEventListener('keydown', onKeydown)
 
@@ -1717,7 +1616,7 @@ export const mountSiteEditor = (
 	return () => {
 		destroyed = true
 		unsubscribe()
-		unmountForm()
+		formSlot.unmount()
 		if (frame !== null) win?.cancelAnimationFrame?.(frame)
 		doc.removeEventListener('keydown', onKeydown)
 		doc.removeEventListener('pointerover', onPointerOver)
@@ -1730,6 +1629,7 @@ export const mountSiteEditor = (
 		bridge.setSelecting(false)
 		html.removeAttribute('data-obelism-editor')
 		html.removeAttribute('data-obelism-docked')
+		html.style.removeProperty('--obelism-dock')
 		pageStyle.remove()
 		host.remove()
 	}

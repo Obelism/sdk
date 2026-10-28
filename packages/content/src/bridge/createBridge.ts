@@ -55,6 +55,8 @@ export type BridgeState = {
 	prompting: boolean
 	// The editor can undo the last prompt.
 	canUndo: boolean
+	// Editing on the site: how many steps `undo()` can take back.
+	undoSteps?: number | undefined
 	// Editing on the site: prompts changed content that isn't saved yet.
 	unsaved: boolean
 	// Editing on the site: a save or publish is running.
@@ -105,6 +107,8 @@ export type FormOptions = {
 	onReady?: (() => void) | undefined
 	// It couldn't open, or the CMS reports a problem in it.
 	onError?: ((message: string) => void) | undefined
+	// Escape was pressed in it (from CMS versions that say so).
+	onEscape?: (() => void) | undefined
 }
 
 export type FormHandle = {

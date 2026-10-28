@@ -67,6 +67,7 @@ const fakeBridge = () => {
 							prompting: false,
 							unsaved: history.length > 0,
 							canUndo: history.length > 0,
+							undoSteps: history.length,
 						})
 						if (value instanceof Error) reject(value)
 						else resolve(value)
@@ -109,7 +110,11 @@ const fakeBridge = () => {
 		undo: vi.fn(() => {
 			const last = history.pop()
 			if (last !== undefined) title = last
-			setState({ unsaved: history.length > 0, canUndo: history.length > 0 })
+			setState({
+				unsaved: history.length > 0,
+				canUndo: history.length > 0,
+				undoSteps: history.length,
+			})
 		}),
 		save: vi.fn(async () => setState({ unsaved: false })),
 		publish: vi.fn(async () => {
@@ -132,8 +137,8 @@ const shadow = () =>
 	document.querySelector('[data-obelism-content-editor]')!.shadowRoot!
 const $ = <T extends Element = HTMLElement>(selector: string) =>
 	shadow().querySelector<T>(selector)!
-const button = (text: string) =>
-	[...shadow().querySelectorAll('button')].find(
+const button = (text: string, scope = '') =>
+	[...shadow().querySelectorAll<HTMLButtonElement>(`${scope} button`)].find(
 		(node) => node.textContent?.trim() === text,
 	)!
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -292,18 +297,26 @@ describe('mountSiteEditor', () => {
 			'Keep or undo the suggestion to save',
 		)
 
-		button('Keep it').click()
+		const summary = $('.answer .summary')
+		button('Keep it', '.answer').click()
 		expect($('.answer').dataset.status).toBe('kept')
 		expect($('.answer .eyebrow').textContent).toBe('Kept')
-		expect(shadow().querySelector('.answer .actions')).toBeNull()
+		expect($('.answer .actions').hidden).toBe(true)
+		// Updated in place, so the log doesn't read the card out again.
+		expect($('.answer .summary')).toBe(summary)
 		expect(button('Save draft').disabled).toBe(false)
 		expect($('.save-state').textContent).toBe('Unsaved changes')
 
-		// Undo reverts the last kept change.
-		button('Undo').click()
+		// Undo reverts the last kept change, and says so on its card.
+		button('Undo', '.foot').click()
 		expect(bridge.undo).toHaveBeenCalledTimes(1)
 		expect(bridge.getState().unsaved).toBe(false)
 		expect($('.save-state').textContent).toBe('No unsaved changes')
+		expect($('.answer').dataset.status).toBe('undone')
+		expect($('.answer .eyebrow').textContent).toBe('Undone')
+		expect($('.panel > [role="status"]').textContent).toBe(
+			'Undone: A warmer title.',
+		)
 	})
 
 	it('undoes a suggestion, or tries another', async () => {
@@ -332,9 +345,12 @@ describe('mountSiteEditor', () => {
 			).toEqual(['undone', 'pending']),
 		)
 
-		const undoButtons = [...shadow().querySelectorAll('.answer button')].filter(
-			(node) => node.textContent === 'Undo',
-		)
+		const undoButtons = [
+			...shadow().querySelectorAll<HTMLElement>('.answer .actions'),
+		]
+			.filter((actions) => !actions.hidden)
+			.flatMap((actions) => [...actions.querySelectorAll('button')])
+			.filter((node) => node.textContent === 'Undo')
 		expect(undoButtons).toHaveLength(1)
 		;(undoButtons[0] as HTMLButtonElement).click()
 		expect(bridge.undo).toHaveBeenCalledTimes(2)
@@ -357,7 +373,7 @@ describe('mountSiteEditor', () => {
 		)
 	})
 
-	it('edits fields in the CMS’s form, keeping what was suggested', async () => {
+	it('asks to keep or undo a suggestion before editing fields', async () => {
 		const { bridge, setState, answer, forms } = fakeBridge()
 		unmount = mountSiteEditor(document, bridge)
 		setState({ features: ['prompt', 'form', 'save'] })
@@ -369,19 +385,101 @@ describe('mountSiteEditor', () => {
 		await vi.waitFor(() => expect($('.answer').dataset.status).toBe('pending'))
 
 		button('Edit fields').click()
-		expect($('.answer').dataset.status).toBe('kept')
+		expect($('.gate').hidden).toBe(false)
+		expect($('.gate').textContent).toContain(
+			'Keep or undo the suggestion before editing fields.',
+		)
+		expect(shadow().activeElement).toBe(button('Keep it', '.gate'))
+		expect($('.answer').dataset.status).toBe('pending')
+		expect(button('Edit fields').getAttribute('aria-selected')).toBe('false')
+		expect(forms).toHaveLength(0)
+
+		button('Undo', '.gate').click()
+		expect(bridge.undo).toHaveBeenCalledTimes(1)
+		expect($('.answer').dataset.status).toBe('undone')
+		expect($('.gate').hidden).toBe(true)
 		expect(button('Edit fields').getAttribute('aria-selected')).toBe('true')
 		expect($('.ask').hidden).toBe(true)
 		expect(forms).toHaveLength(1)
 		expect($('.form-note').textContent).toBe('Opening the form…')
 		forms[0]!.options.onReady?.()
 		expect($('.form-note').hidden).toBe(true)
+	})
 
+	it('moves between the tabs with the arrows, opening one on Enter', () => {
+		const { bridge, setState, forms } = fakeBridge()
+		unmount = mountSiteEditor(document, bridge)
+		setState({ features: ['prompt', 'form'] })
+		button('Ask').focus()
 		$('[role="tablist"]').dispatchEvent(
-			new KeyboardEvent('keydown', { key: 'ArrowLeft' }),
+			new KeyboardEvent('keydown', { key: 'ArrowRight' }),
 		)
+		expect(shadow().activeElement).toBe(button('Edit fields'))
 		expect(button('Ask').getAttribute('aria-selected')).toBe('true')
+		expect(forms).toHaveLength(0)
+
+		// Enter and Space click a button.
+		button('Edit fields').click()
+		expect(button('Edit fields').getAttribute('aria-selected')).toBe('true')
+		$('[role="tablist"]').dispatchEvent(
+			new KeyboardEvent('keydown', { key: 'Home' }),
+		)
+		expect(shadow().activeElement).toBe(button('Ask'))
+		button('Ask').click()
 		expect(forms[0]!.frame.isConnected).toBe(false)
+	})
+
+	it('steps back on Escape in the form too', () => {
+		const { bridge, setState, forms } = fakeBridge()
+		unmount = mountSiteEditor(document, bridge)
+		setState({ features: ['prompt', 'form'] })
+		bridge.select('hero_1')
+		button('Edit fields').click()
+		forms[0]!.options.onEscape?.()
+		expect(bridge.select).toHaveBeenLastCalledWith(null)
+	})
+
+	it('washes the previewed block and names its page', async () => {
+		document.title = 'Home page'
+		const { bridge, setState, answer } = fakeBridge()
+		bridge.pages.mockRejectedValue(new Error('No'))
+		unmount = mountSiteEditor(document, bridge)
+		setState({ features: ['prompt'] })
+		const hero = document.querySelector('h1')!
+		hero.getBoundingClientRect = () =>
+			({
+				top: 100,
+				left: 40,
+				right: 440,
+				bottom: 300,
+				width: 400,
+				height: 200,
+			}) as DOMRect
+		bridge.select('hero_1')
+		type('Warmer')
+		await vi.waitFor(() => expect(bridge.prompt).toHaveBeenCalled())
+		answer({ summary: 'Warmer.' })
+		await vi.waitFor(() => expect($('.wash .box.fill')).not.toBeNull())
+		expect($('.layer .accent-chip').textContent).toBe('Hero title · preview')
+		expect($('.layer .ink-chip').textContent).toBe('Home page')
+	})
+
+	it('tells the site how much room the panel takes', () => {
+		document.body.innerHTML +=
+			'<header data-obelism-dock style="position: fixed; right: 0">Cart</header>'
+		const { bridge, setState } = fakeBridge()
+		unmount = mountSiteEditor(document, bridge)
+		setState({ features: ['prompt'] })
+		const style = document.documentElement.style
+		expect(style.getPropertyValue('--obelism-dock')).toBe('436px')
+		expect(getComputedStyle(document.querySelector('header')!).right).toBe(
+			'436px',
+		)
+		$<HTMLButtonElement>('.head .icon-button').click()
+		expect(style.getPropertyValue('--obelism-dock')).toBe('0px')
+		expect(getComputedStyle(document.querySelector('header')!).right).toBe(
+			'0px',
+		)
 	})
 
 	it('goes to another page from the header', async () => {
@@ -521,5 +619,8 @@ describe('mountSiteEditor', () => {
 		expect(document.documentElement.hasAttribute('data-obelism-docked')).toBe(
 			false,
 		)
+		expect(
+			document.documentElement.style.getPropertyValue('--obelism-dock'),
+		).toBe('')
 	})
 })

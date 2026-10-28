@@ -155,7 +155,10 @@ Optional integration syncs the datafile to Vercel Edge Config (`@vercel/edge-con
     editor (`bridge/siteEditor.ts`, `mountSiteEditor`) instead of the prompt
     box: a panel docked beside the site (Ask, Edit fields = the form frame,
     answers previewed until kept), block names drawn on the page, a launcher.
-    The prompt box stays for the visual editor and Content's canvas
+    The prompt box stays for the visual editor and Content's canvas. What
+    both share is in `bridge/labels.ts` (`SharedLabels`, then
+    `PromptLabels` / `SiteEditorLabels`), `dom.ts` (icons, marks),
+    `pagesPicker.ts`, `formSlot.ts` and `siteActions.ts`: fix it there
   - On the site the bridge also edits JSON (`bridge.view()` /
     `applyJson()`, the CMS's `/api/site/v1/entries/{id}/view|apply`) and
     lists the pages (`bridge.pages()` / `openPage()`, `GET pages`)

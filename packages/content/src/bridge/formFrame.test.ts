@@ -21,7 +21,12 @@ const CONTENT = {
 const setup = () => {
 	const container = document.createElement('div')
 	document.body.appendChild(container)
-	const handlers = { onReady: vi.fn(), onChange: vi.fn(), onError: vi.fn() }
+	const handlers = {
+		onReady: vi.fn(),
+		onChange: vi.fn(),
+		onError: vi.fn(),
+		onEscape: vi.fn(),
+	}
 	const frame = mountFormFrame(window, container, FORM_URL, 'Form', handlers)
 	const iframe = container.querySelector('iframe')!
 	const postMessage = vi.spyOn(iframe.contentWindow!, 'postMessage')
@@ -44,6 +49,20 @@ afterEach(() => {
 })
 
 describe('mountFormFrame', () => {
+	it('says when Escape was pressed in the form, from the form only', () => {
+		const setUp = setup()
+		frame = setUp.frame
+		const { handlers, receive } = setUp
+		receive(
+			{ source: FORM_SOURCE, type: 'escape' },
+			{ origin: 'https://evil.test' },
+		)
+		receive({ source: FORM_SOURCE, type: 'escape' }, { source: window })
+		expect(handlers.onEscape).not.toHaveBeenCalled()
+		receive({ source: FORM_SOURCE, type: 'escape' })
+		expect(handlers.onEscape).toHaveBeenCalledTimes(1)
+	})
+
 	it('opens the form, and sends it the content once it is ready', () => {
 		const setUp = setup()
 		frame = setUp.frame
