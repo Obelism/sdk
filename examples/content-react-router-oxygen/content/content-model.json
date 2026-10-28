@@ -1,0 +1,174 @@
+{
+	"$schema": "https://content.obelism.studio/schema/content-model.v1.json",
+	"version": 1,
+	"contentTypes": [
+		{
+			"apiId": "hero",
+			"name": "Hero",
+			"kind": "block",
+			"description": "The opening section of a page: an eyebrow, heading, text, image and one call to action.",
+			"accent": "lilac",
+			"groups": [
+				{
+					"id": "fields",
+					"fieldIds": [
+						"eyebrow",
+						"heading",
+						"text",
+						"image",
+						"ctaLabel",
+						"ctaHref"
+					]
+				}
+			],
+			"fields": [
+				{
+					"apiId": "eyebrow",
+					"name": "Eyebrow",
+					"type": "text",
+					"localized": true
+				},
+				{
+					"apiId": "heading",
+					"name": "Heading",
+					"type": "text",
+					"required": true,
+					"localized": true
+				},
+				{
+					"apiId": "text",
+					"name": "Text",
+					"type": "textarea",
+					"localized": true
+				},
+				{
+					"apiId": "image",
+					"name": "Image",
+					"type": "asset",
+					"mimeTypes": ["image/"]
+				},
+				{
+					"apiId": "ctaLabel",
+					"name": "Call to action label",
+					"type": "text",
+					"localized": true
+				},
+				{
+					"apiId": "ctaHref",
+					"name": "Call to action URL",
+					"type": "text"
+				}
+			]
+		},
+		{
+			"apiId": "mediaShowcase",
+			"name": "Media showcase",
+			"kind": "block",
+			"description": "Content assets at several widths, a private file and a product-tagged image with hotspots.",
+			"accent": "lilac",
+			"groups": [
+				{
+					"id": "fields",
+					"fieldIds": ["heading", "body", "image", "privateFile", "gallery"]
+				}
+			],
+			"fields": [
+				{
+					"apiId": "heading",
+					"name": "Heading",
+					"type": "text",
+					"localized": true
+				},
+				{
+					"apiId": "body",
+					"name": "Body",
+					"type": "textarea",
+					"localized": true
+				},
+				{
+					"apiId": "image",
+					"name": "Image",
+					"type": "asset",
+					"mimeTypes": ["image/"]
+				},
+				{
+					"apiId": "privateFile",
+					"name": "Private file",
+					"type": "asset"
+				},
+				{
+					"apiId": "gallery",
+					"name": "Gallery",
+					"type": "asset",
+					"multiple": true,
+					"mimeTypes": ["image/"]
+				}
+			]
+		},
+		{
+			"apiId": "page",
+			"name": "Page",
+			"kind": "page",
+			"description": "A storefront page built from hero, text and media blocks.",
+			"accent": "butter",
+			"groups": [
+				{
+					"id": "fields",
+					"fieldIds": ["title", "seoDescription"]
+				},
+				{
+					"id": "blocks-body",
+					"fieldIds": ["body"]
+				}
+			],
+			"fields": [
+				{
+					"apiId": "title",
+					"name": "Title",
+					"type": "text",
+					"required": true,
+					"localized": true
+				},
+				{
+					"apiId": "seoDescription",
+					"name": "SEO description",
+					"type": "textarea",
+					"localized": true
+				},
+				{
+					"apiId": "body",
+					"name": "Body",
+					"type": "blocks",
+					"allowedBlocks": ["hero", "richText", "mediaShowcase"]
+				}
+			]
+		},
+		{
+			"apiId": "richText",
+			"name": "Text",
+			"kind": "block",
+			"description": "A heading and a rich text block.",
+			"accent": "lilac",
+			"groups": [
+				{
+					"id": "fields",
+					"fieldIds": ["heading", "text"]
+				}
+			],
+			"fields": [
+				{
+					"apiId": "heading",
+					"name": "Heading",
+					"type": "text",
+					"localized": true
+				},
+				{
+					"apiId": "text",
+					"name": "Text",
+					"type": "richtext",
+					"localized": true
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,29 @@
+import { createContext } from 'react-router'
+
+export type Env = {
+	MOCK_SHOP?: string
+	PRIVATE_STOREFRONT_API_TOKEN?: string
+	PUBLIC_STOREFRONT_API_TOKEN?: string
+	PUBLIC_CHECKOUT_DOMAIN?: string
+	PUBLIC_STORE_DOMAIN?: string
+	PUBLIC_STOREFRONT_ID?: string
+	PUBLIC_CUSTOMER_ACCOUNT_API_CLIENT_ID?: string
+	SESSION_SECRET?: string
+	SHOP_ID?: string
+
+	CONTENT_DELIVERY_TOKEN?: string
+	CONTENT_SPACE_ID?: string
+	CONTENT_ENVIRONMENT?: 'develop' | 'staging' | 'production'
+
+	IMPROVE_ORGANIZATION_ID?: string
+	IMPROVE_SPACE_ID?: string
+	IMPROVE_ENVIRONMENT?: 'develop' | 'staging' | 'production'
+	IMPROVE_API_TOKEN?: string
+
+	NUMBERS_ORGANIZATION_ID?: string
+	NUMBERS_SPACE_ID?: string
+	NUMBERS_ENVIRONMENT?: 'develop' | 'staging' | 'production'
+	NUMBERS_API_TOKEN?: string
+}
+
+export const envContext = createContext<Env>()

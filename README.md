@@ -35,6 +35,7 @@ a site and A/B test a block. See [its README](plugin/README.md).
 - `improve-nextjs-vercel`: the same with Vercel Edge Config; [preview](https://nextjs-vercel.improve.obelism.studio)
 - `improve-nextjs-rsc`: resolving the variant in a React Server Component; [preview](https://nextjs-rsc.improve.obelism.studio)
 - `content-nextjs`: a Next.js site with the Content SDKs and live preview in the visual editor
+- `content-react-router-oxygen`: a React Router 7 + Hydrogen storefront on Shopify Oxygen, with Content, Improve, numbers, media and the Storefront API
 
 ## Development
 
