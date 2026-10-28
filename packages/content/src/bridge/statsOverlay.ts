@@ -36,14 +36,14 @@ const fill = (template: string, values: Record<string, string | number>) =>
 		key in values ? String(values[key]) : match,
 	)
 
-// The same tokens as the prompt box: near-black pill, beige text, the orange
+// The same tokens as the prompt box: an ink pill, paper text, the orange
 // accent for the rate.
 const CSS = `
 :host { all: initial; }
 .layer {
 	position: fixed; inset: 0; pointer-events: none;
 	z-index: 2147483646;
-	font: 600 12px/1 'InterVariable', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	font: 600 12px/1 'Geist', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	-webkit-font-smoothing: antialiased;
 }
 .badge {
@@ -51,8 +51,8 @@ const CSS = `
 	display: inline-flex; gap: 6px; align-items: center;
 	padding: 6px 10px; white-space: nowrap; cursor: pointer;
 	pointer-events: auto; border: 0;
-	color: rgb(238 236 233); background: rgb(12 12 12 / .88);
-	border-radius: 5em; box-shadow: 0 6px 16px -8px rgb(12 12 12 / .5);
+	color: rgb(242 240 236); background: rgb(23 22 20 / .88);
+	border-radius: 5em; box-shadow: 0 6px 16px -8px rgb(23 22 20 / .5);
 	font: inherit;
 }
 .badge::before {

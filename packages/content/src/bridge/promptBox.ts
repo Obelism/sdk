@@ -174,31 +174,27 @@ const ICONS = {
 }
 
 // Obelism's design tokens (obelism.studio/design.md), under their own names:
-// beige and near-black, one orange accent, Inter, pill buttons.
+// warm paper and ink, one orange accent, Geist, pill buttons.
 const CSS = `
 :host { all: initial; }
 * { box-sizing: border-box; font: inherit; color: inherit; margin: 0; }
 .root {
-	--color-white-rgb: 248 248 248; --color-beige-rgb: 238 236 233; --color-beige-off-rgb: 228 225 217;
-	--color-grey-light-rgb: 132 132 132; --color-grey-rgb: 108 108 108; --color-grey-mid-rgb: 100 100 100; --color-grey-dark-rgb: 40 40 40;
-	--color-black-off-rgb: 20 20 20; --color-black-rgb: 12 12 12;
-	--color-orange-rgb: 212 130 30; --color-red-rgb: 240 93 93;
-	--theme-foreground-rgb: var(--color-black-rgb);
-	--theme-background-alt-rgb: var(--color-white-rgb);
-	--theme-background-actions-rgb: var(--color-beige-off-rgb);
-	--theme-border-rgb: var(--color-grey-light-rgb);
-	--theme-accent-rgb: var(--color-orange-rgb);
-	--theme-foreground-muted-rgb: var(--color-grey-mid-rgb);
-	--theme-error: #b3261e;
+	--theme-foreground-rgb: 23 22 20;
+	--theme-background-alt-rgb: 255 255 255;
+	--theme-background-actions-rgb: 232 229 223;
+	--theme-border-rgb: 138 132 124;
+	--theme-accent-rgb: 212 130 30;
+	--theme-foreground-muted-rgb: 105 100 94;
+	--theme-error: rgb(184 46 46);
 	--border-radius-medium: 20px; --border-radius-pill: 5em;
 	--ease-roll: cubic-bezier(0.65, 0, 0.35, 1);
-	--shadow: 0 18px 40px -16px rgb(var(--color-black-rgb) / .3), 0 2px 6px rgb(var(--color-black-rgb) / .05);
-	--font-inter: 'InterVariable', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-		Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+	--shadow: 0 0 0 1px rgb(23 22 20 / .08), 0 12px 32px rgb(23 22 20 / .14);
+	--font-base: 'Geist', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+		Roboto, 'Helvetica Neue', Arial, sans-serif;
 	position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
 	transition: translate .45s cubic-bezier(0.34, 1.3, 0.64, 1);
 	z-index: 2147483647; width: min(640px, calc(100vw - 32px)); color-scheme: light dark;
-	font: 400 14px/1.4 var(--font-inter); color: rgb(var(--theme-foreground-rgb));
+	font: 400 14px/1.4 var(--font-base); color: rgb(var(--theme-foreground-rgb));
 	-webkit-font-smoothing: antialiased;
 }
 /* Dragged to a side of the screen, it stays there, springing into place. */
@@ -212,13 +208,13 @@ const CSS = `
 .pill { touch-action: none; }
 @media (prefers-color-scheme: dark) {
 	.root {
-		--theme-foreground-rgb: var(--color-white-rgb);
-		--theme-background-alt-rgb: var(--color-black-off-rgb);
-		--theme-background-actions-rgb: var(--color-grey-dark-rgb);
-		--theme-border-rgb: var(--color-grey-rgb);
-		--theme-foreground-muted-rgb: var(--color-grey-light-rgb);
-		--theme-error: rgb(var(--color-red-rgb));
-		--shadow: 0 18px 40px -14px rgb(0 0 0 / .7), 0 2px 6px rgb(0 0 0 / .3);
+		--theme-foreground-rgb: 242 240 236;
+		--theme-background-alt-rgb: 27 26 24;
+		--theme-background-actions-rgb: 45 43 40;
+		--theme-border-rgb: 112 108 102;
+		--theme-foreground-muted-rgb: 160 154 146;
+		--theme-error: rgb(240 110 110);
+		--shadow: 0 0 0 1px rgb(255 255 255 / .06), 0 12px 32px rgb(0 0 0 / .5);
 	}
 }
 .icon { display: inline-flex; flex: none; }
@@ -359,7 +355,7 @@ button.chip:disabled { opacity: .5; }
 .modes button:hover { color: rgb(var(--theme-foreground-rgb)); }
 .modes button[aria-pressed='true'] {
 	background: rgb(var(--theme-background-alt-rgb)); color: rgb(var(--theme-foreground-rgb));
-	box-shadow: 0 1px 2px rgb(var(--color-black-rgb) / .08);
+	box-shadow: 0 1px 2px rgb(23 22 20 / .08);
 }
 .divider { width: 1px; height: 20px; background: rgb(var(--theme-border-rgb) / .3); margin: 0 4px; }
 
