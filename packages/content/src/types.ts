@@ -192,7 +192,30 @@ type BaseField = {
 	description?: string
 	required?: boolean
 	localized?: boolean
+	// Edited in a plugin's field editor instead of the CMS's own; not on
+	// blocks fields.
+	editor?: { plugin: string; config?: Record<string, unknown> }
+	when?: FieldCondition
 }
+
+// Shown in the editor only while an earlier, non-localized field of the same
+// type holds a value. Exactly one of equals, in and filled.
+export type FieldCondition = {
+	field: string
+	equals?: boolean | string
+	in?: string[]
+	filled?: true
+}
+
+// A section of the entry editor: fields by apiId, kept in the order of
+// `fields`. Without a label the CMS names it in the editor's language.
+export type FieldGroup = {
+	id: string
+	label?: string
+	fieldIds: string[]
+}
+
+export type ContentTypeAccent = 'coral' | 'butter' | 'lilac' | 'sky' | 'mint'
 
 export type FieldDefinition = BaseField &
 	(
@@ -284,6 +307,13 @@ export type ContentTypeDefinition = {
 	// A picture of the type for the CMS's block picker: an https URL or a
 	// media asset id (`asset_…`).
 	previewImage?: string | null
+	// The tile in the CMS: its tint and one or two characters. Null or left
+	// out: the kind's tint, the name's first letters.
+	accent?: ContentTypeAccent | null
+	code?: string | null
+	// Left out: the CMS keeps an existing type's groups, gives a new one the
+	// default.
+	groups?: FieldGroup[]
 	fields: FieldDefinition[]
 }
 
