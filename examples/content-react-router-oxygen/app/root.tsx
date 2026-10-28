@@ -21,6 +21,7 @@ import {
 } from '~/components/AnalyticsTrackers'
 import { AnnouncementBar } from '~/components/AnnouncementBar'
 import { CartDrawer } from '~/components/CartDrawer'
+import { NumbersTracker } from '~/components/numbers-tracker'
 import { Footer } from '~/components/Footer'
 import { Header } from '~/components/Header'
 import { SearchDrawer } from '~/components/SearchDrawer'
@@ -189,15 +190,6 @@ export function Layout({ children }: { children: ReactNode }) {
 				) : null}
 				<Meta />
 				<Links />
-				{rootData?.numbers.organizationId && !rootData.isDraft ? (
-					<script
-						defer
-						src="https://numbers.obelism.studio/script.js"
-						data-organization={rootData.numbers.organizationId}
-						data-space={rootData.numbers.spaceId}
-						data-environment={rootData.numbers.environment}
-					/>
-				) : null}
 			</head>
 			<body className="bg-surface text-on-surface font-body flex min-h-svh flex-col antialiased">
 				<ContentBridge />
@@ -217,10 +209,18 @@ export function Layout({ children }: { children: ReactNode }) {
 
 export default function App({ loaderData }: Route.ComponentProps) {
 	// The provider's effect reads this when it creates the browser client.
+	// Env is fixed per deployment, so isolates never race with different values.
 	setImproveConfig(loaderData.obelism)
 
 	return (
 		<ImproveProvider>
+			{loaderData.numbers.organizationId && !loaderData.isDraft ? (
+				<NumbersTracker
+					organizationId={loaderData.numbers.organizationId}
+					spaceId={loaderData.numbers.spaceId}
+					environment={loaderData.numbers.environment}
+				/>
+			) : null}
 			<CartProvider initialData={loaderData.cartData}>
 				<PageViewedTracker />
 				<CartAnalyticsTracker />

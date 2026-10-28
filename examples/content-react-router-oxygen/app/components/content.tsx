@@ -236,9 +236,3 @@ export function ContentPage({
 		</div>
 	)
 }
-
-// The small print a draft response needs: never cached, never indexed.
-export const draftHeaders = (headers: Headers) => {
-	headers.set('Cache-Control', 'private, no-store')
-	headers.set('X-Robots-Tag', 'noindex')
-}

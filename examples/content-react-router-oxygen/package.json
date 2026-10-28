@@ -13,8 +13,8 @@
 		"lint": "react-router typegen && tsc --noEmit"
 	},
 	"dependencies": {
-		"@obelism/content": "^0.26.0",
-		"@obelism/content-react": "^0.4.6",
+		"@obelism/content": "^0.27.1",
+		"@obelism/content-react": "^0.4.7",
 		"@obelism/improve-sdk": "^3.3.0",
 		"@obelism/improve-sdk-react": "^1.1.1",
 		"@obelism/numbers-sdk": "^0.2.0",

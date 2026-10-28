@@ -1,5 +1,7 @@
 import { ImproveServerSDK } from '@obelism/improve-sdk/server'
 
+import { readCookie } from './cookies'
+
 import type { Env } from './env'
 
 let sdk: ImproveServerSDK | undefined
@@ -15,12 +17,6 @@ export const getImprove = (env: Env) => {
 		token: env.IMPROVE_API_TOKEN,
 	}))
 }
-
-export const readCookie = (header: string | null, name: string) =>
-	header
-		?.split('; ')
-		.find((row) => row.split('=')[0] === name)
-		?.split('=')[1] ?? null
 
 const cookie = (name: string, value: string) =>
 	`${name}=${encodeURIComponent(value)}; Path=/; Max-Age=2592000; SameSite=Lax; Secure`
@@ -47,12 +43,16 @@ export async function variant(
 			? storedVisitor
 			: (improve?.generateVisitorId() ?? `visi_${crypto.randomUUID()}`)
 
-	if (!improve) {
-		return { value: 'control', cookies: [cookie(visitorCookie, visitorId)] }
-	}
-
 	let value = 'control'
 	let testDefault = 'control'
+
+	if (!improve) {
+		return {
+			value,
+			cookies: [cookie(visitorCookie, visitorId), cookie(testSlug, value)],
+		}
+	}
+
 	try {
 		await improve.fetchConfig()
 		const test = improve.getTestConfig(testSlug)

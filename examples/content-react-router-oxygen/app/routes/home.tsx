@@ -1,5 +1,4 @@
-import { ContentApiError } from '@obelism/content'
-import { gql, type CacheInstance } from '@shopify/hydrogen'
+import { gql } from '@shopify/hydrogen'
 import { data, Link, useRouteLoaderData } from 'react-router'
 
 import {
@@ -15,10 +14,9 @@ import {
 	type ProductCardData,
 } from '~/components/ProductCard'
 import { PurchaseTest } from '~/components/purchase-test'
-import { createContentFor, publishedPage } from '~/lib/content.server'
+import { readContentPage } from '~/lib/content.server'
 import type { PageEntry } from '~/lib/content-types'
 import { envContext } from '~/lib/env'
-import type { Env } from '~/lib/env'
 import { variant } from '~/lib/improve.server'
 import { useTestValue } from '~/lib/improve'
 import { selectHomeHero } from '~/lib/home-hero'
@@ -89,20 +87,19 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 
 	const [catalogue, content, test] = await Promise.all([
 		storefrontClient.graphql(HOME_QUERY),
-		readHome(env, request, context.cache, context.waitUntil),
+		readContentPage<PageEntry>(
+			env,
+			request,
+			'home',
+			context.cache,
+			context.waitUntil,
+		),
 		variant(request, env, 'home-hero'),
 	])
 	const { data: catalogueData } = catalogue
 
 	const headers = new Headers()
 	for (const setCookie of test.cookies) headers.append('Set-Cookie', setCookie)
-	if (
-		new URL(request.url).searchParams.has('cms_token') ||
-		request.headers.get('cookie')?.includes('obelism_content_token=')
-	) {
-		headers.set('Cache-Control', 'private, no-store')
-		headers.set('X-Robots-Tag', 'noindex')
-	}
 
 	return data(
 		{
@@ -116,28 +113,6 @@ export async function loader({ context, request }: Route.LoaderArgs) {
 		},
 		{ headers },
 	)
-}
-
-async function readHome(
-	env: Env,
-	request: Request,
-	cache: CacheInstance,
-	waitUntil: ExecutionContext['waitUntil'],
-): Promise<PageEntry | null> {
-	const client = createContentFor(request, env, cache, waitUntil)
-	if (!client) return null
-	try {
-		return await client.getPage<PageEntry>('home', { depth: 2 })
-	} catch (error) {
-		// An expired or other-space token shows what is published.
-		if (error instanceof ContentApiError && error.status === 401) {
-			return publishedPage(env, (published) =>
-				published.getPage<PageEntry>('home', { depth: 2 }),
-			)
-		}
-		console.error('[content] Could not read the home page', error)
-		return null
-	}
 }
 
 function NewArrivals({ products }: { products: readonly ProductCardData[] }) {

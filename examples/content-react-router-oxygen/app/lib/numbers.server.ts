@@ -1,7 +1,7 @@
 import { detectDevice } from '@obelism/numbers-sdk'
 
 import type { Env } from './env'
-import { readCookie } from './improve.server'
+import { readCookie } from './cookies'
 
 const NUMBERS_URL = 'https://numbers.obelism.studio/api/log'
 

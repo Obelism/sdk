@@ -18,7 +18,7 @@ export function PurchaseTest() {
 				A server event
 			</h2>
 			<p className="text-on-surface-secondary mb-4 max-w-prose text-sm">
-				Sends a test order's <code>purchase</code> to numbers from the loader,
+				Sends a test order's <code>purchase</code> to numbers from an action,
 				with the visitor id from the cookie and no country: Oxygen has no{' '}
 				<code>cf-connecting-ip</code> on a subrequest.
 			</p>

@@ -1,10 +1,16 @@
-import { ContentClient, readPreviewParams } from '@obelism/content'
+import {
+	ContentApiError,
+	ContentClient,
+	readPreviewParams,
+} from '@obelism/content'
 import { readSiteToken } from '@obelism/content/site'
 import {
 	Cache,
-	createFetchWithCache,
 	type CacheInstance,
+	createFetchWithCache,
 } from '@shopify/hydrogen'
+
+import type { Entry } from '@obelism/content'
 
 import type { Env } from './env'
 
@@ -14,20 +20,22 @@ export const isContentConfigured = (
 
 // Naming the space and environment makes a token someone made for another
 // space read nothing here.
-const drafts = (token: string, env: Env) =>
+const client = (
+	token: string,
+	env: Env,
+	options: Pick<ContentClientOptions, 'init' | 'fetch'> = {},
+) =>
 	new ContentClient({
 		token,
 		space: env.CONTENT_SPACE_ID,
 		environment: env.CONTENT_ENVIRONMENT,
-		init: { cache: 'no-store' },
+		...options,
 	})
 
-const delivery = (env: Env) =>
-	new ContentClient({
-		token: env.CONTENT_DELIVERY_TOKEN!,
-		space: env.CONTENT_SPACE_ID,
-		environment: env.CONTENT_ENVIRONMENT,
-	})
+type ContentClientOptions = ConstructorParameters<typeof ContentClient>[0]
+
+const drafts = (token: string, env: Env) =>
+	client(token, env, { init: { cache: 'no-store' } })
 
 // The published client with Hydrogen's cache in front of it. Content purges its
 // own edge cache on publish, so the TTL is the only staleness and Oxygen's cache
@@ -43,10 +51,7 @@ const cachedDelivery = (
 			input instanceof Request ? input.url : String(input)
 		}`
 
-	return new ContentClient({
-		token: env.CONTENT_DELIVERY_TOKEN!,
-		space: env.CONTENT_SPACE_ID,
-		environment: env.CONTENT_ENVIRONMENT,
+	return client(env.CONTENT_DELIVERY_TOKEN!, env, {
 		fetch: (input, init) =>
 			init?.cache === 'no-store'
 				? fetch(input, init)
@@ -72,12 +77,32 @@ export const createContentFor = (
 	if (siteToken) return drafts(siteToken, env)
 	return cache && waitUntil
 		? cachedDelivery(env, cache, waitUntil)
-		: delivery(env)
+		: client(env.CONTENT_DELIVERY_TOKEN!, env)
 }
 
-// The published page when a draft read is refused: an expired site token, a
-// cms_token minted for another space, or a token for another environment.
-export const publishedPage = async <T>(
+// A page read, with the published page when a draft read is refused: an expired
+// site token, a cms_token minted for another space, or a token for another
+// environment.
+export const readContentPage = async <T extends Entry>(
 	env: Env,
-	read: (client: ContentClient) => Promise<T | null>,
-): Promise<T | null> => (isContentConfigured(env) ? read(delivery(env)) : null)
+	request: Request,
+	path: string,
+	cache: CacheInstance,
+	waitUntil: ExecutionContext['waitUntil'],
+): Promise<T | null> => {
+	const content = createContentFor(request, env, cache, waitUntil)
+	if (!content) return null
+
+	const read = (from: ContentClient) => from.getPage<T>(path, { depth: 2 })
+	try {
+		return await read(content)
+	} catch (error) {
+		if (error instanceof ContentApiError && error.status === 401) {
+			return isContentConfigured(env)
+				? read(client(env.CONTENT_DELIVERY_TOKEN!, env))
+				: null
+		}
+		console.error(`[content] Could not read "${path}"`, error)
+		return null
+	}
+}

@@ -11,13 +11,13 @@ template's; the Obelism wiring is the part this example adds.
 
 ## What it adds
 
-| Product | Where                                                                     | What to look at                                                                                                                                                                                                                                                                                |
-| ------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Content | `app/lib/content.server.ts`, `app/routes/home.tsx`, `app/routes/page.tsx` | `contentFor` reads the Worker env, the splat route serves `pages/*`, `ContentBridge` starts the canvas, and `/cms/*` is the site-editing handler. Published reads go through `createFetchWithCache` with a 60-second TTL; drafts use `no-store` and answer `private, no-store` plus `noindex`. |
-| Improve | `app/lib/improve.server.ts`, `app/lib/improve.tsx`, `app/routes/home.tsx` | One server SDK per isolate, `variant()` in the loader, both cookies on the first response, `useTestValue` in the browser for the exposure, and `oxygen-buyer-country` mapped to the SDK's `geo`.                                                                                               |
-| numbers | `app/root.tsx`, `app/lib/numbers.server.ts`                               | The script on every page and a server `purchase` event through `POST /api/log` with the environment's token.                                                                                                                                                                                   |
-| Media   | `app/components/content.tsx`                                              | Content assets at three widths with `srcset`, a private file's signed URL, and hotspots from the asset's `products[].position`.                                                                                                                                                                |
-| Shopify | `app/routes/product-by-id.tsx`                                            | A product read by `gid://shopify/Product/…` with `Cache.short()`, price and stock from the Storefront API.                                                                                                                                                                                     |
+| Product | Where                                                                     | What to look at                                                                                                                                                                                                                                                                                                      |
+| ------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Content | `app/lib/content.server.ts`, `app/routes/home.tsx`, `app/routes/page.tsx` | `contentFor` reads the Worker env, the splat route serves `pages/*`, `ContentBridge` starts the canvas, and `/cms/*` is the site-editing handler. Published reads go through `createFetchWithCache` with a 60-second TTL; drafts use `no-store` and answer `private, no-store` plus `noindex`.                       |
+| Improve | `app/lib/improve.server.ts`, `app/lib/improve.tsx`, `app/routes/home.tsx` | One server SDK per isolate, `variant()` in the loader, both cookies on the first response, `useTestValue` in the browser for the exposure, and `oxygen-buyer-country` mapped to the SDK's `geo`.                                                                                                                     |
+| numbers | `app/components/numbers-tracker.tsx`, `app/lib/numbers.server.ts`         | Page views on every navigation and a server `purchase` event through `POST /api/log` with the environment's token. The hosted script sends to the organization's **first** space, so this example uses the SDK's `autoTrack` for its own space; where the site is the first space, the script tag is the same thing. |
+| Media   | `app/components/content.tsx`                                              | Content assets at three widths with `srcset`, a private file's signed URL, and hotspots from the asset's `products[].position`.                                                                                                                                                                                      |
+| Shopify | `app/routes/product-by-id.tsx`                                            | A product read by `gid://shopify/Product/…` with `Cache.short()`, price and stock from the Storefront API.                                                                                                                                                                                                           |
 
 The home route also keeps the template's new arrivals and collections, and the
 test's two variants differ before hydration: `view-source` shows the loader's
@@ -42,6 +42,22 @@ falls back to [mock.shop](https://mock.shop).
 In Obelism, add `http://localhost:5173` to the space environment's **allowed
 origins** (develop allows `http://localhost:*` by default), and set the Content
 environment's **preview URL** to this origin to open the canvas.
+
+### The Content it expects
+
+The app reads a `home` page and any `pages/*` page. Create them in the space
+with these blocks:
+
+- **Hero** — an eyebrow, heading, text, an image and one call to action.
+- **Text** — a heading and rich text.
+- **Media showcase** — one image, a private file and a gallery. On the image,
+  switch on **Show its products** so delivery adds `products[].position` and the
+  page draws a hotspot for each tagged product. Tag products on the file in
+  Media first; without a store connected to the space that list is empty.
+
+Upload the image and the private file in **Media**, mark the file private, then
+pick them in the entry. `content/content-model.json` is the model; the types in
+`content/content-types.ts` are generated from it.
 
 ## Content model
 
@@ -84,8 +100,11 @@ npx shopify hydrogen deploy --assets-dir dist/client --worker-dir dist/server
 The variables are frozen per deployment: a rotated token reaches the site after
 a redeploy. Point the Content environment's **preview URL** at the Oxygen
 **environment** URL (not a deployment preview URL), and make that environment
-public so the canvas can frame it. Development stores and trials cannot have a
-public environment; the single-store paid plans allow one.
+public so the canvas can frame it. Add that same environment URL to the space
+environment's **allowed origins** in Improve and numbers: every deployment's
+preview URL is a new origin, so a preview is refused until its origin is added
+or the environment allows any origin. Development stores and trials cannot have
+a public environment; the single-store paid plans allow one.
 
 ## Docs
 
