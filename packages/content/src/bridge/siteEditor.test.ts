@@ -377,56 +377,62 @@ describe('mountSiteEditor', () => {
 		const { bridge, setState, answer, forms } = fakeBridge()
 		unmount = mountSiteEditor(document, bridge)
 		setState({ features: ['prompt', 'form', 'save'] })
-		expect($('[role="tablist"]').textContent).toBe('AskEdit fields')
+		// The fields are the first view, and the form is already up.
+		expect($('.fields').hidden).toBe(false)
+		expect($('.ask').hidden).toBe(true)
+		expect(forms).toHaveLength(1)
+
+		button('Ask').click()
+		expect($('.fields').hidden).toBe(true)
+		expect(forms[0]!.frame.isConnected).toBe(false)
 
 		type('Shorter')
 		await vi.waitFor(() => expect(bridge.prompt).toHaveBeenCalled())
 		answer({ summary: 'Shorter.' })
 		await vi.waitFor(() => expect($('.answer').dataset.status).toBe('pending'))
 
-		button('Edit fields').click()
+		// Back to the fields with a suggestion waiting: asked first.
+		button('Ask').click()
 		expect($('.gate').hidden).toBe(false)
 		expect($('.gate').textContent).toContain(
 			'Keep or undo the suggestion before editing fields.',
 		)
 		expect(shadow().activeElement).toBe(button('Keep it', '.gate'))
 		expect($('.answer').dataset.status).toBe('pending')
-		expect(button('Edit fields').getAttribute('aria-selected')).toBe('false')
-		expect(forms).toHaveLength(0)
+		expect(button('Ask').getAttribute('aria-pressed')).toBe('true')
 
 		button('Undo', '.gate').click()
 		expect(bridge.undo).toHaveBeenCalledTimes(1)
 		expect($('.answer').dataset.status).toBe('undone')
 		expect($('.gate').hidden).toBe(true)
-		expect(button('Edit fields').getAttribute('aria-selected')).toBe('true')
+		expect(button('Ask').getAttribute('aria-pressed')).toBe('false')
 		expect($('.ask').hidden).toBe(true)
-		expect(forms).toHaveLength(1)
+		expect(forms).toHaveLength(2)
+		expect(forms[1]!.frame.isConnected).toBe(true)
 		expect($('.form-note').textContent).toBe('Opening the form…')
-		forms[0]!.options.onReady?.()
+		forms[1]!.options.onReady?.()
 		expect($('.form-note').hidden).toBe(true)
 	})
 
-	it('moves between the tabs with the arrows, opening one on Enter', () => {
+	it('switches between the fields and the ask view with the head button', () => {
 		const { bridge, setState, forms } = fakeBridge()
 		unmount = mountSiteEditor(document, bridge)
 		setState({ features: ['prompt', 'form'] })
-		button('Ask').focus()
-		$('[role="tablist"]').dispatchEvent(
-			new KeyboardEvent('keydown', { key: 'ArrowRight' }),
-		)
-		expect(shadow().activeElement).toBe(button('Edit fields'))
-		expect(button('Ask').getAttribute('aria-selected')).toBe('true')
-		expect(forms).toHaveLength(0)
+		const ask = $<HTMLButtonElement>('.mode')
+		expect(ask.getAttribute('aria-pressed')).toBe('false')
+		expect(forms).toHaveLength(1)
 
-		// Enter and Space click a button.
-		button('Edit fields').click()
-		expect(button('Edit fields').getAttribute('aria-selected')).toBe('true')
-		$('[role="tablist"]').dispatchEvent(
-			new KeyboardEvent('keydown', { key: 'Home' }),
-		)
-		expect(shadow().activeElement).toBe(button('Ask'))
-		button('Ask').click()
+		ask.click()
+		expect(ask.getAttribute('aria-pressed')).toBe('true')
+		expect($('.ask').hidden).toBe(false)
+		expect($('.fields').hidden).toBe(true)
 		expect(forms[0]!.frame.isConnected).toBe(false)
+
+		ask.click()
+		expect(ask.getAttribute('aria-pressed')).toBe('false')
+		expect($('.fields').hidden).toBe(false)
+		expect(forms).toHaveLength(2)
+		expect(forms[1]!.frame.isConnected).toBe(true)
 	})
 
 	it('steps back on Escape in the form too', () => {
@@ -434,7 +440,6 @@ describe('mountSiteEditor', () => {
 		unmount = mountSiteEditor(document, bridge)
 		setState({ features: ['prompt', 'form'] })
 		bridge.select('hero_1')
-		button('Edit fields').click()
 		forms[0]!.options.onEscape?.()
 		expect(bridge.select).toHaveBeenLastCalledWith(null)
 	})
@@ -560,6 +565,7 @@ describe('mountSiteEditor', () => {
 		unmount = mountSiteEditor(document, bridge, { signOut: false, actions })
 		setState({ features: ['prompt'] })
 		expect($('.exit').hidden).toBe(true)
+		expect($('.mode').hidden).toBe(true)
 		expect(actions.slot).toBe('actions-footer')
 		$<HTMLButtonElement>('.head .icon-button').click()
 		expect(actions.slot).toBe('actions-bar')
@@ -572,7 +578,7 @@ describe('mountSiteEditor', () => {
 		unmount = mountSiteEditor(document, bridge)
 		setState({ features: ['prompt', 'create', 'save', 'form'] })
 		expect($('.path').hidden).toBe(false)
-		expect($('.tabs').hidden).toBe(true)
+		expect($('.mode').hidden).toBe(true)
 		expect(button('Save draft').hidden).toBe(true)
 		expect($('.note > span:not(.icon)').textContent).toBe('New page')
 

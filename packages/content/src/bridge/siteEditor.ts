@@ -25,12 +25,12 @@ import {
 } from './siteActions'
 
 // The on-site editor: editing a site signed in to edit (siteBridge.ts) from
-// a panel docked on the right, the site reflowed beside it. Ask (prompts,
-// previewed on the page until kept) or Edit fields (the CMS's form, see
-// formFrame.ts); the blocks on the page outlined with their names; a launcher
-// at the bottom left to hide the panel or the outlines, and to exit. Plain
-// DOM in a shadow root, like the prompt box, which the visual editor and
-// Content's canvas keep using.
+// a panel docked on the right, the site reflowed beside it. Edit fields (the
+// CMS's form, see formFrame.ts) first; Ask — a small button in the head — for
+// prompts, previewed on the page until kept. The blocks on the page outlined
+// with their names; a launcher at the bottom left to hide the panel or the
+// outlines, and to exit. Plain DOM in a shadow root, like the prompt box,
+// which the visual editor and Content's canvas keep using.
 
 export type SiteEditorOptions = Omit<PromptBoxOptions, 'labels'> & {
 	labels?: Partial<SiteEditorLabels> | undefined
@@ -195,17 +195,15 @@ button:disabled { cursor: not-allowed; }
 .empty.error { color: rgb(var(--negative)); }
 .new-page { justify-content: flex-start; }
 
-.tabs {
-	display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; flex: none;
-	margin: 12px 14px 0; padding: 3px; border-radius: 999px; background: rgb(var(--actions));
+.mode {
+	display: inline-flex; align-items: center; gap: 6px; flex: none; height: 32px;
+	padding: 0 12px; border-radius: 999px; background: rgb(var(--paper));
+	font-size: 13px; font-weight: 500; color: rgb(var(--soft));
 }
-.tab {
-	display: flex; align-items: center; justify-content: center; gap: 6px; height: 38px;
-	border-radius: 999px; font-size: 13px; font-weight: 500; color: rgb(var(--soft));
-}
-.tab:hover { color: rgb(var(--fg)); }
-.tab[aria-selected='true'] { background: rgb(var(--bg)); color: rgb(var(--fg)); box-shadow: var(--shadow-small); }
-.tab .mark svg { width: 12px; height: 12px; }
+.mode:hover:not(:disabled) { background: rgb(var(--actions)); color: rgb(var(--fg)); }
+.mode[aria-pressed='true'] { background: rgb(var(--coral-wash)); color: rgb(var(--coral-ink)); }
+.mode:disabled { opacity: .5; }
+.mode .mark svg { width: 12px; height: 12px; }
 .ask, .fields { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 14px; }
 .note {
@@ -544,6 +542,10 @@ export const mountSiteEditor = (
 	const minimise = button('icon-button hit', icon('dash'))
 	minimise.setAttribute('aria-label', labels.minimize)
 	minimise.title = labels.minimize
+	// The fields are the editor's first view; Ask is this small button beside
+	// the minimise one, pressed while the ask view shows.
+	const askMode = button('mode hit', mark(), labels.modePrompt)
+	askMode.setAttribute('aria-pressed', 'false')
 	const head = element(
 		doc,
 		'div',
@@ -553,6 +555,7 @@ export const mountSiteEditor = (
 		pageName,
 		env,
 		element(doc, 'span', { className: 'spacer' }),
+		askMode,
 		minimise,
 	)
 
@@ -571,27 +574,6 @@ export const mountSiteEditor = (
 		newPage,
 	)
 
-	const tab = (
-		id: string,
-		controls: string,
-		...children: (Node | string)[]
-	) => {
-		const node = button('tab', ...children)
-		node.id = id
-		node.setAttribute('role', 'tab')
-		node.setAttribute('aria-controls', controls)
-		return node
-	}
-	const askTab = tab(
-		'obelism-tab-ask',
-		'obelism-ask',
-		mark(),
-		labels.modePrompt,
-	)
-	const fieldsTab = tab('obelism-tab-fields', 'obelism-fields', labels.form)
-	const tabs = element(doc, 'div', { className: 'tabs' }, askTab, fieldsTab)
-	tabs.setAttribute('role', 'tablist')
-	tabs.setAttribute('aria-label', labels.modes)
 	// Edit fields asked for while a suggestion waits: it's kept or undone
 	// first, never by the switch itself.
 	const gateKeep = button('button primary', labels.keep)
@@ -675,7 +657,7 @@ export const mountSiteEditor = (
 		composer,
 	)
 	ask.setAttribute('role', 'tabpanel')
-	ask.setAttribute('aria-labelledby', askTab.id)
+	ask.setAttribute('aria-label', labels.modePrompt)
 
 	const formNote = element(doc, 'p', { className: 'form-note' })
 	formNote.setAttribute('role', 'status')
@@ -687,7 +669,7 @@ export const mountSiteEditor = (
 		formBox,
 	)
 	fields.setAttribute('role', 'tabpanel')
-	fields.setAttribute('aria-labelledby', fieldsTab.id)
+	fields.setAttribute('aria-label', labels.form)
 
 	const saveState = element(doc, 'p', { className: 'save-state' })
 	saveState.setAttribute('aria-live', 'polite')
@@ -715,7 +697,6 @@ export const mountSiteEditor = (
 		{ className: 'panel', id: 'obelism-editor' },
 		head,
 		pagesBox,
-		tabs,
 		gate,
 		ask,
 		fields,
@@ -773,7 +754,10 @@ export const mountSiteEditor = (
 	shadow.append(element(doc, 'style', { textContent: CSS }), root)
 
 	let open = readOpen(win)
-	let mode: 'ask' | 'fields' = 'ask'
+	// The fields are the first view (mode); without the form the ask view
+	// shows instead (view), and back once the form is there.
+	let mode: 'ask' | 'fields' = 'fields'
+	let view: 'ask' | 'fields' = 'fields'
 	let gated = false
 	let creating = false
 	let outlines = true
@@ -793,10 +777,18 @@ export const mountSiteEditor = (
 	let destroyed = false
 
 	const formSlot = createFormSlot(bridge, formBox, labels.formTitle, {
-		onReady: () => refresh(),
+		onReady: () => {
+			refresh()
+			// The form came while the fields show: straight into it.
+			if (open && view === 'fields') focusForm()
+		},
 		onError: () => refresh(),
 		onEscape: () => stepBack(),
 	})
+
+	// The form's iframe, once the slot has one; the fields view's focus
+	// target (the slot mounts it only while shown, so it may not be there).
+	const focusForm = () => formBox.querySelector('iframe')?.focus()
 
 	const pending = () => answers.filter(({ status }) => status === 'pending')
 	const latestPending = () => pending().slice(-1)[0] ?? null
@@ -1127,9 +1119,9 @@ export const mountSiteEditor = (
 		if (onlyNew) creating = true
 		const hasForm =
 			site && !creating && !pageless && state.features.includes('form')
-		if (!hasForm) mode = 'ask'
+		view = hasForm ? mode : 'ask'
 		const waiting = pending().length > 0
-		if (!waiting || mode === 'fields') gated = false
+		if (!waiting || view === 'fields') gated = false
 		// Steps undone elsewhere (or saved away) aren't any answer's any more.
 		for (const answer of answers)
 			if (answer.step !== null && answer.step > (state.undoSteps ?? 0))
@@ -1154,7 +1146,7 @@ export const mountSiteEditor = (
 		const selecting = shown && outlines && !creating
 		if (state.selecting !== selecting) bridge.setSelecting(selecting)
 
-		const showForm = shown && mode === 'fields'
+		const showForm = shown && view === 'fields'
 		if (showForm && !formSlot.mounted) formSlot.mount()
 		else if (!showForm && formSlot.mounted) formSlot.unmount()
 
@@ -1173,16 +1165,13 @@ export const mountSiteEditor = (
 		envText.textContent =
 			environment === 'production' ? labels.envProduction : (environment ?? '')
 
-		tabs.hidden = !hasForm
-		askTab.setAttribute('aria-selected', String(mode === 'ask'))
-		fieldsTab.setAttribute('aria-selected', String(mode === 'fields'))
-		askTab.disabled = fieldsTab.disabled = busy
-		askTab.tabIndex = mode === 'ask' ? 0 : -1
-		fieldsTab.tabIndex = mode === 'fields' ? 0 : -1
+		askMode.hidden = !hasForm
+		askMode.setAttribute('aria-pressed', String(view === 'ask'))
+		askMode.disabled = busy
 		gate.hidden = !gated
 		gateKeep.disabled = gateUndo.disabled = busy
-		ask.hidden = mode !== 'ask'
-		fields.hidden = mode !== 'fields'
+		ask.hidden = view !== 'ask'
+		fields.hidden = view !== 'fields'
 
 		const offerShop = shopHere !== null && !creating
 		if (creating) {
@@ -1322,7 +1311,9 @@ export const mountSiteEditor = (
 		if (!open) picking = false
 		refresh()
 		if (open) {
-			;(mode === 'fields' ? fieldsTab : creating ? pathInput : input).focus()
+			if (creating) pathInput.focus()
+			else if (view === 'fields') focusForm()
+			else input.focus()
 		} else {
 			launch.focus()
 		}
@@ -1494,33 +1485,19 @@ export const mountSiteEditor = (
 		shopMessage = await addShopPage(bridge, labels)
 		refresh()
 	})
-	askTab.addEventListener('click', () => setMode('ask'))
-	fieldsTab.addEventListener('click', () => setMode('fields'))
-	// Arrows move focus between the tabs; Enter or Space (a click) opens one.
-	tabs.addEventListener('keydown', (event) => {
-		if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-		event.preventDefault()
-		const onAsk = shadow.activeElement === askTab
-		const target =
-			event.key === 'Home'
-				? askTab
-				: event.key === 'End'
-					? fieldsTab
-					: onAsk
-						? fieldsTab
-						: askTab
-		target.focus()
-	})
+	askMode.addEventListener('click', () =>
+		setMode(mode === 'ask' ? 'fields' : 'ask'),
+	)
 	gateKeep.addEventListener('click', () => {
 		keepAll(false)
 		setMode('fields')
-		fieldsTab.focus()
+		focusForm()
 	})
 	gateUndo.addEventListener('click', () => {
 		for (let answer = decidable(); answer; answer = decidable())
 			undoAnswer(answer, false)
 		setMode('fields')
-		fieldsTab.focus()
+		focusForm()
 	})
 	undo.addEventListener('click', () => {
 		const step = bridge.getState().undoSteps
