@@ -1,7 +1,7 @@
 {
 	"name": "@obelism/content",
 	"description": "Obelism Content SDK: the delivery API client, the visual editor bridge with prompt editing, editing on your own site, webhook verification, and the content model CLI",
-	"version": "0.26.0",
+	"version": "0.27.0",
 	"keywords": [
 		"cms",
 		"headless-cms",
