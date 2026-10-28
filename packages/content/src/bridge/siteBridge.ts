@@ -70,6 +70,7 @@ export const readSiteEditing = (doc: Document): string | null => {
 
 type SessionInfo = {
 	features: string[]
+	environment?: string
 	// Where product pages are on the site, with {handle}: the environment's
 	// setting in the CMS (from 2026-10-20).
 	productPath?: string
@@ -356,7 +357,9 @@ export const createSiteBridge = (
 		get collection() {
 			return pageCollection()
 		},
-		environment: null,
+		get environment() {
+			return session?.environment ?? null
+		},
 		on: emitter.on,
 		getState: () => state,
 

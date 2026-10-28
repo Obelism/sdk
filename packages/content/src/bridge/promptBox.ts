@@ -4,6 +4,7 @@ import type {
 	FormHandle,
 	SitePage,
 } from './createBridge'
+import { element, MARKS } from './dom'
 
 // The prompt box: a small bar at the bottom of the page, inside the visual
 // editor or on a site signed in to edit, where an editor types what to
@@ -69,11 +70,46 @@ export type PromptLabels = {
 	addingCollectionPage: string
 	addedCollectionPage: string
 	collectionPageHint: string
+	// The on-site editor (mountSiteEditor) from here on.
+	editor: string
+	editing: string
+	hideOutlines: string
+	environment: string
+	// How `production` reads; other environments show their own name.
+	envProduction: string
+	// `{name}`: the block's name, in bold.
+	scopeNoteBlock: string
+	scopeNotePage: string
+	// A block whose type isn't known yet.
+	block: string
+	// `{name}`: the block's name.
+	previewChip: string
+	askIntro: string
+	you: string
+	obelism: string
+	suggested: string
+	keep: string
+	retry: string
+	// Sent for Try another; `{prompt}` is the request it retries.
+	retryPrompt: string
+	kept: string
+	undone: string
+	before: string
+	after: string
+	emptyValue: string
+	// `{count}`: changed fields not shown.
+	moreChanges: string
+	keepFirst: string
+	saveDraft: string
+	upToDate: string
+	saveFailed: string
+	publishFailed: string
+	tryAgain: string
 }
 
 export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 	open: 'Edit with a prompt',
-	placeholder: 'Describe a change, e.g. “make the heading shorter”',
+	placeholder: 'Describe a change, like “make it warmer”',
 	send: 'Apply',
 	undo: 'Undo',
 	close: 'Close',
@@ -91,7 +127,7 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 	saved: 'Saved as a draft',
 	published: 'Published',
 	unsaved: 'Unsaved changes',
-	signOut: 'Exit editing',
+	signOut: 'Exit',
 	viewingDrafts: 'Viewing drafts',
 	selectHint: 'Click a block to change only that block',
 	newPage: 'New page',
@@ -103,8 +139,8 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 	creating: 'Writing the page…',
 	created: 'Opening the new page…',
 	modes: 'Edit with',
-	modePrompt: 'Prompt',
-	form: 'Form',
+	modePrompt: 'Ask',
+	form: 'Edit fields',
 	formTitle: 'The content form',
 	formLoading: 'Opening the form…',
 	pages: 'Pages',
@@ -124,6 +160,36 @@ export const DEFAULT_PROMPT_LABELS: PromptLabels = {
 	addedCollectionPage: 'Opening the collection page…',
 	collectionPageHint:
 		'This collection has no page yet. Add one for what goes around its products.',
+	editor: 'Obelism editor',
+	editing: 'Editing',
+	hideOutlines: 'Show the page without outlines',
+	environment: 'Environment',
+	envProduction: 'live',
+	scopeNoteBlock: 'Working on {name}. Click another block to switch.',
+	scopeNotePage:
+		'Working on the whole page. Click a block to change only that block.',
+	block: 'Block',
+	previewChip: '{name} · preview',
+	askIntro:
+		'Describe a change and Obelism shows it on the page. Nothing is stored until you keep it and save.',
+	you: 'You',
+	obelism: 'Obelism',
+	suggested: 'Suggested by Obelism',
+	keep: 'Keep it',
+	retry: 'Try another',
+	retryPrompt: '{prompt}\n\nWrite a different version than the last one.',
+	kept: 'Kept',
+	undone: 'Undone',
+	before: 'Before',
+	after: 'After',
+	emptyValue: 'Empty',
+	moreChanges: '{count} more changed',
+	keepFirst: 'Keep or undo the suggestion to save',
+	saveDraft: 'Save draft',
+	upToDate: 'No unsaved changes',
+	saveFailed: 'Couldn’t save',
+	publishFailed: 'Couldn’t publish',
+	tryAgain: 'Try again',
 }
 
 export type PromptBoxOptions = {
@@ -169,7 +235,7 @@ const ICONS = {
 	chevrons: '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
 	search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
 	check: '<path d="M20 6 9 17l-5-5"/>',
-	mark: '<path d="M12 3v18M3 12h18"/><g fill="currentColor" stroke="none"><circle cx="7" cy="7" r="1.75"/><circle cx="17" cy="7" r="1.75"/><circle cx="7" cy="17" r="1.75"/><circle cx="17" cy="17" r="1.75"/></g>',
+	mark: `<g fill="currentColor" stroke="none">${MARKS.obelism}</g>`,
 	send: '<path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z"/><path d="M6 12h16"/>',
 }
 
@@ -407,24 +473,6 @@ button.chip:disabled { opacity: .5; }
 .empty.error { color: var(--theme-error); }
 [hidden] { display: none !important; }
 `
-
-const element = <K extends keyof HTMLElementTagNameMap>(
-	doc: Document,
-	tag: K,
-	props: Record<string, string | number | boolean> = {},
-	...children: (Node | string)[]
-): HTMLElementTagNameMap[K] => {
-	const node = doc.createElement(tag)
-	Object.assign(node, props)
-	// appendChild, not append: Workers types redefine Element.append, and a
-	// site's server code may well have them loaded.
-	for (const child of children) {
-		node.appendChild(
-			typeof child === 'string' ? doc.createTextNode(child) : child,
-		)
-	}
-	return node
-}
 
 const icon = (doc: Document, name: keyof typeof ICONS) => {
 	const span = element(doc, 'span', { className: 'icon' })

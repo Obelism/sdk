@@ -141,6 +141,7 @@ export type ContentBridge = {
 	readonly mode: 'editor' | 'site' | null
 	// The entry being edited (on the site: the page's, see `editable`).
 	readonly entryId: string | null
+	// On the site: the session's, once it loaded.
 	readonly environment: string | null
 	// Editing on the site: the Shopify product the page shows (marked with
 	// `editableProduct`), else null.

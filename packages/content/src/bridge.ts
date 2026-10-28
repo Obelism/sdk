@@ -5,6 +5,7 @@ import {
 } from './bridge/createBridge'
 import { mountPromptBox, type PromptBoxOptions } from './bridge/promptBox'
 import { createSiteBridge, readSiteEditing } from './bridge/siteBridge'
+import { mountSiteEditor } from './bridge/siteEditor'
 import { DEFAULT_URL, normalizeUrl } from './config'
 
 export type {
@@ -24,6 +25,7 @@ export type {
 } from './bridge/createBridge'
 export { INITIAL_STATE } from './bridge/createBridge'
 export { DEFAULT_PROMPT_LABELS, mountPromptBox } from './bridge/promptBox'
+export { mountSiteEditor } from './bridge/siteEditor'
 export { DEFAULT_STATS_LABELS, mountStatsOverlay } from './bridge/statsOverlay'
 export type {
 	BlockStats,
@@ -37,9 +39,10 @@ export type BridgeOptions = {
 	// Default: https://content.obelism.studio
 	url?: string | undefined
 	// The prompt box editors change the page with (shown only inside the
-	// visual editor or on a site signed in to edit, to people who may edit).
-	// `false` leaves it out, e.g. to build your own with `bridge.prompt()`.
-	// Default: shown.
+	// visual editor or on a site signed in to edit, to people who may edit);
+	// on the site, the editor docked beside it (`mountSiteEditor`). `false`
+	// leaves it out, e.g. to build your own with `bridge.prompt()`. Default:
+	// shown.
 	prompt?: boolean | PromptBoxOptions | undefined
 	// Editing on the site: where a CMS path (`solutions/agencies`) in a
 	// locale is on the site, to open a page made with "New page" or picked
@@ -120,9 +123,10 @@ export const getContentBridge = ({
 			const doc = win.document
 			let unmount = () => {}
 			let destroyed = false
+			const mountUi = sitePath ? mountSiteEditor : mountPromptBox
 			const mount = () => {
 				if (destroyed) return
-				unmount = mountPromptBox(doc, bridge, prompt === true ? {} : prompt)
+				unmount = mountUi(doc, bridge, prompt === true ? {} : prompt)
 			}
 			// A script tag in <head> runs before there is a body to mount into.
 			if (doc.body) mount()
