@@ -38,7 +38,9 @@ const describeChange = (change: Change) => {
 	}
 	if (change.reordered) details.push('fields reordered')
 	if (change.settingsChanged && change.action === 'update') {
-		details.push('name, kind or description')
+		details.push(
+			'settings: name, kind, description, preview image, accent, code or groups',
+		)
 	}
 	if (change.affectedEntries && change.affectedEntries > 0) {
 		details.push(

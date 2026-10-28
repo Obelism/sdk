@@ -53,6 +53,30 @@ describe('formatPlan', () => {
 		expect(markdown.endsWith('```')).toBe(true)
 	})
 
+	it('names the settings a change to groups, accent or code falls under', () => {
+		expect(
+			formatPlan({
+				changes: [
+					{
+						apiId: 'page',
+						name: 'Page',
+						action: 'update',
+						fields: [],
+						reordered: false,
+						settingsChanged: true,
+						affectedEntries: 0,
+					},
+				],
+			}),
+		).toBe(
+			[
+				'1 content type to change:',
+				'~ page (Page)',
+				'    settings: name, kind, description, preview image, accent, code or groups',
+			].join('\n'),
+		)
+	})
+
 	it('puts problems first, and says when nothing changes', () => {
 		expect(
 			formatPlan({
