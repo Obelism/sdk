@@ -1,9 +1,15 @@
-import type {
-	BridgeState,
-	ContentBridge,
-	FormHandle,
-	SitePage,
-} from './createBridge'
+import type { BridgeState, ContentBridge } from './createBridge'
+import { element, icon as drawIcon, type ICONS } from './dom'
+import { createFormSlot } from './formSlot'
+import { DEFAULT_PROMPT_LABELS, type PromptLabels } from './labels'
+import { createPagesPicker } from './pagesPicker'
+import {
+	addShopPage,
+	failure as reason,
+	pageContext,
+	shopCopy as shopWords,
+	storeChanges,
+} from './siteActions'
 
 // The prompt box: a small bar at the bottom of the page, inside the visual
 // editor or on a site signed in to edit, where an editor types what to
@@ -17,114 +23,7 @@ import type {
 // entry form (Form mode, `bridge.openForm`), edited live, and goes to any
 // page of the space, drafts included.
 
-export type PromptLabels = {
-	open: string
-	placeholder: string
-	send: string
-	undo: string
-	close: string
-	minimize: string
-	expand: string
-	scopeEntry: string
-	// The scope with no page to act on (no entry), like Content's canvas
-	// with nothing selected.
-	scopeNoPage: string
-	scopeBlock: string
-	clearBlock: string
-	working: string
-	save: string
-	publish: string
-	saving: string
-	publishing: string
-	saved: string
-	published: string
-	unsaved: string
-	signOut: string
-	viewingDrafts: string
-	selectHint: string
-	newPage: string
-	newPageCancel: string
-	newPagePlaceholder: string
-	path: string
-	pathPlaceholder: string
-	creating: string
-	created: string
-	modes: string
-	modePrompt: string
-	form: string
-	formTitle: string
-	formLoading: string
-	pages: string
-	pagesSearch: string
-	pagesLoading: string
-	pagesEmpty: string
-	pageCurrent: string
-	pageDraft: string
-	pageChanged: string
-	addProductPage: string
-	addingProductPage: string
-	addedProductPage: string
-	productPageHint: string
-	addCollectionPage: string
-	addingCollectionPage: string
-	addedCollectionPage: string
-	collectionPageHint: string
-}
-
-export const DEFAULT_PROMPT_LABELS: PromptLabels = {
-	open: 'Edit with a prompt',
-	placeholder: 'Describe a change, e.g. “make the heading shorter”',
-	send: 'Apply',
-	undo: 'Undo',
-	close: 'Close',
-	minimize: 'Minimize, to see the page',
-	expand: 'Expand',
-	scopeEntry: 'Whole page',
-	scopeNoPage: 'Whole page',
-	scopeBlock: 'Selected block',
-	clearBlock: 'Edit the whole page instead',
-	working: 'Working on it…',
-	save: 'Save',
-	publish: 'Publish',
-	saving: 'Saving…',
-	publishing: 'Publishing…',
-	saved: 'Saved as a draft',
-	published: 'Published',
-	unsaved: 'Unsaved changes',
-	signOut: 'Exit editing',
-	viewingDrafts: 'Viewing drafts',
-	selectHint: 'Click a block to change only that block',
-	newPage: 'New page',
-	newPageCancel: 'Edit this page instead',
-	newPagePlaceholder:
-		'Describe the new page, e.g. “a pricing page for agencies”',
-	path: 'Path',
-	pathPlaceholder: '/pricing',
-	creating: 'Writing the page…',
-	created: 'Opening the new page…',
-	modes: 'Edit with',
-	modePrompt: 'Prompt',
-	form: 'Form',
-	formTitle: 'The content form',
-	formLoading: 'Opening the form…',
-	pages: 'Pages',
-	pagesSearch: 'Find a page',
-	pagesLoading: 'Loading pages…',
-	pagesEmpty: 'No pages match',
-	pageCurrent: 'This page',
-	pageDraft: 'Draft',
-	pageChanged: 'Changed',
-	addProductPage: 'Add a product page',
-	addingProductPage: 'Making the product page…',
-	addedProductPage: 'Opening the product page…',
-	productPageHint:
-		'This product has no page yet. Add one for what the store doesn’t say.',
-	addCollectionPage: 'Add a collection page',
-	addingCollectionPage: 'Making the collection page…',
-	addedCollectionPage: 'Opening the collection page…',
-	collectionPageHint:
-		'This collection has no page yet. Add one for what goes around its products.',
-}
+export { DEFAULT_PROMPT_LABELS, type PromptLabels } from './labels'
 
 export type PromptBoxOptions = {
 	labels?: Partial<PromptLabels> | undefined
@@ -154,24 +53,6 @@ const FLICK_MAX_PX = 120
 const FLICK_STALE_MS = 80
 // Its distance from the side of the screen, as in the CSS.
 const EDGE_PX = 16
-
-// Icons (Lucide), drawn in the text colour.
-const ICONS = {
-	page: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
-	newPage:
-		'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 15h6"/><path d="M12 18v-6"/>',
-	block:
-		'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 8h10"/><path d="M7 12h6"/>',
-	undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
-	close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-	minimize: '<path d="m6 9 6 6 6-6"/>',
-	expand: '<path d="m18 15-6-6-6 6"/>',
-	chevrons: '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
-	search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
-	check: '<path d="M20 6 9 17l-5-5"/>',
-	mark: '<path d="M12 3v18M3 12h18"/><g fill="currentColor" stroke="none"><circle cx="7" cy="7" r="1.75"/><circle cx="17" cy="7" r="1.75"/><circle cx="7" cy="17" r="1.75"/><circle cx="17" cy="17" r="1.75"/></g>',
-	send: '<path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z"/><path d="M6 12h16"/>',
-}
 
 // Obelism's design tokens (obelism.studio/design.md), under their own names:
 // warm paper and ink, one orange accent, Geist, pill buttons.
@@ -408,30 +289,7 @@ button.chip:disabled { opacity: .5; }
 [hidden] { display: none !important; }
 `
 
-const element = <K extends keyof HTMLElementTagNameMap>(
-	doc: Document,
-	tag: K,
-	props: Record<string, string | number | boolean> = {},
-	...children: (Node | string)[]
-): HTMLElementTagNameMap[K] => {
-	const node = doc.createElement(tag)
-	Object.assign(node, props)
-	// appendChild, not append: Workers types redefine Element.append, and a
-	// site's server code may well have them loaded.
-	for (const child of children) {
-		node.appendChild(
-			typeof child === 'string' ? doc.createTextNode(child) : child,
-		)
-	}
-	return node
-}
-
-const icon = (doc: Document, name: keyof typeof ICONS) => {
-	const span = element(doc, 'span', { className: 'icon' })
-	span.setAttribute('aria-hidden', 'true')
-	span.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[name]}</svg>`
-	return span
-}
+const icon = (doc: Document, name: keyof typeof ICONS) => drawIcon(doc, name)
 
 const mark = (doc: Document) => {
 	const span = icon(doc, 'mark')
@@ -644,31 +502,17 @@ export const mountPromptBox = (
 	pageChip.setAttribute('aria-haspopup', 'listbox')
 	pageChip.setAttribute('aria-expanded', 'false')
 	pageChip.setAttribute('aria-controls', 'obelism-pages')
-	const search = element(doc, 'input', {
-		type: 'text',
-		placeholder: labels.pagesSearch,
-		autocomplete: 'off',
-		spellcheck: false,
+	const picker = createPagesPicker(doc, bridge, labels, {
+		onLoad: () => refresh(),
+		onClose: () => setPicking(false),
 	})
-	search.setAttribute('role', 'combobox')
-	search.setAttribute('aria-label', labels.pagesSearch)
-	search.setAttribute('aria-autocomplete', 'list')
-	search.setAttribute('aria-expanded', 'true')
-	search.setAttribute('aria-controls', 'obelism-pages')
-	const optionList = element(doc, 'ul', {
-		className: 'options',
-		id: 'obelism-pages',
-	})
-	optionList.setAttribute('role', 'listbox')
-	optionList.setAttribute('aria-label', labels.pages)
-	const pagesNote = element(doc, 'p', { className: 'empty' })
 	const pagesSection = element(
 		doc,
 		'div',
 		{ className: 'pages' },
-		element(doc, 'label', { className: 'search' }, icon(doc, 'search'), search),
-		optionList,
-		pagesNote,
+		picker.searchRow,
+		picker.list,
+		picker.note,
 	)
 
 	// The page's own controls (`actions`), in the footer while open and next
@@ -852,23 +696,20 @@ export const mountPromptBox = (
 	let minimized = false
 	let creating = false
 	let message: { text: string; error: boolean } | null = null
-	// Form mode, and the form while mounted: a fresh one (and one-time
-	// address) every time it shows.
 	let form = false
-	let formHandle: FormHandle | null = null
-	let formLoading = false
-	// The pages, fetched once the panel opens and kept; `active` is the
-	// option arrow keys are on.
-	let picking = false
-	let pages: SitePage[] | null = null
-	let pagesLoad: Promise<void> | null = null
-	let pagesError: string | null = null
-	let active = 0
-
-	const failure = (error: unknown) => ({
-		text: error instanceof Error ? error.message : String(error),
-		error: true,
+	const formSlot = createFormSlot(bridge, formBox, labels.formTitle, {
+		onReady: () => {
+			message = null
+			refresh()
+		},
+		onError: (text) => {
+			message = { text, error: true }
+			refresh()
+		},
 	})
+	let picking = false
+
+	const failure = (error: unknown) => ({ text: reason(error), error: true })
 
 	const render = (state: BridgeState) => {
 		const available = state.features.includes('prompt')
@@ -878,43 +719,21 @@ export const mountPromptBox = (
 		pill.hidden = open || !available
 		viewing.hidden = available || !site
 		panel.hidden = !open || !available
-		const canCreate = site && state.features.includes('create')
-		// A page of the site that isn't an entry (no `editable(entry)`, like a
-		// hand-written /about) has nothing to edit: only New page.
-		const pageless = site && bridge.entryId === null
-		// …unless it shows a product (collection): then Add a product
-		// (collection) page first.
-		const shopHere =
-			!pageless || !canCreate
-				? null
-				: bridge.product
-					? ('product' as const)
-					: bridge.collection
-						? ('collection' as const)
-						: null
+		const { canCreate, pageless, shopHere, onlyNew } = pageContext(
+			bridge,
+			state,
+			options.promptWithoutPage,
+		)
 		const productHere = shopHere !== null
-		const shopCopy =
-			shopHere === 'collection'
-				? {
-						add: labels.addCollectionPage,
-						adding: labels.addingCollectionPage,
-						hint: labels.collectionPageHint,
-					}
-				: {
-						add: labels.addProductPage,
-						adding: labels.addingProductPage,
-						hint: labels.productPageHint,
-					}
+		const shopCopy = shopWords(labels, shopHere)
 		addProduct.lastChild!.textContent = shopCopy.add
-		const onlyNew =
-			pageless && canCreate && !productHere && !options.promptWithoutPage
 		if (!canCreate) creating = false
 		if (onlyNew) creating = true
 		if (creating || pageless || !site) form = false
 		// The form is there only while shown in the open panel.
 		const showForm = open && available && form
-		if (showForm && !formHandle) mountForm()
-		else if (!showForm && formHandle) unmountForm()
+		if (showForm && !formSlot.mounted) formSlot.mount()
+		else if (!showForm && formSlot.mounted) formSlot.unmount()
 		const offerProduct = productHere && !creating
 		pillText.textContent = offerProduct
 			? shopCopy.add
@@ -933,8 +752,8 @@ export const mountPromptBox = (
 		pathInput.disabled = busy
 		input.hidden = form || picking || minimized || offerProduct
 		formBox.hidden = !form || picking || minimized
-		formBox.classList.toggle('loading', formLoading)
-		formLoader.hidden = !formLoading
+		formBox.classList.toggle('loading', formSlot.loading)
+		formLoader.hidden = !formSlot.loading
 		toolbar.hidden = picking
 		pagesSection.hidden = !picking
 		input.placeholder = creating
@@ -988,10 +807,8 @@ export const mountPromptBox = (
 		unsaved.hidden = !state.unsaved
 		pageChip.hidden = !site
 		pageChip.setAttribute('aria-expanded', String(picking))
-		pageChipText.textContent =
-			pages?.find(({ entryId }) => entryId === bridge.entryId)?.name ??
-			labels.pages
-		const loadingForm = form && formLoading && !picking
+		pageChipText.textContent = picker.current()?.name ?? labels.pages
+		const loadingForm = form && formSlot.loading && !picking
 		const working = state.prompting
 		// A form opening says so in its own place.
 		const note = state.prompting
@@ -1019,35 +836,6 @@ export const mountPromptBox = (
 		input.style.height = `${input.scrollHeight}px`
 	}
 
-	// Callbacks come later (the address is fetched first), never during a
-	// render.
-	const mountForm = () => {
-		formLoading = true
-		formBox.classList.add('loading')
-		const handle = bridge.openForm(formBox, {
-			title: labels.formTitle,
-			onReady: () => {
-				if (formHandle !== handle) return
-				formLoading = false
-				message = null
-				refresh()
-			},
-			onError: (text) => {
-				if (formHandle !== handle) return
-				formLoading = false
-				message = { text, error: true }
-				refresh()
-			},
-		})
-		formHandle = handle
-	}
-
-	const unmountForm = () => {
-		formHandle?.close()
-		formHandle = null
-		formLoading = false
-	}
-
 	const setForm = (next: boolean) => {
 		if (form === next) return
 		form = next
@@ -1067,8 +855,7 @@ export const mountPromptBox = (
 				if (!path) return pathInput.focus()
 				// The bridge opens the new page; this shows until it does.
 				await bridge.createPage(path, prompt)
-				pages = null
-				pagesLoad = null
+				picker.forget()
 				message = { text: labels.created, error: false }
 			} else {
 				const { summary } = await bridge.prompt(prompt)
@@ -1083,113 +870,12 @@ export const mountPromptBox = (
 		input.focus()
 	}
 
-	const fetchPages = () => {
-		pagesLoad ??= bridge.pages().then(
-			(list) => {
-				pages = list
-				pagesError = null
-				renderPages()
-				refresh()
-			},
-			(error: unknown) => {
-				pagesLoad = null
-				pagesError = failure(error).text
-				renderPages()
-			},
-		)
-		return pagesLoad
-	}
-
-	const matching = () => {
-		const query = search.value.trim().toLowerCase()
-		return (pages ?? []).filter(
-			(page) =>
-				!query ||
-				page.name.toLowerCase().includes(query) ||
-				page.url.toLowerCase().includes(query) ||
-				`/${page.path}`.toLowerCase().includes(query),
-		)
-	}
-
-	const renderPages = () => {
-		const list = matching()
-		active = Math.max(0, Math.min(active, list.length - 1))
-		optionList.textContent = ''
-		list.forEach((page, index) => {
-			const current = page.entryId === bridge.entryId
-			const option = element(
-				doc,
-				'li',
-				{
-					className: `option${index === active ? ' active' : ''}`,
-					id: `obelism-page-${index}`,
-				},
-				element(
-					doc,
-					'span',
-					{ className: 'option-text' },
-					element(doc, 'span', { textContent: page.name }),
-					element(doc, 'span', {
-						className: 'option-path',
-						textContent: page.url,
-					}),
-				),
-			)
-			option.setAttribute('role', 'option')
-			option.setAttribute('aria-selected', String(index === active))
-			if (page.status !== 'published') {
-				option.appendChild(
-					element(doc, 'span', {
-						className: 'badge',
-						textContent:
-							page.status === 'draft' ? labels.pageDraft : labels.pageChanged,
-					}),
-				)
-			}
-			if (current) {
-				option.setAttribute('aria-current', 'page')
-				const check = icon(doc, 'check')
-				check.removeAttribute('aria-hidden')
-				check.setAttribute('role', 'img')
-				check.setAttribute('aria-label', labels.pageCurrent)
-				option.appendChild(check)
-			}
-			option.addEventListener('click', () => choose(page))
-			optionList.appendChild(option)
-		})
-		const activeOption = optionList.children[active]
-		if (activeOption) {
-			search.setAttribute('aria-activedescendant', activeOption.id)
-			activeOption.scrollIntoView?.({ block: 'nearest' })
-		} else {
-			search.removeAttribute('aria-activedescendant')
-		}
-		const note = pagesError ?? (pages ? '' : labels.pagesLoading)
-		pagesNote.textContent = note || (list.length === 0 ? labels.pagesEmpty : '')
-		pagesNote.hidden = !pagesNote.textContent
-		pagesNote.className = `empty${pagesError ? ' error' : ''}`
-	}
-
 	const setPicking = (next: boolean) => {
 		picking = next
 		message = null
-		if (picking) {
-			search.value = ''
-			active = Math.max(
-				0,
-				(pages ?? []).findIndex(({ entryId }) => entryId === bridge.entryId),
-			)
-			void fetchPages()
-			renderPages()
-		}
+		if (picking) picker.reset()
 		refresh()
-		;(picking ? search : pageChip).focus()
-	}
-
-	const choose = (page: SitePage) => {
-		if (page.entryId === bridge.entryId) return setPicking(false)
-		// Asks first when changes aren't saved; stays here if told no.
-		bridge.openPage(page)
+		;(picking ? picker.search : pageChip).focus()
 	}
 
 	const setOpen = (next: boolean) => {
@@ -1200,7 +886,7 @@ export const mountPromptBox = (
 		}
 		refresh()
 		if (site) bridge.setSelecting(open && !creating)
-		if (open && site) void fetchPages()
+		if (open && site) void picker.fetch()
 	}
 
 	const setCreating = (next: boolean) => {
@@ -1214,15 +900,13 @@ export const mountPromptBox = (
 
 	const store = async (action: 'save' | 'publish') => {
 		message = null
-		try {
-			await bridge[action]()
-			message = {
-				text: action === 'save' ? labels.saved : labels.published,
-				error: false,
-			}
-		} catch (error) {
-			message = failure(error)
-		}
+		const error = await storeChanges(bridge, action)
+		message = error
+			? { text: error, error: true }
+			: {
+					text: action === 'save' ? labels.saved : labels.published,
+					error: false,
+				}
 		refresh()
 	}
 
@@ -1257,18 +941,7 @@ export const mountPromptBox = (
 	newPage.addEventListener('click', () => setCreating(true))
 	addProduct.addEventListener('click', async () => {
 		message = null
-		try {
-			// The bridge reloads the page; this shows until it does.
-			if (bridge.product) {
-				await bridge.createProductPage()
-				message = { text: labels.addedProductPage, error: false }
-			} else {
-				await bridge.createCollectionPage()
-				message = { text: labels.addedCollectionPage, error: false }
-			}
-		} catch (error) {
-			message = failure(error)
-		}
+		message = await addShopPage(bridge, labels)
 		refresh()
 	})
 	cancelNew.addEventListener('click', () => setCreating(false))
@@ -1282,26 +955,6 @@ export const mountPromptBox = (
 			input.focus()
 		} else if (event.key === 'Escape') {
 			setOpen(false)
-		}
-	})
-	search.addEventListener('input', () => {
-		active = 0
-		renderPages()
-	})
-	search.addEventListener('keydown', (event) => {
-		const count = optionList.children.length
-		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-			event.preventDefault()
-			if (count === 0) return
-			active = (active + (event.key === 'ArrowDown' ? 1 : -1) + count) % count
-			renderPages()
-		} else if (event.key === 'Enter' && !event.isComposing) {
-			event.preventDefault()
-			const page = matching()[active]
-			if (page) choose(page)
-		} else if (event.key === 'Escape') {
-			event.preventDefault()
-			setPicking(false)
 		}
 	})
 	undo.addEventListener('click', () => {
@@ -1330,7 +983,7 @@ export const mountPromptBox = (
 
 	return () => {
 		unsubscribe()
-		unmountForm()
+		formSlot.unmount()
 		host.remove()
 	}
 }

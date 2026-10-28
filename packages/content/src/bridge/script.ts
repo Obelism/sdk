@@ -1,4 +1,4 @@
-import { getContentBridge, mountPromptBox } from '../bridge'
+import { getContentBridge, mountPromptBox, mountSiteEditor } from '../bridge'
 import { DEFAULT_URL } from '../config'
 import type { ContentBridge } from './createBridge'
 
@@ -18,12 +18,14 @@ import type { ContentBridge } from './createBridge'
 //                          content.obelism.studio)
 //   data-prompt="false"    no prompt box; mount one later with
 //                          ObelismContent.mountPromptBox(document, bridge)
+//                          (on a site signed in to edit: mountSiteEditor)
 
 export type ScriptWindow = Window & {
 	ObelismBridge?: ContentBridge
 	ObelismContent?: {
 		getContentBridge: typeof getContentBridge
 		mountPromptBox: typeof mountPromptBox
+		mountSiteEditor: typeof mountSiteEditor
 	}
 }
 
@@ -44,6 +46,6 @@ export const startScriptBridge = (
 ) => {
 	const bridge = getContentBridge(readScriptOptions(script))
 	win.ObelismBridge = bridge
-	win.ObelismContent = { getContentBridge, mountPromptBox }
+	win.ObelismContent = { getContentBridge, mountPromptBox, mountSiteEditor }
 	return bridge
 }

@@ -249,16 +249,45 @@ import { editable, editableCollection } from '@obelism/content'
 await bridge.createCollectionPage() // bridge.collection says which
 ```
 
-There the box also switches between **Prompt** and **Form**. Form shows the
-CMS's own form for the page — or for the entry around the selected block —
-right in the box: the fields, and blocks as cards to open and add,
-as in the dashboard. Edits apply as you make them: they land in the unsaved
-changes, show on the page, and undo a burst of typing at a time. A prompt or
-an undo shows in the form too. The form is as tall as it needs to be (up to
-60% of the window), and the box can be minimized to its toolbar and footer to
-see the page, keeping the form as it is. A chip under the prompt names the page and
-opens every page of the space, drafts included, to go to one (at
-`pagePath`, in the page's language when it has a path there):
+On the site the prompt box is the **on-site editor** instead
+(`mountSiteEditor`, mounted by `getContentBridge` with the same options): a
+panel docked on the right, the site reflowed beside it (a sheet over the page
+on small screens). **Ask** sends a prompt for the selected block — or the
+whole page — and shows the answer with what it changed, before and after; the
+change shows on the page straight away, outlined as a preview, and needs
+**Keep it** before it can be saved (**Try another** and **Undo** take it
+back). **Edit fields** is the CMS's own form for the page — or for the entry
+around the selected block — right in the panel: the fields, and blocks as
+cards to open and add, as in the dashboard. Edits apply as you make them:
+they land in the unsaved changes, show on the page, and undo a burst of
+typing at a time. Hovered blocks show their name; Escape goes from a block
+back to the whole page. The header names the page and opens every page of
+the space, drafts included, to go to one (at `pagePath`, in the page's
+language when it has a path there), and shows the environment. A launcher
+at the bottom left minimizes the panel, hides the outlines and exits. Its
+words are `labels` (`SiteEditorLabels`, defaults in
+`DEFAULT_SITE_EDITOR_LABELS`).
+
+The site makes room for the panel with a margin on `<html>`, which moves
+everything in the page's flow. Elements with `position: fixed` (or `sticky`)
+stay on the viewport, so a fixed header or cart button would sit under the
+panel. Give them the room yourself with the `--obelism-dock` custom property
+the editor sets on `<html>` (`436px` while docked, `0px` otherwise), or add
+`data-obelism-dock` to the element and the editor sets its `right` and
+`max-width` while docked:
+
+```css
+.site-header {
+	position: fixed;
+	right: var(--obelism-dock, 0px);
+}
+```
+
+```html
+<button class="cart" data-obelism-dock>Cart</button>
+```
+
+The form, the pages and saving work as below:
 
 ```ts
 const form = bridge.openForm(element, { onReady, onError }) // an iframe

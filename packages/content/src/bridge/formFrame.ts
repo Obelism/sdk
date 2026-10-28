@@ -8,11 +8,13 @@ import { BRIDGE_SOURCE } from './createBridge'
 // Messages are only exchanged with the URL's origin, and only with the
 // iframe's window:
 // - form → bridge: { source: 'obelism-content-form', type: 'ready' |
-//   'loaded' | 'change' | 'error' | 'height', loading?, content?, message?,
-//   height? } — `ready` with `loading: true` when the form still loads the
+//   'loaded' | 'change' | 'error' | 'height' | 'escape', loading?, content?,
+//   message?, height? } — `ready` with `loading: true` when the form still loads the
 //   entry after it and says `loaded` once it shows (a CMS from before says
 //   only `ready`), `change` carries the whole entry content after an edit,
-//   `height` the form's own height in px, which the iframe takes (up to 60vh)
+//   `height` the form's own height in px, which the iframe takes (up to 60vh),
+//   `escape` that Escape was pressed in it (focus there never reaches the
+//   page's keydown)
 // - bridge → form: { source: 'obelism-content-bridge', type: 'content',
 //   entryId, content, locale, selectedUid }
 
@@ -39,6 +41,7 @@ export type FormFrameHandlers = {
 		entryId: string | undefined,
 	) => void
 	onError: (message: string) => void
+	onEscape?: (() => void) | undefined
 }
 
 export type FormFrame = {
@@ -130,6 +133,8 @@ export const mountFormFrame = (
 				const px = Math.round(Math.min(Math.max(height, 80), 4000))
 				iframe.style.height = `min(${px}px, 60vh)`
 			}
+		} else if (data.type === 'escape') {
+			handlers.onEscape?.()
 		} else if (data.type === 'error') {
 			handlers.onError(
 				typeof data.message === 'string' && data.message

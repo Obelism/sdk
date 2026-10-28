@@ -233,7 +233,7 @@ describe('mountPromptBox', () => {
 			.filter((button) => !button.closest('[hidden]'))
 			.map((button) => button.textContent)
 		expect(visible).not.toContain('Save')
-		expect(visible).not.toContain('Exit editing')
+		expect(visible).not.toContain('Exit')
 	})
 
 	it('saves, publishes and signs out on the site', async () => {
@@ -262,7 +262,7 @@ describe('mountPromptBox', () => {
 		)
 		expect($('.status').className).toContain('error')
 
-		button('Exit editing').click()
+		button('Exit').click()
 		expect(bridge.signOut).toHaveBeenCalled()
 	})
 
@@ -284,7 +284,7 @@ describe('mountPromptBox', () => {
 		expect($('.footer slot[name="actions-footer"]')).not.toBeNull()
 
 		const exit = [...shadow().querySelectorAll('button')].find(
-			(button) => button.textContent === 'Exit editing',
+			(button) => button.textContent === 'Exit',
 		)!
 		expect(exit.hidden).toBe(true)
 
@@ -351,7 +351,7 @@ describe('mountPromptBox', () => {
 			.map((button) => button.textContent)
 		expect(visible).not.toContain('Save')
 		expect(visible).not.toContain('Publish')
-		expect(visible).toContain('Exit editing')
+		expect(visible).toContain('Exit')
 		// No way back to editing a page that isn't there.
 		expect($<HTMLButtonElement>('.scope:not([hidden]) button').hidden).toBe(
 			true,
@@ -478,11 +478,11 @@ describe('mountPromptBox', () => {
 			[...shadow().querySelectorAll('button')]
 				.filter((button) => !button.closest('[hidden]') && !button.hidden)
 				.map((button) => button.textContent)
-		expect(mode('Prompt').getAttribute('aria-pressed')).toBe('true')
+		expect(mode('Ask').getAttribute('aria-pressed')).toBe('true')
 		expect(bridge.openForm).not.toHaveBeenCalled()
 
-		mode('Form').click()
-		expect(mode('Form').getAttribute('aria-pressed')).toBe('true')
+		mode('Edit fields').click()
+		expect(mode('Edit fields').getAttribute('aria-pressed')).toBe('true')
 		expect(bridge.openForm).toHaveBeenCalledTimes(1)
 		const form = $<HTMLElement>('.form')
 		expect(form.hidden).toBe(false)
@@ -497,7 +497,7 @@ describe('mountPromptBox', () => {
 		expect($<HTMLButtonElement>('.primary').hidden).toBe(true)
 		expect(visible()).not.toContain('New page')
 		expect(visible()).toEqual(
-			expect.arrayContaining(['Save', 'Publish', 'Exit editing']),
+			expect.arrayContaining(['Save', 'Publish', 'Exit']),
 		)
 
 		forms[0]!.options.onReady!()
@@ -515,11 +515,11 @@ describe('mountPromptBox', () => {
 		expect($('.status').className).toContain('error')
 
 		// Back to Prompt: the form goes, and a fresh one comes next time.
-		mode('Prompt').click()
+		mode('Ask').click()
 		expect(form.querySelector('iframe')).toBeNull()
 		expect($<HTMLTextAreaElement>('textarea').hidden).toBe(false)
 		expect($<HTMLButtonElement>('.primary').hidden).toBe(false)
-		mode('Form').click()
+		mode('Edit fields').click()
 		expect(bridge.openForm).toHaveBeenCalledTimes(2)
 		// A late answer from the first form changes nothing.
 		forms[0]!.options.onReady!()
@@ -533,7 +533,7 @@ describe('mountPromptBox', () => {
 		expect(form.querySelectorAll('iframe')).toHaveLength(1)
 
 		// Not for a new page.
-		mode('Prompt').click()
+		mode('Ask').click()
 		;[...shadow().querySelectorAll('button')]
 			.find((button) => button.textContent === 'New page')!
 			.click()
@@ -708,7 +708,7 @@ describe('mountPromptBox', () => {
 		expect($<HTMLElement>('.modes').hidden).toBe(true)
 		setState({ features: ['prompt', 'form', 'create'] })
 		expect($<HTMLElement>('.modes').hidden).toBe(false)
-		expect($('.modes').textContent).toBe('PromptForm')
+		expect($('.modes').textContent).toBe('AskEdit fields')
 		;[...shadow().querySelectorAll('button')]
 			.find((button) => button.textContent === 'New page')!
 			.click()

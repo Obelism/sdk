@@ -84,6 +84,15 @@ describe('readSiteEditing', () => {
 })
 
 describe('createSiteBridge', () => {
+	it('says which environment the session edits, once it loaded', async () => {
+		const { win } = site({
+			session: () => ({ ...SESSION, environment: 'staging' }),
+		})
+		const bridge = createSiteBridge(win, '/cms')
+		expect(bridge.environment).toBeNull()
+		await vi.waitFor(() => expect(bridge.environment).toBe('staging'))
+	})
+
 	it('edits in memory, then saves and publishes what changed', async () => {
 		const { win, calls, reload } = site({
 			session: () => SESSION,
