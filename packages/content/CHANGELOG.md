@@ -1,5 +1,11 @@
 # @obelism/content
 
+## 0.27.1
+
+### Patch Changes
+
+- f048fa2: The on-site editor opens on **Edit fields**. **Ask** is a small button in the header instead of a pair of tabs, pressed while the ask view shows, and back to the fields on another click (a waiting suggestion is still kept or undone first).
+
 ## 0.27.0
 
 ### Minor Changes
