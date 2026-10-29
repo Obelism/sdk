@@ -23,6 +23,9 @@ The home route also keeps the template's new arrivals and collections, and the
 test's two variants differ before hydration: `view-source` shows the loader's
 value in `data-improve-variant`.
 
+A deployment lives at `https://oxygen-test-store-a7b6e51a1b166c36689d.o2.myshopify.dev`
+(private; open it with the deployment's `oxygen-auth-bypass-token` header).
+
 ## Run it locally
 
 From the repository root (`Obelism/sdk`), where the workspace installs every
@@ -114,12 +117,35 @@ a public environment; the single-store paid plans allow one.
 - [numbers](https://numbers.obelism.studio/docs/getting-started) and [POST /api/log](https://numbers.obelism.studio/docs/api/log#from-a-storefront)
 - [Content assets](https://content.obelism.studio/docs/guides/assets) and [images](https://content.obelism.studio/docs/api/images)
 
-## What this store could not verify
+## What this deployment verified
 
-The Obelism store this was built against is a development store, so Oxygen
-refused a public environment. That leaves four checklist items unverified here:
-the canvas framing a deployed environment, `/cms/login` with a real editor
-account, a second deployment's preview origin being refused, and hotspots from
-tagged Shopify products (the space has no store connected to Content). Locally,
-the draft read, the TTL, the Improve cookies and variant, the numbers script and
-server event, the signed private file and the GID product read all work.
+The app is deployed to Oxygen (the production environment of
+`oxygen-test-store` on `obelism-commerce`). From the environment URL, with the
+auth bypass header while the environment is private:
+
+- Content renders the `home` and `pages/about` entries, assets with `srcset`, the
+  signed private PDF, and the CSP that lets the canvas frame it.
+- Improve's config and exposure requests from the Oxygen origin answer `200`
+  after the environment URL is in allowed origins; `visitorId` and `home-hero`
+  are set on the first response and variant B renders in the first paint.
+- numbers page views POST `200` from the Oxygen origin.
+- `/p/<id>` reads `gid://shopify/Product/…` with `Cache.short()` and shows the
+  live price and stock.
+- `/cms/login` redirects to Content with the environment URL as `redirect_uri`.
+- A publish showed on Oxygen within 6 seconds.
+
+## What this deployment could not verify
+
+- **The canvas and a real `/cms/login` sign-in.** Oxygen offers only private
+  environments on this development store ("Only private environments are
+  available on your plan"), so the canvas gets the Shopify login page. That is
+  the limit the Oxygen guide describes; the preview URL is set to the
+  environment URL for when the store can publish it.
+- **A second deployment's preview origin being refused.** Preview URLs change
+  per deployment; the environment URL is the one added to allowed origins.
+- **Hotspots from tagged products.** The space has no Shopify store connected to
+  Content, so every asset's `products` list is empty; the renderer handles
+  `products[].position` but has not drawn a non-empty list.
+- **numbers and Improve dashboard counts.** Both accept the browser requests
+  with `200`, but the space's numbers report still shows 0 and the test stays
+  `pending`; that is the backend's queue, not the storefront.
