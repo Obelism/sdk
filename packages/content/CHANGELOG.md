@@ -1,5 +1,11 @@
 # @obelism/content
 
+## 0.27.2
+
+### Patch Changes
+
+- f9418b3: The on-site editor's form shows which block it edits, with **Whole page** to go back to the page, as the ask view does.
+
 ## 0.27.1
 
 ### Patch Changes
