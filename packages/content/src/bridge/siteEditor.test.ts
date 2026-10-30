@@ -444,6 +444,25 @@ describe('mountSiteEditor', () => {
 		expect(bridge.select).toHaveBeenLastCalledWith(null)
 	})
 
+	it('offers the whole page above the form as well', async () => {
+		const { bridge, setState } = fakeBridge()
+		unmount = mountSiteEditor(document, bridge)
+		setState({ features: ['prompt', 'form'] })
+		await settle()
+		const back = () => $('.fields .note')
+		expect(back().hidden).toBe(true)
+
+		bridge.select('hero_1')
+		expect(back().hidden).toBe(false)
+		expect(back().textContent).toContain(
+			'Working on Hero title. Click another block to switch.',
+		)
+
+		button('Whole page', '.fields').click()
+		expect(bridge.select).toHaveBeenLastCalledWith(null)
+		expect(back().hidden).toBe(true)
+	})
+
 	it('washes the previewed block and names its page', async () => {
 		document.title = 'Home page'
 		const { bridge, setState, answer } = fakeBridge()
