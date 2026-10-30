@@ -261,7 +261,8 @@ switches to prompts for the selected block — or the whole page — and shows
 the answer with what it changed, before and after; the change shows on the
 page straight away, outlined as a preview, and needs **Keep it** before it
 can be saved (**Try another** and **Undo** take it back). Hovered blocks
-show their name; Escape goes from a block back to the whole page. The header
+show their name; Escape — or **Whole page** above the form — goes from a
+block back to the whole page. The header
 names the page and opens every page of the space, drafts included, to go to
 one (at `pagePath`, in the page's language when it has a path there), and
 shows the environment. A launcher at the bottom left minimizes the panel,

@@ -302,7 +302,9 @@ textarea:disabled, .path input:disabled { opacity: .6; }
 .send .icon svg { stroke-width: 2; }
 .send .working svg, .send .working .accent { fill: rgb(var(--ink)); }
 
-.form { position: relative; flex: 1; min-height: 0; margin: 12px 14px 0; }
+.fields { padding-top: 12px; }
+.fields .note { margin: 0 14px 14px; }
+.form { position: relative; flex: 1; min-height: 0; margin: 0 14px; }
 .form iframe {
 	display: block; width: 100%; height: 100% !important; border: 0; border-radius: 12px; background: rgb(var(--subtle));
 }
@@ -662,10 +664,22 @@ export const mountSiteEditor = (
 	const formNote = element(doc, 'p', { className: 'form-note' })
 	formNote.setAttribute('role', 'status')
 	const formBox = element(doc, 'div', { className: 'form' }, formNote)
+	// The same way back as the ask view's note, above the form it changes.
+	const fieldsNoteText = element(doc, 'span')
+	const wholePageFields = button('', labels.scopeEntry)
+	const fieldsNote = element(
+		doc,
+		'div',
+		{ className: 'note' },
+		icon('scope'),
+		fieldsNoteText,
+		wholePageFields,
+	)
 	const fields = element(
 		doc,
 		'div',
 		{ className: 'fields', id: 'obelism-fields' },
+		fieldsNote,
 		formBox,
 	)
 	fields.setAttribute('role', 'tabpanel')
@@ -1178,14 +1192,16 @@ export const mountSiteEditor = (
 			noteText.textContent = labels.newPage
 		} else if (state.selectedUid) {
 			const [beforeName, afterName = ''] = labels.scopeNoteBlock.split('{name}')
-			noteText.replaceChildren(
-				beforeName ?? '',
-				element(doc, 'strong', { textContent: nameOf(state.selectedUid) }),
-				afterName,
-			)
+			for (const text of [noteText, fieldsNoteText])
+				text.replaceChildren(
+					beforeName ?? '',
+					element(doc, 'strong', { textContent: nameOf(state.selectedUid) }),
+					afterName,
+				)
 		} else {
 			noteText.textContent = labels.scopeNotePage
 		}
+		fieldsNote.hidden = creating || !state.selectedUid
 		note.hidden =
 			offerShop || (pageless && !creating && !options.promptWithoutPage)
 		wholePage.hidden = creating || !state.selectedUid
@@ -1479,6 +1495,10 @@ export const mountSiteEditor = (
 	wholePage.addEventListener('click', () => {
 		bridge.select(null)
 		input.focus()
+	})
+	wholePageFields.addEventListener('click', () => {
+		bridge.select(null)
+		focusForm()
 	})
 	shopButton.addEventListener('click', async () => {
 		shopMessage = null
