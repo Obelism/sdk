@@ -1,7 +1,7 @@
 {
 	"name": "@obelism/improve-sdk",
 	"description": "Obelism Improve SDK",
-	"version": "3.4.0",
+	"version": "3.5.0",
 	"keywords": [
 		"ab-tests",
 		"feature-flags",
@@ -64,7 +64,7 @@
 		"clean": "rm -rf ./node_modules && rm -rf ./dist && rm -rf ./.turbo"
 	},
 	"dependencies": {
-		"@obelism/numbers-sdk": "^0.3.0"
+		"@obelism/numbers-sdk": "^0.4.0"
 	},
 	"peerDependencies": {
 		"ua-parser-js": "^2.0.0",
