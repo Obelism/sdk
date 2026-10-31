@@ -28,11 +28,17 @@ client on `window.numbers`:
 numbers.track('sign_up', 'footer_form')
 ```
 
+A page view is counted once per pathname: a change that only touches the
+query string or hash (`?tab=2`, `#pricing`) isn't a second page view.
+
 `data-space` names the space (one site or project of the organization) the
 events belong to; without it they go to the organization's first space.
 `data-endpoint="https://…"` sends somewhere else, e.g. a proxy on your own
-domain. npm CDNs serve the same file from
-`@obelism/numbers-sdk/dist/script.global.js`.
+domain; without it events go to numbers' origin, even when a CDN serves the
+file. `data-debug` turns on the client's development warnings (snake_case
+names, an 8 KB body, a `data-space` it can't use), and
+`data-storage="session"` (or `"none"`) counts without a cookie. npm CDNs
+serve the same file from `@obelism/numbers-sdk/dist/script.global.js`.
 
 ## Module
 
@@ -52,7 +58,8 @@ const numbers = createNumbers({
 })
 
 // Page views now and on every navigation, and clicks on tagged elements.
-const stop = numbers.autoTrack() // { pageViews?: boolean, clicks?: boolean }
+const stop = numbers.autoTrack()
+// { pageViews?, clicks?, outbound?, downloads?, forms? }
 
 numbers.track('add_to_cart', 'product_page', {
 	value: 59.95,
@@ -60,8 +67,15 @@ numbers.track('add_to_cart', 'product_page', {
 	params: { ecommerce: { items: [{ item_id: 'sku_1' }] } },
 })
 numbers.track('view_item', 'list', { dedupeKey: 'sku_1' }) // once per key
+numbers.formSubmit(form, 'newsletter') // or autoTrack({ forms: true })
 numbers.pageView() // by hand, without autoTrack
 ```
+
+`autoTrack({ outbound: true })` sends `outbound_click` for links to another
+site, `downloads: true` sends `file_download` for links to a file, and
+`forms: true` sends `form_submit` for each submitted form. Calling
+`autoTrack` again replaces the previous listeners, so it doesn't double
+count.
 
 The client is safe to create during server rendering: outside the browser
 every call does nothing and returns `null`.
@@ -93,11 +107,19 @@ its visual editor shows each block's click rate.
 
 ### Visitors
 
-A visitor is a random id in the `visitorId` cookie (`visi_` and 26
+A visitor is a random id in the `obelism_visitor_id` cookie (`visi_` and 26
 characters, 30 days from the last visit), the same cookie the improve SDK
-uses. `numbers.visitor()` returns `{ id, recurring }`. The device categories
+uses. The old `visitorId` cookie is read and written too, for a deprecation
+window, so a site that still runs an older improve SDK keeps one visitor.
+`numbers.visitor()` returns `{ id, recurring }`. The device categories
 (pointer, device, browser, os, screen size) come from the user agent; pass
 `device` to `createNumbers` (or call `setDevice`) to use your own.
+
+For a site that counts without asking for consent, `storage: 'session'`
+keeps the id in sessionStorage for the tab and `storage: 'none'` makes a new
+one on every client (so every full load in a page that isn't an SPA): neither
+sets a cookie. The script takes the same as
+`data-storage`.
 
 ### Limits
 

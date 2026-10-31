@@ -1,16 +1,25 @@
 import {
+	LEGACY_VISITOR_COOKIE,
 	VISITOR_COOKIE,
 	VISITOR_COOKIE_DAYS,
 	VISITOR_ID_LENGTH,
 	VISITOR_ID_PREFIX,
 	VISITOR_ID_SEPARATOR,
+	VISITOR_SESSION_KEY,
 } from './constants'
 
 export type Visitor = {
 	id: string
-	/** Whether the visitor had a cookie already: `recurring` on the server. */
+	/** Whether the visitor had an id already: `recurring` on the server. */
 	recurring: boolean
 }
+
+/**
+ * Where the visitor id lives. `cookie` is the shared 30-day cookie; `session`
+ * keeps it in sessionStorage for the tab only (no cookie); `none` makes a new
+ * id for every page load, so visits still count but unique visitors don't.
+ */
+export type VisitorStorage = 'cookie' | 'session' | 'none'
 
 const CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
@@ -46,12 +55,41 @@ export const createVisitorId = () => {
 	return `${VISITOR_ID_PREFIX}${VISITOR_ID_SEPARATOR}${id}`
 }
 
-// The visitor in the cookie, or a new one; either way the cookie is set
-// again, so it lasts 30 days from the last visit.
-export const loadVisitor = (): Visitor => {
-	const existing = readCookie(VISITOR_COOKIE)
+const readStoredVisitor = (storage: 'cookie' | 'session') => {
+	if (storage === 'session') {
+		try {
+			return sessionStorage.getItem(VISITOR_SESSION_KEY) ?? ''
+		} catch {
+			return ''
+		}
+	}
+	return readCookie(VISITOR_COOKIE) || readCookie(LEGACY_VISITOR_COOKIE)
+}
+
+const writeStoredVisitor = (storage: 'cookie' | 'session', id: string) => {
+	if (storage === 'session') {
+		try {
+			sessionStorage.setItem(VISITOR_SESSION_KEY, id)
+		} catch {
+			// Storage can be disabled; the id then lives for this call only.
+		}
+		return
+	}
+	writeCookie(VISITOR_COOKIE, id)
+	// Write the old cookie too, for a deprecation window: a site that still
+	// runs an older improve SDK reads only `visitorId` and would mint a second
+	// id for the same person. Drop this with the legacy read.
+	writeCookie(LEGACY_VISITOR_COOKIE, id)
+}
+
+// The visitor in its storage, or a new one; either way it is written again, so
+// the cookie lasts 30 days from the last visit and the session id lasts the tab.
+export const loadVisitor = (storage: VisitorStorage = 'cookie'): Visitor => {
+	if (storage === 'none') return { id: createVisitorId(), recurring: false }
+
+	const existing = readStoredVisitor(storage)
 	const recurring = isVisitorId(existing)
 	const id = recurring ? existing : createVisitorId()
-	writeCookie(VISITOR_COOKIE, id)
+	writeStoredVisitor(storage, id)
 	return { id, recurring }
 }

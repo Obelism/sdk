@@ -1,3 +1,5 @@
+import type { VisitorStorage } from './visitor'
+
 export type Environment = 'develop' | 'staging' | 'production'
 
 /**
@@ -30,6 +32,13 @@ export type NumbersOptions = {
 	device?: Device
 	/** Silence the development warnings (e.g. a name that isn't snake_case). */
 	disableWarnings?: boolean
+	/**
+	 * Where the visitor id lives. Default `cookie`: the shared 30-day
+	 * `obelism_visitor_id` cookie. `session` keeps it in sessionStorage for the
+	 * tab only, and `none` makes a new id per page load: neither sets a cookie,
+	 * for a site that counts visits without asking for consent.
+	 */
+	storage?: VisitorStorage
 }
 
 /**

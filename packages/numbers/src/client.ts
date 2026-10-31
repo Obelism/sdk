@@ -28,7 +28,53 @@ export type AutoTrackOptions = {
 	 * element with `data-numbers-id="…"`. Default on.
 	 */
 	clicks?: boolean
+	/**
+	 * An `outbound_click` for clicks on links to another site, scoped to the
+	 * destination (or the link's `data-numbers-id`). Default off.
+	 */
+	outbound?: boolean
+	/**
+	 * A `file_download` for clicks on links to a file, scoped to its name (or
+	 * the link's `data-numbers-id`). Default off.
+	 */
+	downloads?: boolean
+	/**
+	 * A `form_submit` for every submitted form, scoped to its
+	 * `data-numbers-id`, its `id`, or its action. Default off.
+	 */
+	forms?: boolean
 }
+
+// Documents, archives and media, not images a browser shows inline (a link
+// with `download` still counts, whatever it points at).
+const DOWNLOAD_EXTENSIONS = [
+	'7z',
+	'avi',
+	'csv',
+	'doc',
+	'docx',
+	'gz',
+	'mov',
+	'mp3',
+	'mp4',
+	'pdf',
+	'ppt',
+	'pptx',
+	'rar',
+	'tar',
+	'txt',
+	'wav',
+	'xls',
+	'xlsx',
+	'xml',
+	'zip',
+]
+
+const isDownload = (url: URL, link: HTMLAnchorElement) =>
+	link.hasAttribute('download') ||
+	DOWNLOAD_EXTENSIONS.includes(
+		url.pathname.split('.').pop()?.toLowerCase() ?? '',
+	)
 
 /** What a send resolves to: the response, or nothing when it failed. */
 export type Sent = Promise<Response | undefined>
@@ -54,9 +100,11 @@ export type NumbersClient = {
 	) => Sent | null
 	/** Sends a page view of the current page. */
 	pageView: () => Sent | null
+	/** Sends a `form_submit` for a form, scoped to its id or action. */
+	formSubmit: (form: HTMLFormElement, scope?: string) => Sent | null
 	/** Sends a test's or flag's assignment, once per subject per client. */
 	expose: (exposure: Exposure) => Sent | null
-	/** Starts page views and click tracking; returns a function that stops them. */
+	/** Starts automatic tracking; returns a function that stops it. */
 	autoTrack: (options?: AutoTrackOptions) => () => void
 }
 
@@ -80,6 +128,7 @@ export const createNumbers = ({
 	endpoint = DEFAULT_ENDPOINT,
 	device: givenDevice,
 	disableWarnings = false,
+	storage = 'cookie',
 }: NumbersOptions): NumbersClient => {
 	let visitor: Visitor | null = null
 	let device = givenDevice
@@ -87,6 +136,7 @@ export const createNumbers = ({
 	// Epoch ms until which sending is paused after a 429.
 	let pausedUntil = 0
 	let firstPageView = true
+	let stopAutoTrack: (() => void) | null = null
 	const sentKeys = new Set<string>()
 	const exposed = new Set<string>()
 	const warned = new Set<string>()
@@ -99,7 +149,7 @@ export const createNumbers = ({
 
 	const getVisitor = () => {
 		if (!isBrowser()) return null
-		visitor ??= loadVisitor()
+		visitor ??= loadVisitor(storage)
 		return visitor
 	}
 
@@ -136,7 +186,9 @@ export const createNumbers = ({
 			)
 		return fetch(url, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			// A CORS-safelisted type, so a browser sends the event without a
+			// preflight; numbers parses the body as JSON either way.
+			headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
 			body: serialized,
 			keepalive: true,
 		}).then(
@@ -205,6 +257,22 @@ export const createNumbers = ({
 		return sendEvent('page_view', location.pathname, {}, referrer)
 	}
 
+	const formScope = (form: HTMLFormElement) => {
+		const given = form.getAttribute('data-numbers-id') || form.id
+		if (given) return given
+		try {
+			const action = new URL(form.action, location.href)
+			return action.origin === location.origin
+				? action.pathname
+				: `${action.origin}${action.pathname}`
+		} catch {
+			return 'form'
+		}
+	}
+
+	const formSubmit: NumbersClient['formSubmit'] = (form, scope) =>
+		track('form_submit', scope || formScope(form))
+
 	const expose = (exposure: Exposure) => {
 		const current = getVisitor()
 		if (!current || paused()) return null
@@ -217,8 +285,14 @@ export const createNumbers = ({
 	const autoTrack = ({
 		pageViews = true,
 		clicks = true,
+		outbound = false,
+		downloads = false,
+		forms = false,
 	}: AutoTrackOptions = {}) => {
 		if (!isBrowser()) return () => {}
+		// A second call replaces the first instead of stacking listeners, so a
+		// site can add outbound/download/form tracking to the script's autoTrack.
+		stopAutoTrack?.()
 		const stops: (() => void)[] = []
 
 		if (pageViews) {
@@ -263,9 +337,51 @@ export const createNumbers = ({
 			stops.push(() => document.removeEventListener('click', onClick, true))
 		}
 
-		return () => {
-			for (const stop of stops) stop()
+		if (outbound || downloads) {
+			const onLinkClick = (event: MouseEvent) => {
+				const target = event.target as Element | null
+				const link = target?.closest?.('a[href]') as HTMLAnchorElement | null
+				if (!link) return
+				let url: URL
+				try {
+					url = new URL(link.href, location.href)
+				} catch {
+					return
+				}
+				const id = link
+					.closest('[data-numbers-id]')
+					?.getAttribute('data-numbers-id')
+				if (downloads && isDownload(url, link))
+					track(
+						'file_download',
+						id ?? url.pathname.split('/').pop() ?? url.pathname,
+					)
+				else if (
+					outbound &&
+					url.origin !== location.origin &&
+					/^https?:$/.test(url.protocol)
+				)
+					track('outbound_click', id ?? `${url.origin}${url.pathname}`)
+			}
+			document.addEventListener('click', onLinkClick, true)
+			stops.push(() => document.removeEventListener('click', onLinkClick, true))
 		}
+
+		if (forms) {
+			const onSubmit = (event: Event) => {
+				const form = event.target
+				if (form instanceof HTMLFormElement) formSubmit(form)
+			}
+			document.addEventListener('submit', onSubmit, true)
+			stops.push(() => document.removeEventListener('submit', onSubmit, true))
+		}
+
+		const stop = () => {
+			for (const fn of stops) fn()
+			if (stopAutoTrack === stop) stopAutoTrack = null
+		}
+		stopAutoTrack = stop
+		return stop
 	}
 
 	return {
@@ -281,6 +397,7 @@ export const createNumbers = ({
 		},
 		track,
 		pageView,
+		formSubmit,
 		expose,
 		autoTrack,
 	}

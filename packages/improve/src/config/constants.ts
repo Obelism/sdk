@@ -1,4 +1,7 @@
-export const COOKIE_NAME_VISITOR = 'visitorId'
+// The same namespaced cookie as @obelism/numbers-sdk (its constants.ts), so
+// a visitor is one in both. The old `visitorId` is still read for visitors
+// who have it.
+export const COOKIE_NAME_VISITOR = 'obelism_visitor_id'
 
 export const VISITOR_ID_PREFIX = 'visi'
 
