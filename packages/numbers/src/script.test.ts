@@ -78,7 +78,7 @@ describe('startScript', () => {
 		expect(JSON.parse(String(init!.body)).spaceId).toBe('space_1')
 	})
 
-	it('warns about a data-space it has to drop', () => {
+	it('warns about a data-space it has to drop, with data-debug', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 		startScript(
 			window,
@@ -86,6 +86,7 @@ describe('startScript', () => {
 				src: 'https://numbers.obelism.studio/script.js',
 				'data-organization': 'org_1',
 				'data-space': 'Example Shop',
+				'data-debug': '',
 			}),
 		)
 		expect(warn).toHaveBeenCalledWith(
@@ -96,13 +97,14 @@ describe('startScript', () => {
 		).not.toHaveProperty('spaceId')
 	})
 
-	it('warns about a data-organization that is not an org_… id', () => {
+	it('warns about a data-organization that is not an org_… id, with data-debug', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 		startScript(
 			window,
 			scriptTag({
 				src: 'https://numbers.obelism.studio/script.js',
 				'data-organization': 'acme',
+				'data-debug': '',
 			}),
 		)
 		expect(warn).toHaveBeenCalledWith(
@@ -200,5 +202,51 @@ describe('startScript', () => {
 			startScript(window, scriptTag({ 'data-organization': 'org_1' })),
 		).toBeNull()
 		expect(fetchMock).not.toHaveBeenCalled()
+	})
+
+	it('warns about bad ids and storage only with data-debug', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+		const bad = {
+			src: 'https://numbers.obelism.studio/script.js',
+			'data-organization': 'nope',
+			'data-space': 'nope',
+			'data-storage': 'local',
+		}
+
+		startScript(window, scriptTag(bad))
+		expect(warn).not.toHaveBeenCalled()
+
+		delete (window as ScriptWindow).numbers
+		startScript(window, scriptTag({ ...bad, 'data-debug': '' }))
+		expect(warn).toHaveBeenCalledTimes(3)
+	})
+
+	it('warns about an unknown data-environment only with data-debug', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+		const tag = {
+			src: 'https://numbers.obelism.studio/script.js',
+			'data-organization': 'org_1',
+			'data-environment': 'prod',
+		}
+
+		startScript(window, scriptTag(tag))
+		expect(warn).not.toHaveBeenCalled()
+
+		delete (window as ScriptWindow).numbers
+		startScript(window, scriptTag({ ...tag, 'data-debug': '' }))
+		expect(warn).toHaveBeenCalledWith(
+			expect.stringContaining('data-environment "prod"'),
+		)
+	})
+
+	it('says an Organization is missing only with data-debug', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+		startScript(window, scriptTag({ src: '/script.js' }))
+		expect(warn).not.toHaveBeenCalled()
+
+		startScript(window, scriptTag({ src: '/script.js', 'data-debug': '' }))
+		expect(warn).toHaveBeenCalledWith(
+			'[numbers] data-organization is missing; nothing is tracked.',
+		)
 	})
 })

@@ -15,11 +15,17 @@ import type { VisitorStorage } from './visitor'
 //
 // It sends page views and clicks on tagged elements, and puts the client on
 // `window.numbers` (`numbers.track('sign_up', 'footer_form')`). Events go to
-// numbers' origin, or `data-endpoint`; `data-debug` turns on the client's
-// development warnings, and `data-storage="session|none"` counts without a
-// cookie.
+// numbers' origin, or `data-endpoint`; `data-debug` turns on the client's and
+// the script's development warnings, and `data-storage="session|none"` counts
+// without a cookie.
 
 export type ScriptWindow = Window & { numbers?: NumbersClient }
+
+const ENVIRONMENTS: readonly Environment[] = [
+	'develop',
+	'staging',
+	'production',
+]
 
 const NUMBERS_HOST = 'numbers.obelism.studio'
 
@@ -48,27 +54,28 @@ export const startScript = (
 	script: HTMLScriptElement | null,
 ) => {
 	if (!script || target.numbers) return null
-	const organizationId = script.dataset.organization
-	if (!organizationId) return null
 
+	// `data-debug` turns on every development warning: the client's (a name
+	// that isn't snake_case, a body over 8 KB) and this file's own below.
 	const debug = script.dataset.debug !== undefined
 	const warn = (message: string) => {
 		if (debug && typeof console !== 'undefined')
 			console.warn(`[numbers] ${message}`)
 	}
 
-	if (!organizationId.startsWith('org_') && typeof console !== 'undefined')
-		console.warn(
-			`[numbers] data-organization "${organizationId}" is not an org_… id.`,
-		)
+	const organizationId = script.dataset.organization
+	if (!organizationId) {
+		warn('data-organization is missing; nothing is tracked.')
+		return null
+	}
+	if (!organizationId.startsWith('org_'))
+		warn(`data-organization "${organizationId}" is not an org_… id.`)
 
 	const givenSpace = script.dataset.space
 	const spaceId =
 		givenSpace && givenSpace.startsWith('space_') ? givenSpace : undefined
-	if (givenSpace && !spaceId && typeof console !== 'undefined')
-		console.warn(
-			`[numbers] data-space "${givenSpace}" is not a space_… id and will be ignored.`,
-		)
+	if (givenSpace && !spaceId)
+		warn(`data-space "${givenSpace}" is not a space_… id and will be ignored.`)
 
 	const givenStorage = script.dataset.storage
 	if (givenStorage && givenStorage !== 'session' && givenStorage !== 'none')
@@ -76,10 +83,19 @@ export const startScript = (
 			`data-storage "${givenStorage}" is not "session" or "none"; using a cookie.`,
 		)
 
+	const givenEnvironment = script.dataset.environment
+	if (
+		givenEnvironment &&
+		!ENVIRONMENTS.includes(givenEnvironment as Environment)
+	)
+		warn(
+			`data-environment "${givenEnvironment}" is not one of ${ENVIRONMENTS.join(', ')}; using production.`,
+		)
+
 	const numbers = createNumbers({
 		organizationId,
 		spaceId,
-		environment: (script.dataset.environment || 'production') as Environment,
+		environment: (givenEnvironment || 'production') as Environment,
 		endpoint: script.dataset.endpoint || resolveEndpoint(script.src),
 		disableWarnings: !debug,
 		storage: storageOf(givenStorage),

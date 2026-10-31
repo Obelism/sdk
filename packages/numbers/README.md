@@ -35,8 +35,9 @@ query string or hash (`?tab=2`, `#pricing`) isn't a second page view.
 events belong to; without it they go to the organization's first space.
 `data-endpoint="https://…"` sends somewhere else, e.g. a proxy on your own
 domain; without it events go to numbers' origin, even when a CDN serves the
-file. `data-debug` turns on the client's development warnings (snake_case
-names, an 8 KB body, a `data-space` it can't use), and
+file. `data-debug` turns on the development warnings (snake_case names, an 8 KB
+body, a `data-organization` or `data-space` it can't use, an unknown
+`data-environment` or `data-storage`), and
 `data-storage="session"` (or `"none"`) counts without a cookie. npm CDNs
 serve the same file from `@obelism/numbers-sdk/dist/script.global.js`.
 

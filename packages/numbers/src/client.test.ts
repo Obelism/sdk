@@ -343,10 +343,20 @@ describe('autoTrack', () => {
 		])
 	})
 
+	it('does not count the page again when a second autoTrack keeps page views', () => {
+		const numbers = numbersFor()
+		numbers.autoTrack({ clicks: false })
+		const stop = numbers.autoTrack({ clicks: false })
+		history.pushState(null, '', '/one')
+		stop()
+		expect(sentBodies().map((body) => body.path)).toEqual(['/', '/one'])
+	})
+
 	it('counts outbound links and downloads when asked', () => {
 		document.body.innerHTML = `
 			<a id="out" href="https://elsewhere.example/path?q=1">out</a>
 			<a id="file" href="/files/report.pdf">pdf</a>
+			<a id="tagged" href="https://elsewhere.example/x" data-numbers-id="hero_cta">out</a>
 			<a id="same" href="/pricing">same</a>`
 		document.body.addEventListener('click', (event) => event.preventDefault())
 		const stop = numbersFor().autoTrack({
@@ -355,7 +365,7 @@ describe('autoTrack', () => {
 			outbound: true,
 			downloads: true,
 		})
-		for (const id of ['out', 'file', 'same'])
+		for (const id of ['out', 'file', 'tagged', 'same'])
 			document
 				.getElementById(id)!
 				.dispatchEvent(
@@ -363,9 +373,48 @@ describe('autoTrack', () => {
 				)
 		stop()
 		expect(sentBodies()).toMatchObject([
-			{ event: 'outbound_click', scope: 'https://elsewhere.example/path' },
-			{ event: 'file_download', scope: 'report.pdf' },
+			{
+				event: 'outbound_click',
+				scope: 'https://elsewhere.example/path',
+				params: { link_domain: 'elsewhere.example' },
+			},
+			{
+				event: 'file_download',
+				scope: 'report.pdf',
+				params: { file_name: 'report', file_extension: 'pdf' },
+			},
+			// The tag decides the scope, and the destination needs no params.
+			{ event: 'outbound_click', scope: 'hero_cta' },
 		])
+	})
+
+	it('counts a download attribute, and leaves out data: URLs and image links', () => {
+		document.body.innerHTML = `
+			<a id="named" href="/export" download>export</a>
+			<a id="image" href="/photo.jpg">photo</a>
+			<a id="data" href="data:text/csv,a,b" download>csv</a>`
+		document.body.addEventListener('click', (event) => event.preventDefault())
+		const stop = numbersFor().autoTrack({
+			pageViews: false,
+			clicks: false,
+			outbound: true,
+			downloads: true,
+		})
+		for (const id of ['named', 'image', 'data'])
+			document
+				.getElementById(id)!
+				.dispatchEvent(
+					new MouseEvent('click', { bubbles: true, cancelable: true }),
+				)
+		stop()
+		expect(sentBodies()).toMatchObject([
+			{
+				event: 'file_download',
+				scope: 'export',
+				params: { file_name: 'export' },
+			},
+		])
+		expect(sentBodies()).toHaveLength(1)
 	})
 
 	it('counts a form_submit, by its data-numbers-id, id or action', () => {
