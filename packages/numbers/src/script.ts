@@ -57,6 +57,11 @@ export const startScript = (
 			console.warn(`[numbers] ${message}`)
 	}
 
+	if (!organizationId.startsWith('org_') && typeof console !== 'undefined')
+		console.warn(
+			`[numbers] data-organization "${organizationId}" is not an org_… id.`,
+		)
+
 	const givenSpace = script.dataset.space
 	const spaceId =
 		givenSpace && givenSpace.startsWith('space_') ? givenSpace : undefined

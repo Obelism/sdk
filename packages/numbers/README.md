@@ -109,15 +109,16 @@ its visual editor shows each block's click rate.
 
 A visitor is a random id in the `obelism_visitor_id` cookie (`visi_` and 26
 characters, 30 days from the last visit), the same cookie the improve SDK
-uses. The old `visitorId` cookie is still read, so existing visitors keep
-their id. `numbers.visitor()` returns `{ id, recurring }`. The device
-categories (pointer, device, browser, os, screen size) come from the user
-agent; pass `device` to `createNumbers` (or call `setDevice`) to use your
-own.
+uses. The old `visitorId` cookie is read and written too, for a deprecation
+window, so a site that still runs an older improve SDK keeps one visitor.
+`numbers.visitor()` returns `{ id, recurring }`. The device categories
+(pointer, device, browser, os, screen size) come from the user agent; pass
+`device` to `createNumbers` (or call `setDevice`) to use your own.
 
 For a site that counts without asking for consent, `storage: 'session'`
 keeps the id in sessionStorage for the tab and `storage: 'none'` makes a new
-one per page load: neither sets a cookie. The script takes the same as
+one on every client (so every full load in a page that isn't an SPA): neither
+sets a cookie. The script takes the same as
 `data-storage`.
 
 ### Limits

@@ -46,6 +46,9 @@ describe('visitor', () => {
 		expect(visitor.id).toMatch(/^visi_[A-Z0-9]{26}$/)
 		expect(visitor.recurring).toBe(false)
 		expect(document.cookie).toContain(`obelism_visitor_id=${visitor.id}`)
+		// An older improve SDK reads only the legacy name; a fresh visitor must
+		// get it too, or the two SDKs split them in two.
+		expect(document.cookie).toContain(`visitorId=${visitor.id}`)
 	})
 
 	it('reuses a valid cookie as a recurring visitor', () => {

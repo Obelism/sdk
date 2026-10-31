@@ -96,6 +96,20 @@ describe('startScript', () => {
 		).not.toHaveProperty('spaceId')
 	})
 
+	it('warns about a data-organization that is not an org_… id', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+		startScript(
+			window,
+			scriptTag({
+				src: 'https://numbers.obelism.studio/script.js',
+				'data-organization': 'acme',
+			}),
+		)
+		expect(warn).toHaveBeenCalledWith(
+			expect.stringContaining('data-organization "acme"'),
+		)
+	})
+
 	it('warns about an unknown data-storage only with data-debug', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 		startScript(
