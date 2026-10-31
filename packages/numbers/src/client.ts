@@ -136,6 +136,9 @@ export const createNumbers = ({
 	// Epoch ms until which sending is paused after a 429.
 	let pausedUntil = 0
 	let firstPageView = true
+	// The path of the last page view, shared by every autoTrack: a second
+	// call replaces the listeners but must not count the page again.
+	let lastPath: string | null = null
 	let stopAutoTrack: (() => void) | null = null
 	const sentKeys = new Set<string>()
 	const exposed = new Set<string>()
@@ -298,7 +301,6 @@ export const createNumbers = ({
 		if (pageViews) {
 			// One page view per path: replaceState for a query or hash change
 			// isn't a new page.
-			let lastPath: string | null = null
 			const onNavigate = () => {
 				if (location.pathname === lastPath) return
 				lastPath = location.pathname
@@ -348,20 +350,37 @@ export const createNumbers = ({
 				} catch {
 					return
 				}
+				// Only http(s): a data: URL's path is its whole payload, and
+				// mailto:/tel: aren't destinations.
+				if (!/^https?:$/.test(url.protocol)) return
 				const id = link
 					.closest('[data-numbers-id]')
 					?.getAttribute('data-numbers-id')
+				const fileName = url.pathname.split('/').pop() || url.pathname
+				const extension = fileName.includes('.')
+					? fileName.split('.').pop()!.toLowerCase()
+					: ''
 				if (downloads && isDownload(url, link))
 					track(
 						'file_download',
-						id ?? url.pathname.split('/').pop() ?? url.pathname,
+						id ?? fileName,
+						id
+							? undefined
+							: {
+									params: {
+										file_name: extension
+											? fileName.slice(0, -(extension.length + 1))
+											: fileName,
+										...(extension && { file_extension: extension }),
+									},
+								},
 					)
-				else if (
-					outbound &&
-					url.origin !== location.origin &&
-					/^https?:$/.test(url.protocol)
-				)
-					track('outbound_click', id ?? `${url.origin}${url.pathname}`)
+				else if (outbound && url.origin !== location.origin)
+					track(
+						'outbound_click',
+						id ?? `${url.origin}${url.pathname}`,
+						id ? undefined : { params: { link_domain: url.hostname } },
+					)
 			}
 			document.addEventListener('click', onLinkClick, true)
 			stops.push(() => document.removeEventListener('click', onLinkClick, true))
