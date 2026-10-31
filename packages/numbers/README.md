@@ -31,8 +31,11 @@ numbers.track('sign_up', 'footer_form')
 `data-space` names the space (one site or project of the organization) the
 events belong to; without it they go to the organization's first space.
 `data-endpoint="https://…"` sends somewhere else, e.g. a proxy on your own
-domain. npm CDNs serve the same file from
-`@obelism/numbers-sdk/dist/script.global.js`.
+domain; without it events go to numbers' origin, even when a CDN serves the
+file. `data-debug` turns on the client's development warnings (snake_case
+names, an 8 KB body, a `data-space` it can't use), and
+`data-storage="session"` (or `"none"`) counts without a cookie. npm CDNs
+serve the same file from `@obelism/numbers-sdk/dist/script.global.js`.
 
 ## Module
 
@@ -52,7 +55,8 @@ const numbers = createNumbers({
 })
 
 // Page views now and on every navigation, and clicks on tagged elements.
-const stop = numbers.autoTrack() // { pageViews?: boolean, clicks?: boolean }
+const stop = numbers.autoTrack()
+// { pageViews?, clicks?, outbound?, downloads?, forms? }
 
 numbers.track('add_to_cart', 'product_page', {
 	value: 59.95,
@@ -93,11 +97,18 @@ its visual editor shows each block's click rate.
 
 ### Visitors
 
-A visitor is a random id in the `visitorId` cookie (`visi_` and 26
+A visitor is a random id in the `obelism_visitor_id` cookie (`visi_` and 26
 characters, 30 days from the last visit), the same cookie the improve SDK
-uses. `numbers.visitor()` returns `{ id, recurring }`. The device categories
-(pointer, device, browser, os, screen size) come from the user agent; pass
-`device` to `createNumbers` (or call `setDevice`) to use your own.
+uses. The old `visitorId` cookie is still read, so existing visitors keep
+their id. `numbers.visitor()` returns `{ id, recurring }`. The device
+categories (pointer, device, browser, os, screen size) come from the user
+agent; pass `device` to `createNumbers` (or call `setDevice`) to use your
+own.
+
+For a site that counts without asking for consent, `storage: 'session'`
+keeps the id in sessionStorage for the tab and `storage: 'none'` makes a new
+one per page load: neither sets a cookie. The script takes the same as
+`data-storage`.
 
 ### Limits
 

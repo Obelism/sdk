@@ -47,7 +47,10 @@ export const generateImproveNextMiddleware = (
 			if (!basePath) return NextResponse.next()
 
 			const visitorCookieName = args.improveSdk.getVisitorCookieName()
-			const cookieVisitorId = request.cookies.get(visitorCookieName)?.value
+			// The name before it was namespaced: keep an existing visitor.
+			const cookieVisitorId =
+				request.cookies.get(visitorCookieName)?.value ??
+				request.cookies.get('visitorId')?.value
 			const validCookieVisitorId =
 				cookieVisitorId && args.improveSdk.validateVisitorId(cookieVisitorId)
 			const visitorId = validCookieVisitorId

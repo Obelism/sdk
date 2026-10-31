@@ -25,6 +25,7 @@ beforeEach(() => {
 	fetchMock = vi.fn<typeof fetch>(async () => new Response('{}'))
 	vi.stubGlobal('fetch', fetchMock)
 	clearCookies()
+	sessionStorage.clear()
 	history.replaceState(null, '', '/')
 })
 
@@ -39,27 +40,61 @@ const numbersFor = (
 	createNumbers({ organizationId: 'org_1', disableWarnings: true, ...options })
 
 describe('visitor', () => {
-	it('makes a new visitor and keeps it in the improve SDK’s cookie', () => {
+	it('makes a new visitor and keeps it in the namespaced cookie', () => {
 		const visitor = numbersFor().visitor()!
 		expect(isVisitorId(visitor.id)).toBe(true)
 		expect(visitor.id).toMatch(/^visi_[A-Z0-9]{26}$/)
 		expect(visitor.recurring).toBe(false)
-		expect(document.cookie).toContain(`visitorId=${visitor.id}`)
+		expect(document.cookie).toContain(`obelism_visitor_id=${visitor.id}`)
 	})
 
 	it('reuses a valid cookie as a recurring visitor', () => {
-		document.cookie = 'visitorId=visi_ABCDEFGHIJKLMNOPQRSTUVWXYZ;path=/'
+		document.cookie =
+			'obelism_visitor_id=visi_ABCDEFGHIJKLMNOPQRSTUVWXYZ;path=/'
 		expect(numbersFor().visitor()).toEqual({
 			id: 'visi_ABCDEFGHIJKLMNOPQRSTUVWXYZ',
 			recurring: true,
 		})
 	})
 
+	it('reads the old visitorId cookie and keeps it in step', () => {
+		document.cookie = 'visitorId=visi_ABCDEFGHIJKLMNOPQRSTUVWXYZ;path=/'
+		const visitor = numbersFor().visitor()!
+		expect(visitor).toEqual({
+			id: 'visi_ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+			recurring: true,
+		})
+		expect(document.cookie).toContain(
+			'visitorId=visi_ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+		)
+		expect(document.cookie).toContain(
+			'obelism_visitor_id=visi_ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+		)
+	})
+
 	it('replaces an invalid cookie', () => {
-		document.cookie = 'visitorId=nope;path=/'
+		document.cookie = 'obelism_visitor_id=nope;path=/'
 		const visitor = numbersFor().visitor()!
 		expect(visitor.id).not.toBe('nope')
 		expect(visitor.recurring).toBe(false)
+	})
+
+	it('keeps a session visitor in sessionStorage, without a cookie', () => {
+		sessionStorage.clear()
+		const first = numbersFor({ storage: 'session' }).visitor()!
+		const second = numbersFor({ storage: 'session' }).visitor()!
+		expect(second).toEqual({ id: first.id, recurring: true })
+		expect(document.cookie).not.toContain('visitorId')
+		expect(document.cookie).not.toContain('obelism_visitor_id')
+	})
+
+	it('makes a new visitor per page load with storage none', () => {
+		const first = numbersFor({ storage: 'none' }).visitor()!
+		const second = numbersFor({ storage: 'none' }).visitor()!
+		expect(first.id).not.toBe(second.id)
+		expect(first.recurring).toBe(false)
+		expect(document.cookie).not.toContain('visitorId')
+		expect(document.cookie).not.toContain('obelism_visitor_id')
 	})
 })
 
@@ -77,7 +112,11 @@ describe('track', () => {
 
 		const [url, init] = fetchMock.mock.calls[0]!
 		expect(url).toBe(DEFAULT_ENDPOINT)
-		expect(init).toMatchObject({ method: 'POST', keepalive: true })
+		expect(init).toMatchObject({
+			method: 'POST',
+			keepalive: true,
+			headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+		})
 		expect(sentBodies()[0]).toEqual({
 			type: 'event',
 			organizationId: 'org_1',
@@ -275,5 +314,61 @@ describe('autoTrack', () => {
 		stop()
 		button.click()
 		expect(sentBodies()).toMatchObject([{ event: 'click', scope: 'block_1' }])
+	})
+
+	it('counts outbound links and downloads when asked', () => {
+		document.body.innerHTML = `
+			<a id="out" href="https://elsewhere.example/path?q=1">out</a>
+			<a id="file" href="/files/report.pdf">pdf</a>
+			<a id="same" href="/pricing">same</a>`
+		document.body.addEventListener('click', (event) => event.preventDefault())
+		const stop = numbersFor().autoTrack({
+			pageViews: false,
+			clicks: false,
+			outbound: true,
+			downloads: true,
+		})
+		for (const id of ['out', 'file', 'same'])
+			document
+				.getElementById(id)!
+				.dispatchEvent(
+					new MouseEvent('click', { bubbles: true, cancelable: true }),
+				)
+		stop()
+		expect(sentBodies()).toMatchObject([
+			{ event: 'outbound_click', scope: 'https://elsewhere.example/path' },
+			{ event: 'file_download', scope: 'report.pdf' },
+		])
+	})
+
+	it('counts a form_submit, by its data-numbers-id, id or action', () => {
+		document.body.innerHTML = `
+			<form id="signup" action="/newsletter"></form>
+			<form data-numbers-id="footer_form"></form>`
+		const stop = numbersFor().autoTrack({
+			pageViews: false,
+			clicks: false,
+			forms: true,
+		})
+		for (const form of document.querySelectorAll('form'))
+			form.dispatchEvent(
+				new Event('submit', { bubbles: true, cancelable: true }),
+			)
+		stop()
+		expect(sentBodies()).toMatchObject([
+			{ event: 'form_submit', scope: 'signup' },
+			{ event: 'form_submit', scope: 'footer_form' },
+		])
+	})
+
+	it('sends a form_submit by hand', () => {
+		document.body.innerHTML = '<form action="/checkout"></form>'
+		const form = document.querySelector('form') as HTMLFormElement
+		numbersFor().formSubmit(form)
+		numbersFor().formSubmit(form, 'paid_order')
+		expect(sentBodies()).toMatchObject([
+			{ event: 'form_submit', scope: '/checkout' },
+			{ event: 'form_submit', scope: 'paid_order' },
+		])
 	})
 })

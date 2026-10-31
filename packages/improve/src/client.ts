@@ -79,8 +79,9 @@ export class ImproveClientSDK extends BaseImproveSDK {
 	}
 
 	setupVisitor = (userAgent: string = window.navigator.userAgent) => {
-		// The numbers SDK reads (or makes) the visitor in the shared `visitorId`
-		// cookie, so the visitor is the same one in numbers' own script.
+		// The numbers SDK reads (or makes) the visitor in the shared
+		// `obelism_visitor_id` cookie, so the visitor is the same one in
+		// numbers' own script.
 		const visitor = this.#numbers.visitor()
 
 		if (!visitor) return null

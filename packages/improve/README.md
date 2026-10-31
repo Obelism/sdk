@@ -170,7 +170,7 @@ setupVisitor(userAgent: string = window.navigator.userAgent) => string | null
 
 Optional method to setup the visitor, if this is not called before using any of the other Client methods it will be called automatically. You only have to call this yourself if you want to make sure it gets the `userAgent` from somewhere else.
 
-This method will automatically save the visitorID to the class and cookie + parse the userAgent to be used in the postAnalytic. The visitor comes from the [numbers SDK](https://www.npmjs.com/package/@obelism/numbers-sdk), which keeps it in the same `visitorId` cookie, so it is the same visitor in numbers' own script tag.
+This method will automatically save the visitorID to the class and cookie + parse the userAgent to be used in the postAnalytic. The visitor comes from the [numbers SDK](https://www.npmjs.com/package/@obelism/numbers-sdk), which keeps it in the same `obelism_visitor_id` cookie, so it is the same visitor in numbers' own script tag. The old `visitorId` cookie is still read.
 
 ### getFlagValue
 
