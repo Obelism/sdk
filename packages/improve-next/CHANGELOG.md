@@ -1,5 +1,13 @@
 # @obelism/improve-sdk-next
 
+## 1.1.3
+
+### Patch Changes
+
+- 3546a7b: The numbers client sends with a CORS-safelisted `text/plain` body (no preflight), defaults to numbers' endpoint when a CDN serves the script, and takes `data-debug` and `data-storage="session|none"` for warnings and cookie-less counting. `autoTrack` can count outbound links, downloads and form submissions, and `formSubmit` sends one by hand. The visitor cookie is now `obelism_visitor_id`; the old `visitorId` is still read and written for a deprecation window, so visitors keep their id across older improve SDKs. `data-organization` and `data-storage` are now checked, and a second `autoTrack` replaces the first instead of stacking listeners.
+- Updated dependencies [3546a7b]
+  - @obelism/improve-sdk@3.4.0
+
 ## 1.1.2
 
 ### Patch Changes

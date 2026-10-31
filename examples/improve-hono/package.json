@@ -8,7 +8,7 @@
 		"deploy": "vercel"
 	},
 	"dependencies": {
-		"@obelism/improve-sdk": "^3.3.0",
+		"@obelism/improve-sdk": "^3.4.0",
 		"hono": "^4.13.14"
 	},
 	"devDependencies": {
