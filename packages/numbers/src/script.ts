@@ -26,14 +26,17 @@ const NUMBERS_HOST = 'numbers.obelism.studio'
 // A CDN serves the same file from its own host, where /api/log doesn't exist.
 // Only numbers itself (or a local numbers while developing) is the endpoint;
 // anything else uses numbers' origin, unless `data-endpoint` says otherwise.
-export const resolveEndpoint = (src: string) => {
+// `url` and `DEFAULT_ENDPOINT` stay in one scope: a `let` in the try block
+// made the script minifier shadow the constant and return the URL object.
+const resolveEndpoint = (src: string) => {
+	let url: URL | undefined
 	try {
-		const url = new URL(src)
-		const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1'
-		if (url.hostname === NUMBERS_HOST || local) return `${url.origin}/api/log`
+		url = new URL(src)
 	} catch {
-		// No usable src: numbers' own endpoint.
+		return DEFAULT_ENDPOINT
 	}
+	const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1'
+	if (url.hostname === NUMBERS_HOST || local) return `${url.origin}/api/log`
 	return DEFAULT_ENDPOINT
 }
 
@@ -57,8 +60,16 @@ export const startScript = (
 	const givenSpace = script.dataset.space
 	const spaceId =
 		givenSpace && givenSpace.startsWith('space_') ? givenSpace : undefined
-	if (givenSpace && !spaceId)
-		warn(`data-space "${givenSpace}" is not a space_… id and will be ignored.`)
+	if (givenSpace && !spaceId && typeof console !== 'undefined')
+		console.warn(
+			`[numbers] data-space "${givenSpace}" is not a space_… id and will be ignored.`,
+		)
+
+	const givenStorage = script.dataset.storage
+	if (givenStorage && givenStorage !== 'session' && givenStorage !== 'none')
+		warn(
+			`data-storage "${givenStorage}" is not "session" or "none"; using a cookie.`,
+		)
 
 	const numbers = createNumbers({
 		organizationId,
@@ -66,7 +77,7 @@ export const startScript = (
 		environment: (script.dataset.environment || 'production') as Environment,
 		endpoint: script.dataset.endpoint || resolveEndpoint(script.src),
 		disableWarnings: !debug,
-		storage: storageOf(script.dataset.storage),
+		storage: storageOf(givenStorage),
 	})
 	target.numbers = numbers
 	numbers.autoTrack()

@@ -78,7 +78,7 @@ describe('startScript', () => {
 		expect(JSON.parse(String(init!.body)).spaceId).toBe('space_1')
 	})
 
-	it('warns about a data-space it has to drop, only with data-debug', () => {
+	it('warns about a data-space it has to drop', () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 		startScript(
 			window,
@@ -88,10 +88,25 @@ describe('startScript', () => {
 				'data-space': 'Example Shop',
 			}),
 		)
-		expect(warn).not.toHaveBeenCalled()
+		expect(warn).toHaveBeenCalledWith(
+			expect.stringContaining('data-space "Example Shop"'),
+		)
 		expect(
 			JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)),
 		).not.toHaveProperty('spaceId')
+	})
+
+	it('warns about an unknown data-storage only with data-debug', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+		startScript(
+			window,
+			scriptTag({
+				src: 'https://numbers.obelism.studio/script.js',
+				'data-organization': 'org_1',
+				'data-storage': 'sesssion',
+			}),
+		)
+		expect(warn).not.toHaveBeenCalled()
 
 		delete (window as ScriptWindow).numbers
 		startScript(
@@ -99,12 +114,12 @@ describe('startScript', () => {
 			scriptTag({
 				src: 'https://numbers.obelism.studio/script.js',
 				'data-organization': 'org_1',
-				'data-space': 'Example Shop',
+				'data-storage': 'sesssion',
 				'data-debug': '',
 			}),
 		)
 		expect(warn).toHaveBeenCalledWith(
-			expect.stringContaining('data-space "Example Shop"'),
+			expect.stringContaining('data-storage "sesssion"'),
 		)
 	})
 

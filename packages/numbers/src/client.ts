@@ -45,28 +45,24 @@ export type AutoTrackOptions = {
 	forms?: boolean
 }
 
+// Documents, archives and media, not images a browser shows inline (a link
+// with `download` still counts, whatever it points at).
 const DOWNLOAD_EXTENSIONS = [
 	'7z',
 	'avi',
 	'csv',
 	'doc',
 	'docx',
-	'gif',
 	'gz',
-	'jpeg',
-	'jpg',
 	'mov',
 	'mp3',
 	'mp4',
 	'pdf',
-	'png',
 	'ppt',
 	'pptx',
 	'rar',
-	'svg',
 	'tar',
 	'txt',
-	'webp',
 	'wav',
 	'xls',
 	'xlsx',
@@ -140,6 +136,7 @@ export const createNumbers = ({
 	// Epoch ms until which sending is paused after a 429.
 	let pausedUntil = 0
 	let firstPageView = true
+	let stopAutoTrack: (() => void) | null = null
 	const sentKeys = new Set<string>()
 	const exposed = new Set<string>()
 	const warned = new Set<string>()
@@ -293,6 +290,9 @@ export const createNumbers = ({
 		forms = false,
 	}: AutoTrackOptions = {}) => {
 		if (!isBrowser()) return () => {}
+		// A second call replaces the first instead of stacking listeners, so a
+		// site can add outbound/download/form tracking to the script's autoTrack.
+		stopAutoTrack?.()
 		const stops: (() => void)[] = []
 
 		if (pageViews) {
@@ -376,9 +376,12 @@ export const createNumbers = ({
 			stops.push(() => document.removeEventListener('submit', onSubmit, true))
 		}
 
-		return () => {
-			for (const stop of stops) stop()
+		const stop = () => {
+			for (const fn of stops) fn()
+			if (stopAutoTrack === stop) stopAutoTrack = null
 		}
+		stopAutoTrack = stop
+		return stop
 	}
 
 	return {

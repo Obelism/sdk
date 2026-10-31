@@ -28,6 +28,9 @@ client on `window.numbers`:
 numbers.track('sign_up', 'footer_form')
 ```
 
+A page view is counted once per pathname: a change that only touches the
+query string or hash (`?tab=2`, `#pricing`) isn't a second page view.
+
 `data-space` names the space (one site or project of the organization) the
 events belong to; without it they go to the organization's first space.
 `data-endpoint="https://…"` sends somewhere else, e.g. a proxy on your own
@@ -64,8 +67,15 @@ numbers.track('add_to_cart', 'product_page', {
 	params: { ecommerce: { items: [{ item_id: 'sku_1' }] } },
 })
 numbers.track('view_item', 'list', { dedupeKey: 'sku_1' }) // once per key
+numbers.formSubmit(form, 'newsletter') // or autoTrack({ forms: true })
 numbers.pageView() // by hand, without autoTrack
 ```
+
+`autoTrack({ outbound: true })` sends `outbound_click` for links to another
+site, `downloads: true` sends `file_download` for links to a file, and
+`forms: true` sends `form_submit` for each submitted form. Calling
+`autoTrack` again replaces the previous listeners, so it doesn't double
+count.
 
 The client is safe to create during server rendering: outside the browser
 every call does nothing and returns `null`.

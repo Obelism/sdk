@@ -316,6 +316,30 @@ describe('autoTrack', () => {
 		expect(sentBodies()).toMatchObject([{ event: 'click', scope: 'block_1' }])
 	})
 
+	it('replaces the previous autoTrack instead of stacking listeners', () => {
+		document.body.innerHTML =
+			'<a id="out" href="https://elsewhere.example/x">out</a>'
+		document.body.addEventListener('click', (event) => event.preventDefault())
+		const numbers = numbersFor()
+		numbers.autoTrack({ clicks: false })
+		const stop = numbers.autoTrack({
+			pageViews: false,
+			clicks: false,
+			outbound: true,
+		})
+		history.pushState(null, '', '/one')
+		document
+			.getElementById('out')!
+			.dispatchEvent(
+				new MouseEvent('click', { bubbles: true, cancelable: true }),
+			)
+		stop()
+		expect(sentBodies()).toMatchObject([
+			{ event: 'page_view', path: '/' },
+			{ event: 'outbound_click', path: '/one' },
+		])
+	})
+
 	it('counts outbound links and downloads when asked', () => {
 		document.body.innerHTML = `
 			<a id="out" href="https://elsewhere.example/path?q=1">out</a>

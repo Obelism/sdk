@@ -76,8 +76,9 @@ const writeStoredVisitor = (storage: 'cookie' | 'session', id: string) => {
 		return
 	}
 	writeCookie(VISITOR_COOKIE, id)
-	// Keep the old cookie in step while sites still run an improve SDK that
-	// reads it, so the same visitor isn't split in two.
+	// Keep the old cookie in step while a site still runs an improve SDK that
+	// reads it, so the same visitor isn't split in two. A visitor who never
+	// had it gets only the namespaced one.
 	if (readCookie(LEGACY_VISITOR_COOKIE)) writeCookie(LEGACY_VISITOR_COOKIE, id)
 }
 
