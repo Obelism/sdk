@@ -37,8 +37,7 @@
 	},
 	"packageManager": "npm@11.21.1",
 	"workspaces": [
-		"packages/*",
-		"examples/*"
+		"packages/*"
 	],
 	"allowScripts": {
 		"@vercel/git-hooks@1.0.0": true

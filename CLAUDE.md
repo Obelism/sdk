@@ -38,11 +38,13 @@ npx turbo run build lint test:ci --filter=@obelism/improve-sdk...   # one packag
   have.
 - `packages/typescript-config` (private): `base.json` and
   `react-library.json`, strict (`noUncheckedIndexedAccess`,
-  `exactOptionalPropertyTypes`), for every package and example. Public option
+  `exactOptionalPropertyTypes`), for every package. Public option
   types say `| undefined` on optional fields, so callers on
   `exactOptionalPropertyTypes` can pass one through
-- `examples/improve-*` (each deployed by its own Vercel project, on `main`
-  only, `vercel.json`) and `examples/content-nextjs`
+- Examples live in their own repository, `Obelism/examples` (`../examples`):
+  `oxygen-store`, `content-nextjs`, and the `improve-*` demos, each deployed by
+  its own Vercel project (`vercel.json`, `main` only). They install the
+  published packages, so a change here reaches an example after a release.
 
 Packages depend on each other through the workspace: improve on numbers,
 improve-react and improve-next on improve, content-react on Content. Never
@@ -168,7 +170,6 @@ Optional integration syncs the datafile to Vercel Edge Config (`@vercel/edge-con
   `useLiveEntry`, `useContentBridge`, `useContentBridgeEvent`,
   `useContentPrompt` (the only
   `'use client'` module) and `RichText` (server-safe)
-- `examples/content-nextjs`: App Router site with preview + live updates
 
 ## Build
 
