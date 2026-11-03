@@ -1,5 +1,11 @@
 # @obelism/content
 
+## 0.28.0
+
+### Minor Changes
+
+- cb0d745: Links to Shopify collections: `Link`'s `type: 'collection'` (the collection and its collection page), `linkHref`'s `collection` option (default `/collections/<handle>`), and a `link` field's `collections` in `FieldDefinition`. Code that switches on `link.type` exhaustively needs a case for `'collection'`.
+
 ## 0.27.2
 
 ### Patch Changes
