@@ -15,21 +15,26 @@ In Claude Code:
 /plugin install obelism@obelism
 ```
 
-Each product asks you to sign in with your Obelism account the first time
-Claude uses it (OAuth). Claude acts as you, as far as your role in each
-Organization allows. Disconnect it any time from your account page on
+The plugin connects one MCP server, `https://www.obelism.studio/mcp`, which
+carries every product's tools. You sign in once with your Obelism account
+(OAuth) the first time Claude uses it. Claude acts as you, as far as your role
+in each Organization allows. Disconnect it any time from your account page on
 www.obelism.studio.
 
-On claude.ai, an Organization Owner can sync this repository's marketplace
-under Organization settings → Plugins. Without the plugin, add the four
-servers as custom connectors:
+A tool carries the name of the product it belongs to: `content_listEntries`,
+`improve_listTests`, `numbers_getReport`, `media_listFiles`. The account's own
+tools (Organizations, members, Spaces, your profile) have no prefix.
 
-| Product | MCP server                           |
-| ------- | ------------------------------------ |
-| Content | `https://content.obelism.studio/mcp` |
-| improve | `https://improve.obelism.studio/mcp` |
-| numbers | `https://numbers.obelism.studio/mcp` |
-| media   | `https://media.obelism.studio/mcp`   |
+On claude.ai, an Organization Owner can sync this repository's marketplace
+under Organization settings → Plugins. Without the plugin, add
+`https://www.obelism.studio/mcp` as a custom connector; you then have every
+tool, without the skills below.
+
+Each product still serves its own MCP server for anyone who wants one product
+only: `https://content.obelism.studio/mcp`,
+`https://improve.obelism.studio/mcp`, `https://numbers.obelism.studio/mcp` and
+`https://media.obelism.studio/mcp`. Their tools have no product prefix, so the
+skills below don't fit them.
 
 ## What it does
 
@@ -44,7 +49,7 @@ servers as custom connectors:
   its variants in Content's `_improve` block, and its results in improve and
   numbers.
 
-Every other tool of the four servers is there too: ask Claude about your
+Every other tool of the four products is there too: ask Claude about your
 pages, tests, flags, visitors or files: describe images, sort them into
 folders, add files from a URL, or share a folder with a password.
 

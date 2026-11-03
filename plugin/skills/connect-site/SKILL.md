@@ -5,8 +5,8 @@ description: Connect a website's code to Obelism Content (and numbers' tracking)
 
 # Connect a site to Content
 
-Run this in the site's repository. Use the `obelism-content` MCP tools, and
-the shell for the repository.
+Run this in the site's repository. Use the `obelism` MCP server's `content_*`
+tools, and the shell for the repository.
 
 Integration changes (tokens, webhooks, settings) are refused in
 `production` (`production_protected`): set everything up in `develop` or
@@ -15,32 +15,32 @@ dashboard (Space settings).
 
 ## 1. Where
 
-1. `listOrganizations`, `listSpaces`. Ask which Space is this site's if
-   there is more than one.
+1. `content_listOrganizations`, `content_listSpaces`. Ask which Space is this
+   site's if there is more than one.
 2. Work in `develop` unless the user names another environment.
 
 ## 2. The code
 
-1. `getProjectSetup` for the Space and environment, and follow its steps in
-   order. It runs the SDK's `npx @obelism/content init` and says which files
-   and environment variables the site needs.
+1. `content_getProjectSetup` for the Space and environment, and follow its
+   steps in order. It runs the SDK's `npx @obelism/content init` and says which
+   files and environment variables the site needs.
 2. Detect the framework from the repository (Next.js, Astro, Remix, plain)
    before changing files, and follow the SDK's example for it.
 
 ## 3. Tokens and the webhook
 
-1. `createApiToken` for a **delivery** token (published content), and a
+1. `content_createApiToken` for a **delivery** token (published content), and a
    **preview** token if the site shows drafts.
 2. Token values and webhook signing secrets come back **once**. Write them
    straight into the site's local env file (`.env.local` or what the
    framework uses, never a file under version control), or hand them to the
    user. Never repeat them in chat, commits or logs.
-3. If the site caches pages, `createWebhook` pointing at its revalidation
-   route, then `sendTestWebhook` and `listWebhookDeliveries`: the delivery
-   must have a 2xx. If it doesn't, read the response body it recorded and fix
-   the route.
-4. `updateSpaceSettings` with the preview URL, so the visual editor opens the
-   site with drafts.
+3. If the site caches pages, `content_createWebhook` pointing at its
+   revalidation route, then `content_sendTestWebhook` and
+   `content_listWebhookDeliveries`: the delivery must have a 2xx. If it
+   doesn't, read the response body it recorded and fix the route.
+4. `content_updateSpaceSettings` with the preview URL, so the visual editor
+   opens the site with drafts.
 
 ## 4. numbers (optional)
 
