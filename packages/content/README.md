@@ -423,14 +423,15 @@ const xml = sitemapXml(pages, {
 ## Links
 
 A `link` field goes to a page of the space, to any address, or (with
-`products: true`) to a product of the space's Shopify store, each with an optional query and anchor. It is
+`products: true` or `collections: true`) to a product or collection of the
+space's Shopify store, each with an optional query and anchor. It is
 delivered as `Link`: the page's `id`, `title`, `slug` and `path` (never its
-fields), the `url`, or the `product` (`{ id, handle }`) with its product
-page as `entry` (`null` when it has none), plus `query` and `hash` without
-their `?` and `#`. A link to a page that isn't published is `null`. Where a
-page's path lives on your site is your routing, so `linkHref` takes it as
-`url` (default `/<path>`), a product's address as `product` (default
-`/products/<handle>`), and adds the query and hash:
+fields), the `url`, or the `product` or `collection` (`{ id, handle }`) with
+its page as `entry` (`null` when it has none), plus `query` and `hash`
+without their `?` and `#`. A link to a page that isn't published is `null`. Where a page's path lives on your site is your routing, so
+`linkHref` takes it as `url` (default `/<path>`), a product's address as
+`product` (default `/products/<handle>`), a collection's as `collection`
+(default `/collections/<handle>`), and adds the query and hash:
 
 ```tsx
 import { linkHref } from '@obelism/content'
@@ -440,6 +441,7 @@ import { linkHref } from '@obelism/content'
 		linkHref(button.link, {
 			url: (path) => `/${locale}/${path}`,
 			product: ({ handle }) => `/${locale}/products/${handle}`,
+			collection: ({ handle }) => `/${locale}/collections/${handle}`,
 		}) ?? undefined
 	}
 >

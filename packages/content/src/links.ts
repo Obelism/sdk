@@ -4,9 +4,11 @@ import type { Link, LinkTarget, ShopifyItem } from './types'
 // is your site's routing (`/nl/pricing`, `nl.example.com/pricing`, the home
 // page at `/`), so pass `url` to turn its path into one; it defaults to
 // `/<path>`. A product's address is your product route, `product` (default
-// `/products/<handle>`), which also gets its product page if it has one. The
-// link's query and hash go after it: `&` joins a query the address has
-// already, and the link's hash replaces the address's own.
+// `/products/<handle>`), which also gets its product page if it has one. A
+// collection's is `collection` (default `/collections/<handle>`), with its
+// collection page if it has one. The link's query and hash go after it: `&`
+// joins a query the address has already, and the link's hash replaces the
+// address's own.
 //
 //   linkHref(button.link, { url: (path) => `/${locale}/${path}` })
 
@@ -17,6 +19,10 @@ export type LinkHrefOptions = {
 	// page when it has one.
 	product?:
 		((product: ShopifyItem, page: LinkTarget | null) => string) | undefined
+	// The address of a collection (a Shopify collection link), with its
+	// collection page when it has one.
+	collection?:
+		((collection: ShopifyItem, page: LinkTarget | null) => string) | undefined
 }
 
 export const linkHref = (
@@ -24,6 +30,7 @@ export const linkHref = (
 	{
 		url = (path) => `/${path}`,
 		product = ({ handle }) => `/products/${handle}`,
+		collection = ({ handle }) => `/collections/${handle}`,
 	}: LinkHrefOptions = {},
 ): string | null => {
 	if (!link) return null
@@ -33,7 +40,9 @@ export const linkHref = (
 			? link.url
 			: link.type === 'product'
 				? product(link.product, link.entry)
-				: url(link.entry.path!)
+				: link.type === 'collection'
+					? collection(link.collection, link.entry)
+					: url(link.entry.path!)
 	const hashAt = base.indexOf('#')
 	const address = hashAt === -1 ? base : base.slice(0, hashAt)
 	const ownHash = hashAt === -1 ? null : base.slice(hashAt + 1)
