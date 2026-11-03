@@ -77,4 +77,42 @@ describe('linkHref', () => {
 			linkHref(product(), { product: ({ handle }) => `/p/${handle}` }),
 		).toBe('/p/mug')
 	})
+
+	it('puts a collection at /collections/<handle>, or where `collection` says', () => {
+		const collection = (extras: Partial<Link> = {}): Link => ({
+			type: 'collection',
+			collection: { id: 'gid://shopify/Collection/7', handle: 'new-arrivals' },
+			entry: null,
+			query: null,
+			hash: null,
+			...(extras as object),
+		})
+		expect(linkHref(collection({ hash: 'featured' }))).toBe(
+			'/collections/new-arrivals#featured',
+		)
+		expect(linkHref(collection({ query: 'sort=new' }))).toBe(
+			'/collections/new-arrivals?sort=new',
+		)
+		const withPage = collection({
+			entry: {
+				id: 'entry_8',
+				title: 'New arrivals',
+				slug: 'new-arrivals',
+				path: 'shop/new-arrivals',
+			},
+		})
+		// Without a `collection` callback the default route wins over the page.
+		expect(linkHref(withPage)).toBe('/collections/new-arrivals')
+		expect(
+			linkHref(withPage, {
+				collection: ({ handle }, page) =>
+					page ? `/${page.path}` : `/c/${handle}`,
+			}),
+		).toBe('/shop/new-arrivals')
+		expect(
+			linkHref(collection(), {
+				collection: ({ handle }) => `/c/${handle}`,
+			}),
+		).toBe('/c/new-arrivals')
+	})
 })

@@ -79,13 +79,13 @@ export type LinkTarget = {
 }
 
 // A link field's value: a page of the space, any address (another site,
-// `/search`, `#faq`, `mailto:`), or a product of the space's Shopify store
-// with its product page (a page whose type has a unique product field) when
-// it has one. `query` (`a=1&b=2`) and `hash` (`pricing`) come without their
-// `?` and `#`, null when not set. A link to a page the token can't see (not
-// published, for a delivery token) is null itself; a link to a product never
-// is. There is no ready address: `linkHref` builds one with your site's
-// routing.
+// `/search`, `#faq`, `mailto:`), or a product or collection of the space's
+// Shopify store with its page (a page whose type has a unique product or
+// collection field) when it has one. `query` (`a=1&b=2`) and `hash`
+// (`pricing`) come without their `?` and `#`, null when not set. A link to a
+// page the token can't see (not published, for a delivery token) is null
+// itself; a link to a Shopify item never is. There is no ready address:
+// `linkHref` builds one with your site's routing.
 export type Link =
 	| {
 			type: 'entry'
@@ -102,6 +102,13 @@ export type Link =
 	| {
 			type: 'product'
 			product: ShopifyItem
+			entry: LinkTarget | null
+			query: string | null
+			hash: string | null
+	  }
+	| {
+			type: 'collection'
+			collection: ShopifyItem
 			entry: LinkTarget | null
 			query: string | null
 			hash: string | null
@@ -275,6 +282,8 @@ export type FieldDefinition = BaseField &
 				contentTypes?: string[]
 				// It may also go to a product of the space's Shopify store.
 				products?: boolean
+				// Or a collection of it.
+				collections?: boolean
 		  }
 		| {
 				type: 'blocks'
