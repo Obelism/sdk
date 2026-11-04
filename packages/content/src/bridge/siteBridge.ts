@@ -774,39 +774,45 @@ export const createSiteBridge = (
 
 	// The tags on the page's links (statsOverlay.ts) while blocks are
 	// outlined: the rates of the ids the page tags, asked for as they appear.
-	const checked = new Set<string>()
+	const asked = new Set<string>()
+	const answered = new Set<string>()
+	let statsOff = false
 	let overlay: StatsOverlay | null = null
 	let statsTimer: ReturnType<typeof setTimeout> | null = null
-	const showStats = () =>
-		overlay?.update(state.stats, state.statsVisible, checked)
+	const showStats = () => overlay?.update(state.stats, state.statsVisible)
 	const loadStats = async () => {
+		if (statsOff) return
 		const ids = [
 			...new Set(
 				[...doc.querySelectorAll(`[${TAG_ATTRIBUTE}]`)].map(
 					(element) => element.getAttribute(TAG_ATTRIBUTE) ?? '',
 				),
 			),
-		]
-			.filter((id) => id && !checked.has(id))
-			.slice(0, MAX_STATS_IDS)
-		if (!ids.length) return
-		ids.forEach((id) => checked.add(id))
+		].filter((id) => id && !asked.has(id))
+		const batch = ids.slice(0, MAX_STATS_IDS)
+		if (!batch.length) return
+		batch.forEach((id) => asked.add(id))
 		try {
-			const { stats } = await api<{ stats?: unknown }>('stats', { uids: ids })
+			const { stats } = await api<{ stats?: unknown }>('stats', {
+				uids: batch,
+			})
+			batch.forEach((id) => answered.add(id))
 			setState({ stats: { ...state.stats, ...readStats(stats) } })
 		} catch {
-			// A CMS without the route: no tags rather than wrong ones.
-			ids.forEach((id) => checked.delete(id))
+			// No tags rather than wrong ones, and no asking again.
+			statsOff = true
 			return
 		}
 		overlay ??= mountStatsOverlay(win, {
 			selector: blockSelector,
 			onSelect: (uid) => highlight(uid),
+			checked: (id) => answered.has(id),
 		})
 		showStats()
+		if (ids.length > batch.length) scheduleStats()
 	}
 	const scheduleStats = () => {
-		if (statsTimer !== null) return
+		if (statsTimer !== null || statsOff) return
 		statsTimer = setTimeout(() => {
 			statsTimer = null
 			void loadStats()

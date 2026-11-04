@@ -894,6 +894,7 @@ describe('createSiteBridge', () => {
 		bridge.setSelecting(true)
 		expect([...tags()].map((tag) => tag.getAttribute('data-status'))).toEqual([
 			'counting',
+			'counting',
 		])
 		bridge.setSelecting(false)
 		expect(tags()).toHaveLength(0)

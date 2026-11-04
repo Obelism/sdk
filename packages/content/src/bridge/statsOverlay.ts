@@ -94,8 +94,6 @@ const CSS = `
 	content: ''; width: 8px; height: 8px; border-radius: 50%;
 	background: rgb(212 130 30);
 }
-.badge[data-place='beside'] { transform: translateY(-50%); }
-.badge[data-place='above'] { transform: translate(-100%, -100%); }
 .badge:focus-visible, .tag:focus-visible { outline: 2px solid rgb(212 130 30); outline-offset: 2px; }
 .tag {
 	position: absolute; transform: translate(-50%, -50%);
@@ -116,48 +114,31 @@ const CSS = `
 }
 `
 
-// Inset from a block's top-right corner, or gap beside a small element.
 const INSET = 8
-// Below this an element is a button or a link, not a section: its label goes
-// beside it (or above, without room on the right) so it doesn't cover it.
+// Below this an element is a button or a link, not a section: a tag on its
+// corner rather than a label over it.
 const SMALL_HEIGHT = 64
-// Room a label needs beside an element.
-const LABEL_WIDTH = 140
 
-// Where a label goes for an element's box: inside the top-right corner of a
-// block, beside a small element, or above one at the right edge.
-export const placeLabel = (
-	rect: Pick<DOMRect, 'top' | 'right' | 'height'>,
-	viewportWidth: number,
-) => {
-	if (rect.height >= SMALL_HEIGHT)
-		return {
-			place: 'inside' as const,
-			top: Math.max(rect.top, 0) + INSET,
-			left: rect.right - INSET,
-		}
-	if (rect.right + INSET + LABEL_WIDTH <= viewportWidth)
-		return {
-			place: 'beside' as const,
-			top: rect.top + rect.height / 2,
-			left: rect.right + INSET,
-		}
-	return {
-		place: 'above' as const,
-		top: rect.top - INSET / 2,
-		left: rect.right,
-	}
-}
+// A block's label: inside its top-right corner, in view when it starts above
+// the screen.
+export const placeLabel = (rect: Pick<DOMRect, 'top' | 'right'>) => ({
+	top: Math.max(rect.top, 0) + INSET,
+	left: rect.right - INSET,
+})
+
+// A tag's: on the element's top-right corner, like a notification badge,
+// kept on screen.
+export const placeTag = (
+	rect: Pick<DOMRect, 'top' | 'right'>,
+	viewport: { width: number; height: number },
+) => ({
+	top: Math.min(Math.max(rect.top, 10), viewport.height - 10),
+	left: Math.min(rect.right, viewport.width - 10),
+})
 
 export type StatsOverlay = {
-	// The rates by block uid, and whether to show them. `checked`: the tagged
-	// ids the rates were asked for, when not all of them; the rest get no tag
-	// until they are.
-	update(
-		stats: Readonly<Record<string, BlockStats>>,
-		visible: boolean,
-		checked?: ReadonlySet<string>,
-	): void
+	// The rates by block uid, and whether to show them.
+	update(stats: Readonly<Record<string, BlockStats>>, visible: boolean): void
 	// Places the labels again, e.g. after the site re-rendered.
 	refresh(): void
 	destroy(): void
@@ -168,12 +149,17 @@ export const mountStatsOverlay = (
 	{
 		selector,
 		onSelect,
+		checked,
 		labels: labelOverrides,
 	}: {
 		// The element of a block, by its uid.
 		selector: (uid: string) => string
 		// A label is a way to select its block too.
 		onSelect: (uid: string) => void
+		// Whether the rates were asked for a tagged id, so no rate means no
+		// clicks. Default: the ids of the page's blocks, which the visual
+		// editor asks for.
+		checked?: ((id: string) => boolean) | undefined
 		labels?: Partial<StatsLabels> | undefined
 	},
 ): StatsOverlay => {
@@ -192,76 +178,81 @@ export const mountStatsOverlay = (
 
 	let stats: Readonly<Record<string, BlockStats>> = {}
 	let visible = false
-	let checked: ReadonlySet<string> | undefined
 	let frame: number | null = null
 
-	const tagged = (id: string) =>
-		doc.querySelector(`[${TAG_ATTRIBUTE}="${id.replace(/["\\]/g, '\\$&')}"]`)
+	const draw = (id: string, element: Element, blocks: ReadonlySet<string>) => {
+		const rect = element.getBoundingClientRect()
+		// Not rendered, or off screen.
+		if (!rect.width && !rect.height) return
+		if (rect.bottom < 0 || rect.top > win.innerHeight) return
+
+		const block = stats[id]
+		const status = statsStatus(block)
+		const label = doc.createElement('button')
+		label.type = 'button'
+		label.dataset.uid = id
+		label.dataset.status = status
+		const rate = block ? Math.round(block.rate * 100) : 0
+		label.title =
+			status === 'rate'
+				? fill(labels.title, {
+						clickers: block!.clickers,
+						viewers: block!.viewers,
+						clicks: block!.clicks,
+					})
+				: status === 'none'
+					? labels.noClicks
+					: fill(labels.counting, {
+							clicks: block!.clicks,
+							viewers: block!.viewers,
+							needed: MIN_VIEWERS,
+						})
+		const { top, left } =
+			status === 'rate' && rect.height >= SMALL_HEIGHT
+				? placeLabel(rect)
+				: placeTag(rect, { width: win.innerWidth, height: win.innerHeight })
+		if (status === 'rate' && rect.height >= SMALL_HEIGHT) {
+			label.className = 'badge'
+			label.textContent = fill(labels.clicked, { rate })
+		} else {
+			label.className = 'tag'
+			if (status === 'rate')
+				label.textContent = fill(labels.clickedShort, { rate })
+			else
+				label.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[status]}</svg>`
+			label.setAttribute('aria-label', label.title)
+		}
+		label.style.top = `${top}px`
+		label.style.left = `${left}px`
+		// Its id names a block by convention; else the block around it.
+		const uid = blocks.has(id)
+			? id
+			: element.closest(`[${UID_ATTRIBUTE}]`)?.getAttribute(UID_ATTRIBUTE)
+		if (uid) label.addEventListener('click', () => onSelect(uid))
+		layer.appendChild(label)
+	}
 
 	const render = () => {
 		frame = null
 		layer.replaceChildren()
 		layer.hidden = !visible
 		if (!visible) return
-		const height = win.innerHeight
-		const ids = new Set(Object.keys(stats))
+		const blocks = new Set<string>()
+		for (const element of doc.querySelectorAll(`[${UID_ATTRIBUTE}]`))
+			blocks.add(element.getAttribute(UID_ATTRIBUTE) ?? '')
+		const isChecked = checked ?? ((id: string) => blocks.has(id))
+		const tagged = new Set<string>()
 		for (const element of doc.querySelectorAll(`[${TAG_ATTRIBUTE}]`)) {
 			const id = element.getAttribute(TAG_ATTRIBUTE)
-			if (id && (!checked || checked.has(id))) ids.add(id)
+			if (!id || (!stats[id] && !isChecked(id))) continue
+			tagged.add(id)
+			draw(id, element, blocks)
 		}
-		for (const id of ids) {
-			const element = tagged(id) ?? doc.querySelector(selector(id))
-			if (!element) continue
-			const rect = element.getBoundingClientRect()
-			// Not rendered, or off screen.
-			if (!rect.width && !rect.height) continue
-			if (rect.bottom < 0 || rect.top > height) continue
-
-			const block = stats[id]
-			const status = statsStatus(block)
-			const label = doc.createElement('button')
-			label.type = 'button'
-			label.dataset.uid = id
-			label.dataset.status = status
-			const rate = block ? Math.round(block.rate * 100) : 0
-			label.title =
-				status === 'rate'
-					? fill(labels.title, {
-							clickers: block!.clickers,
-							viewers: block!.viewers,
-							clicks: block!.clicks,
-						})
-					: status === 'none'
-						? labels.noClicks
-						: fill(labels.counting, {
-								clicks: block!.clicks,
-								viewers: block!.viewers,
-								needed: MIN_VIEWERS,
-							})
-			if (status === 'rate' && rect.height >= SMALL_HEIGHT) {
-				label.className = 'badge'
-				label.textContent = fill(labels.clicked, { rate })
-				const { place, top, left } = placeLabel(rect, win.innerWidth)
-				label.dataset.place = place
-				label.style.top = `${top}px`
-				label.style.left = `${left}px`
-			} else {
-				// A link's: on its top-right corner, like a notification badge.
-				label.className = 'tag'
-				if (status === 'rate')
-					label.textContent = fill(labels.clickedShort, { rate })
-				else
-					label.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[status]}</svg>`
-				label.setAttribute('aria-label', label.title)
-				label.style.top = `${Math.max(rect.top, 10)}px`
-				label.style.left = `${Math.min(rect.right, win.innerWidth - 10)}px`
-			}
-			// The block around a tagged element: its id is the block's by
-			// convention, but the site may tag an element inside it.
-			const uid =
-				element.closest(`[${UID_ATTRIBUTE}]`)?.getAttribute(UID_ATTRIBUTE) ?? id
-			label.addEventListener('click', () => onSelect(uid))
-			layer.appendChild(label)
+		// Rates of blocks the site doesn't tag an element of.
+		for (const id of Object.keys(stats)) {
+			if (tagged.has(id) || !blocks.has(id)) continue
+			const element = doc.querySelector(selector(id))
+			if (element) draw(id, element, blocks)
 		}
 	}
 
@@ -283,10 +274,9 @@ export const mountStatsOverlay = (
 	observer?.observe(doc.body, { childList: true, subtree: true })
 
 	return {
-		update(nextStats, nextVisible, nextChecked) {
+		update(nextStats, nextVisible) {
 			stats = nextStats
 			visible = nextVisible
-			checked = nextChecked
 			if (frame !== null) {
 				win.cancelAnimationFrame?.(frame)
 				frame = null

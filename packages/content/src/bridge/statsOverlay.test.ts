@@ -2,7 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { blockSelector } from './createBridge'
-import { mountStatsOverlay, placeLabel, statsStatus } from './statsOverlay'
+import {
+	mountStatsOverlay,
+	placeLabel,
+	placeTag,
+	statsStatus,
+} from './statsOverlay'
 
 const STATS = {
 	b_1: { clicks: 37, clickers: 5, viewers: 21, rate: 5 / 21 },
@@ -162,11 +167,11 @@ describe('mountStatsOverlay', () => {
 		const overlay = mountStatsOverlay(win(), {
 			selector: blockSelector,
 			onSelect,
+			checked: (id) => id === 'b_3' || id === 'b_4',
 		})
 		overlay.update(
 			{ ...STATS, b_3: { clicks: 2, clickers: 2, viewers: 5, rate: 0.4 } },
 			true,
-			new Set(['b_3', 'b_4']),
 		)
 
 		const tags = Object.fromEntries(
@@ -191,8 +196,39 @@ describe('mountStatsOverlay', () => {
 
 		tags.b_3!.click()
 		expect(onSelect).toHaveBeenLastCalledWith('b_3')
+		// Not a block, nor in one: nothing to select.
 		tags.b_4!.click()
-		expect(onSelect).toHaveBeenLastCalledWith('b_4')
+		expect(onSelect).toHaveBeenCalledTimes(1)
+		overlay.destroy()
+	})
+
+	it('tags every tagged element, and by default only the ids of the page’s blocks', () => {
+		document.body.innerHTML = `
+			<section data-cms-uid="b_1"><a data-numbers-id="b_1">One</a><a data-numbers-id="b_1">Two</a></section>
+			<a data-numbers-id="not_a_block">Elsewhere</a>`
+		for (const element of document.querySelectorAll('[data-numbers-id]'))
+			element.getBoundingClientRect = () =>
+				({
+					top: 500,
+					bottom: 540,
+					right: 300,
+					width: 120,
+					height: 40,
+				}) as DOMRect
+		const overlay = mountStatsOverlay(win(), {
+			selector: blockSelector,
+			onSelect: () => {},
+		})
+		overlay.update({}, true)
+		const tags = [
+			...document
+				.querySelector('[data-obelism-stats]')!
+				.shadowRoot!.querySelectorAll<HTMLElement>('.tag'),
+		]
+		expect(tags.map((tag) => [tag.dataset.uid, tag.dataset.status])).toEqual([
+			['b_1', 'none'],
+			['b_1', 'none'],
+		])
 		overlay.destroy()
 	})
 
@@ -219,33 +255,26 @@ describe('statsStatus', () => {
 })
 
 describe('placeLabel', () => {
-	it('puts a block’s label inside its top-right corner', () => {
-		expect(placeLabel({ top: 100, right: 900, height: 300 }, 1200)).toEqual({
-			place: 'inside',
+	it('puts a block’s label inside its top-right corner, in view', () => {
+		expect(placeLabel({ top: 100, right: 900 })).toEqual({
 			top: 108,
 			left: 892,
 		})
-		// A block that starts above the screen keeps its label in view.
-		expect(
-			placeLabel({ top: -50, right: 900, height: 300 }, 1200),
-		).toMatchObject({
-			top: 8,
-		})
+		expect(placeLabel({ top: -50, right: 900 })).toEqual({ top: 8, left: 892 })
 	})
+})
 
-	it('puts a small element’s label beside it, so the label doesn’t cover it', () => {
-		expect(placeLabel({ top: 100, right: 300, height: 40 }, 1200)).toEqual({
-			place: 'beside',
-			top: 120,
-			left: 308,
+describe('placeTag', () => {
+	it('puts a link’s tag on its corner, kept on screen', () => {
+		const viewport = { width: 1200, height: 800 }
+		expect(placeTag({ top: 100, right: 300 }, viewport)).toEqual({
+			top: 100,
+			left: 300,
 		})
-	})
-
-	it('puts it above when there is no room beside it', () => {
-		expect(placeLabel({ top: 100, right: 1150, height: 40 }, 1200)).toEqual({
-			place: 'above',
-			top: 96,
-			left: 1150,
+		expect(placeTag({ top: -20, right: 1300 }, viewport)).toEqual({
+			top: 10,
+			left: 1190,
 		})
+		expect(placeTag({ top: 900, right: 300 }, viewport).top).toBe(790)
 	})
 })
