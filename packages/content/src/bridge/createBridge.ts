@@ -65,9 +65,10 @@ export type BridgeState = {
 	// Editing on the site: clicking a block selects it instead of following
 	// it (while the prompt box is open). Always true in the visual editor.
 	selecting: boolean
-	// In the visual editor: the blocks' click rates from Obelism numbers, by
-	// uid, and whether the editor's "Show click rates" switch is on. The
-	// bridge shows them on the page itself; a site can also use them.
+	// The blocks' click rates from Obelism Numbers, by uid, and whether they
+	// show: the visual editor's "Show click rates" switch, or on the site
+	// while blocks are outlined. The bridge shows them on the page itself; a
+	// site can also use them.
 	stats: Readonly<Record<string, BlockStats>>
 	statsVisible: boolean
 }

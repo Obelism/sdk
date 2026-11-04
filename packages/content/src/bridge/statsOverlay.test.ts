@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { blockSelector } from './createBridge'
-import { mountStatsOverlay, placeLabel } from './statsOverlay'
+import { mountStatsOverlay, placeLabel, statsStatus } from './statsOverlay'
 
 const STATS = {
 	b_1: { clicks: 37, clickers: 5, viewers: 21, rate: 5 / 21 },
@@ -141,6 +141,61 @@ describe('mountStatsOverlay', () => {
 		overlay.destroy()
 	})
 
+	it('tags the links the page tags: a cross before a click, an hourglass before a rate', () => {
+		document.body.insertAdjacentHTML(
+			'beforeend',
+			`<section data-cms-uid="b_3"><a data-numbers-id="b_3">Few</a></section>
+			<a data-numbers-id="b_4">None</a><a data-numbers-id="b_5">Unasked</a>`,
+		)
+		for (const id of ['b_3', 'b_4', 'b_5']) {
+			const element = document.querySelector(`[data-numbers-id="${id}"]`)!
+			element.getBoundingClientRect = () =>
+				({
+					top: 500,
+					bottom: 540,
+					right: 300,
+					width: 120,
+					height: 40,
+				}) as DOMRect
+		}
+		const onSelect = vi.fn()
+		const overlay = mountStatsOverlay(win(), {
+			selector: blockSelector,
+			onSelect,
+		})
+		overlay.update(
+			{ ...STATS, b_3: { clicks: 2, clickers: 2, viewers: 5, rate: 0.4 } },
+			true,
+			new Set(['b_3', 'b_4']),
+		)
+
+		const tags = Object.fromEntries(
+			badges()
+				.concat([
+					...document
+						.querySelector('[data-obelism-stats]')!
+						.shadowRoot!.querySelectorAll<HTMLButtonElement>('.tag'),
+				])
+				.map((tag) => [tag.dataset.uid, tag]),
+		)
+		expect(Object.keys(tags).sort()).toEqual(['b_1', 'b_3', 'b_4'])
+		expect(tags.b_1!.dataset.status).toBe('rate')
+		expect(tags.b_3!.dataset.status).toBe('counting')
+		expect(tags.b_3!.getAttribute('aria-label')).toBe(
+			'2 clicks so far: a click rate once 20 visitors saw its page (5 yet)',
+		)
+		expect(tags.b_4!.dataset.status).toBe('none')
+		expect(tags.b_4!.title).toBe('No clicks yet in the last 30 days')
+		expect(tags.b_4!.style.top).toBe('500px')
+		expect(tags.b_4!.style.left).toBe('300px')
+
+		tags.b_3!.click()
+		expect(onSelect).toHaveBeenLastCalledWith('b_3')
+		tags.b_4!.click()
+		expect(onSelect).toHaveBeenLastCalledWith('b_4')
+		overlay.destroy()
+	})
+
 	it('removes itself when destroyed', () => {
 		const overlay = mountStatsOverlay(win(), {
 			selector: blockSelector,
@@ -148,6 +203,18 @@ describe('mountStatsOverlay', () => {
 		})
 		overlay.destroy()
 		expect(document.querySelector('[data-obelism-stats]')).toBeNull()
+	})
+})
+
+describe('statsStatus', () => {
+	it('needs a click, then enough visitors, for a rate', () => {
+		expect(statsStatus(undefined)).toBe('none')
+		expect(
+			statsStatus({ clicks: 1, clickers: 1, viewers: 19, rate: 0.05 }),
+		).toBe('counting')
+		expect(
+			statsStatus({ clicks: 1, clickers: 1, viewers: 20, rate: 0.05 }),
+		).toBe('rate')
 	})
 })
 

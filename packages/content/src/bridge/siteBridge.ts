@@ -20,10 +20,16 @@ import {
 	type FormHandle,
 	INITIAL_STATE,
 	type PromptResult,
+	readStats,
 	selectionStyle,
 	type SitePage,
 } from './createBridge'
 import { type FormContent, type FormFrame, mountFormFrame } from './formFrame'
+import {
+	mountStatsOverlay,
+	type StatsOverlay,
+	TAG_ATTRIBUTE,
+} from './statsOverlay'
 
 // The bridge on a site signed in to edit (`/cms/login`, from
 // @obelism/content/site), outside the visual editor. It plays the editor's
@@ -38,6 +44,11 @@ import { type FormContent, type FormFrame, mountFormFrame } from './formFrame'
 // kept in step with the content here, see formFrame.ts), edits JSON (`view`,
 // then `applyJson`: the raw alternative), and lists the space's pages to go
 // to one.
+
+// The CMS's limit on ids in one stats request.
+const MAX_STATS_IDS = 500
+// After the page changes, before asking for the ids it newly tags.
+const STATS_DELAY_MS = 1000
 
 // Plain path segments only: the URL parser drops tabs and newlines and reads
 // \ as /, so anything looser can resolve to another origin.
@@ -721,7 +732,8 @@ export const createSiteBridge = (
 		setSelecting(selecting) {
 			if (selecting) doc.documentElement.setAttribute('data-cms-selecting', '')
 			else doc.documentElement.removeAttribute('data-cms-selecting')
-			setState({ selecting })
+			setState({ selecting, statsVisible: selecting })
+			showStats()
 		},
 
 		destroy() {
@@ -760,10 +772,63 @@ export const createSiteBridge = (
 	win.addEventListener('beforeunload', onBeforeUnload)
 	cleanup.push(() => win.removeEventListener('beforeunload', onBeforeUnload))
 
+	// The tags on the page's links (statsOverlay.ts) while blocks are
+	// outlined: the rates of the ids the page tags, asked for as they appear.
+	const checked = new Set<string>()
+	let overlay: StatsOverlay | null = null
+	let statsTimer: ReturnType<typeof setTimeout> | null = null
+	const showStats = () =>
+		overlay?.update(state.stats, state.statsVisible, checked)
+	const loadStats = async () => {
+		const ids = [
+			...new Set(
+				[...doc.querySelectorAll(`[${TAG_ATTRIBUTE}]`)].map(
+					(element) => element.getAttribute(TAG_ATTRIBUTE) ?? '',
+				),
+			),
+		]
+			.filter((id) => id && !checked.has(id))
+			.slice(0, MAX_STATS_IDS)
+		if (!ids.length) return
+		ids.forEach((id) => checked.add(id))
+		try {
+			const { stats } = await api<{ stats?: unknown }>('stats', { uids: ids })
+			setState({ stats: { ...state.stats, ...readStats(stats) } })
+		} catch {
+			// A CMS without the route: no tags rather than wrong ones.
+			ids.forEach((id) => checked.delete(id))
+			return
+		}
+		overlay ??= mountStatsOverlay(win, {
+			selector: blockSelector,
+			onSelect: (uid) => highlight(uid),
+		})
+		showStats()
+	}
+	const scheduleStats = () => {
+		if (statsTimer !== null) return
+		statsTimer = setTimeout(() => {
+			statsTimer = null
+			void loadStats()
+		}, STATS_DELAY_MS)
+	}
+	const Observer = (
+		win as Window & { MutationObserver?: typeof MutationObserver }
+	).MutationObserver
+	const statsObserver =
+		typeof Observer === 'function' ? new Observer(scheduleStats) : null
+	cleanup.push(() => {
+		statsObserver?.disconnect()
+		if (statsTimer !== null) clearTimeout(statsTimer)
+		overlay?.destroy()
+	})
+
 	api<SessionInfo>('session')
 		.then((info) => {
 			session = info
 			setState({ features: info.features })
+			void loadStats()
+			statsObserver?.observe(doc.body, { childList: true, subtree: true })
 		})
 		.catch((error: unknown) =>
 			console.error('[@obelism/content bridge]', error),

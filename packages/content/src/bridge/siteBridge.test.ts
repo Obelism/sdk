@@ -866,4 +866,54 @@ describe('createSiteBridge', () => {
 		const [page] = await bridge.pages()
 		expect(page?.url).toBe('/shop/mug')
 	})
+
+	it('asks for the clicks of the links the page tags, and tags them while selecting', async () => {
+		document.body.insertAdjacentHTML(
+			'beforeend',
+			'<a data-numbers-id="hero">Our work</a><a data-numbers-id="hero">Again</a>',
+		)
+		for (const element of document.querySelectorAll('[data-numbers-id]'))
+			element.getBoundingClientRect = () =>
+				({ top: 10, bottom: 50, right: 200, width: 100, height: 40 }) as DOMRect
+		const stats = { hero: { clicks: 3, clickers: 2, viewers: 4, rate: 0.5 } }
+		const { win, calls } = site({
+			session: () => SESSION,
+			stats: () => ({ stats }),
+		})
+		const bridge = createSiteBridge(win, '/cms')
+		await vi.waitFor(() => expect(bridge.getState().stats).toEqual(stats))
+		expect(calls.find(({ path }) => path === 'stats')?.body).toEqual({
+			uids: ['hero'],
+		})
+
+		const tags = () =>
+			document
+				.querySelector('[data-obelism-stats]')
+				?.shadowRoot?.querySelectorAll('[data-status]') ?? []
+		expect(tags()).toHaveLength(0)
+		bridge.setSelecting(true)
+		expect([...tags()].map((tag) => tag.getAttribute('data-status'))).toEqual([
+			'counting',
+		])
+		bridge.setSelecting(false)
+		expect(tags()).toHaveLength(0)
+		bridge.destroy()
+		expect(document.querySelector('[data-obelism-stats]')).toBeNull()
+	})
+
+	it('tags nothing when the CMS has no stats for the site', async () => {
+		document.body.insertAdjacentHTML(
+			'beforeend',
+			'<a data-numbers-id="hero">Our work</a>',
+		)
+		const { win, calls } = site({ session: () => SESSION })
+		const bridge = createSiteBridge(win, '/cms')
+		await vi.waitFor(() =>
+			expect(calls.some(({ path }) => path === 'stats')).toBe(true),
+		)
+		await new Promise((resolve) => setTimeout(resolve, 0))
+		bridge.setSelecting(true)
+		expect(document.querySelector('[data-obelism-stats]')).toBeNull()
+		bridge.destroy()
+	})
 })

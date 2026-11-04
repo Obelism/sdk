@@ -1,11 +1,16 @@
-// Click rates on the page: in the visual editor, a small label on each block
-// that numbers has clicks for ("24% clicked"), from the editor's `stats`
-// message. The editor's "Show click rates" switch turns it on and off. Plain
-// DOM in a shadow root, like the prompt box, in a fixed layer that follows
-// the blocks as the page scrolls, resizes and re-renders.
+import { UID_ATTRIBUTE } from '../editable'
+
+// Click rates on the page: a small label on each block Numbers has clicks
+// for ("24% clicked"), and on each element the site tags a little one: a
+// cross before its first click, an hourglass until enough visitors saw its
+// page for a rate. From the visual editor's `stats` message (its "Show click
+// rates" switch turns them on and off), or on the site from the CMS's site
+// API while blocks are outlined. Plain DOM in a shadow root, like the prompt
+// box, in a fixed layer that follows the blocks as the page scrolls, resizes
+// and re-renders.
 //
 // Sites tag a block's clickable element with `data-numbers-id={block._uid}`
-// and load Obelism numbers' script; the CMS reads the rates from numbers
+// and load Obelism Numbers' script; the CMS reads the rates from Numbers
 // (the CMS's content/docs/guides/canvas.mdx, "Click rates").
 
 export type BlockStats = {
@@ -21,14 +26,44 @@ export type BlockStats = {
 export type StatsLabels = {
 	// `{rate}` is a whole percentage.
 	clicked: string
+	// The same on a link's tag.
+	clickedShort: string
 	// `{clickers}`, `{viewers}`, `{clicks}`.
 	title: string
+	noClicks: string
+	// `{clicks}`, `{viewers}`, and `{needed}`: the visitors a rate takes.
+	counting: string
 }
 
 export const DEFAULT_STATS_LABELS: StatsLabels = {
 	clicked: '{rate}% clicked',
+	clickedShort: '{rate}%',
 	title:
 		'{clickers} of {viewers} visitors of its page clicked it in the last 30 days ({clicks} clicks)',
+	noClicks: 'No clicks yet in the last 30 days',
+	counting:
+		'{clicks} clicks so far: a click rate once {needed} visitors saw its page ({viewers} yet)',
+}
+
+// Fewer visitors than this make a rate noise.
+export const MIN_VIEWERS = 20
+
+export const TAG_ATTRIBUTE = 'data-numbers-id'
+
+export type StatsStatus = 'none' | 'counting' | 'rate'
+
+export const statsStatus = (block: BlockStats | undefined): StatsStatus =>
+	!block || block.clicks === 0
+		? 'none'
+		: block.viewers < MIN_VIEWERS
+			? 'counting'
+			: 'rate'
+
+// Lucide's x and hourglass.
+const ICONS: Record<Exclude<StatsStatus, 'rate'>, string> = {
+	none: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+	counting:
+		'<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>',
 }
 
 const fill = (template: string, values: Record<string, string | number>) =>
@@ -61,7 +96,24 @@ const CSS = `
 }
 .badge[data-place='beside'] { transform: translateY(-50%); }
 .badge[data-place='above'] { transform: translate(-100%, -100%); }
-.badge:focus-visible { outline: 2px solid rgb(212 130 30); outline-offset: 2px; }
+.badge:focus-visible, .tag:focus-visible { outline: 2px solid rgb(212 130 30); outline-offset: 2px; }
+.tag {
+	position: absolute; transform: translate(-50%, -50%);
+	display: grid; place-items: center; width: 20px; height: 20px; padding: 0;
+	cursor: pointer; pointer-events: auto; border: 0; border-radius: 50%;
+	color: rgb(242 240 236); background: rgb(23 22 20 / .88);
+	box-shadow: 0 4px 10px -6px rgb(23 22 20 / .5);
+}
+.tag::after { content: ''; position: absolute; inset: -6px; }
+.tag[data-status='counting'] { color: rgb(212 130 30); }
+.tag[data-status='rate'] {
+	width: auto; height: 20px; padding: 0 7px; border-radius: 5em;
+	font-size: 11px; transform: translate(-70%, -50%);
+}
+.tag svg {
+	width: 12px; height: 12px; fill: none; stroke: currentColor;
+	stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
+}
 `
 
 // Inset from a block's top-right corner, or gap beside a small element.
@@ -98,8 +150,14 @@ export const placeLabel = (
 }
 
 export type StatsOverlay = {
-	// The rates by block uid, and whether to show them.
-	update(stats: Readonly<Record<string, BlockStats>>, visible: boolean): void
+	// The rates by block uid, and whether to show them. `checked`: the tagged
+	// ids the rates were asked for, when not all of them; the rest get no tag
+	// until they are.
+	update(
+		stats: Readonly<Record<string, BlockStats>>,
+		visible: boolean,
+		checked?: ReadonlySet<string>,
+	): void
 	// Places the labels again, e.g. after the site re-rendered.
 	refresh(): void
 	destroy(): void
@@ -134,7 +192,11 @@ export const mountStatsOverlay = (
 
 	let stats: Readonly<Record<string, BlockStats>> = {}
 	let visible = false
+	let checked: ReadonlySet<string> | undefined
 	let frame: number | null = null
+
+	const tagged = (id: string) =>
+		doc.querySelector(`[${TAG_ATTRIBUTE}="${id.replace(/["\\]/g, '\\$&')}"]`)
 
 	const render = () => {
 		frame = null
@@ -142,32 +204,64 @@ export const mountStatsOverlay = (
 		layer.hidden = !visible
 		if (!visible) return
 		const height = win.innerHeight
-		for (const [uid, block] of Object.entries(stats)) {
-			const element = doc.querySelector(selector(uid))
+		const ids = new Set(Object.keys(stats))
+		for (const element of doc.querySelectorAll(`[${TAG_ATTRIBUTE}]`)) {
+			const id = element.getAttribute(TAG_ATTRIBUTE)
+			if (id && (!checked || checked.has(id))) ids.add(id)
+		}
+		for (const id of ids) {
+			const element = tagged(id) ?? doc.querySelector(selector(id))
 			if (!element) continue
 			const rect = element.getBoundingClientRect()
 			// Not rendered, or off screen.
 			if (!rect.width && !rect.height) continue
 			if (rect.bottom < 0 || rect.top > height) continue
 
-			const badge = doc.createElement('button')
-			badge.type = 'button'
-			badge.className = 'badge'
-			badge.dataset.uid = uid
-			badge.textContent = fill(labels.clicked, {
-				rate: Math.round(block.rate * 100),
-			})
-			badge.title = fill(labels.title, {
-				clickers: block.clickers,
-				viewers: block.viewers,
-				clicks: block.clicks,
-			})
-			const { place, top, left } = placeLabel(rect, win.innerWidth)
-			badge.dataset.place = place
-			badge.style.top = `${top}px`
-			badge.style.left = `${left}px`
-			badge.addEventListener('click', () => onSelect(uid))
-			layer.appendChild(badge)
+			const block = stats[id]
+			const status = statsStatus(block)
+			const label = doc.createElement('button')
+			label.type = 'button'
+			label.dataset.uid = id
+			label.dataset.status = status
+			const rate = block ? Math.round(block.rate * 100) : 0
+			label.title =
+				status === 'rate'
+					? fill(labels.title, {
+							clickers: block!.clickers,
+							viewers: block!.viewers,
+							clicks: block!.clicks,
+						})
+					: status === 'none'
+						? labels.noClicks
+						: fill(labels.counting, {
+								clicks: block!.clicks,
+								viewers: block!.viewers,
+								needed: MIN_VIEWERS,
+							})
+			if (status === 'rate' && rect.height >= SMALL_HEIGHT) {
+				label.className = 'badge'
+				label.textContent = fill(labels.clicked, { rate })
+				const { place, top, left } = placeLabel(rect, win.innerWidth)
+				label.dataset.place = place
+				label.style.top = `${top}px`
+				label.style.left = `${left}px`
+			} else {
+				// A link's: on its top-right corner, like a notification badge.
+				label.className = 'tag'
+				if (status === 'rate')
+					label.textContent = fill(labels.clickedShort, { rate })
+				else
+					label.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[status]}</svg>`
+				label.setAttribute('aria-label', label.title)
+				label.style.top = `${Math.max(rect.top, 10)}px`
+				label.style.left = `${Math.min(rect.right, win.innerWidth - 10)}px`
+			}
+			// The block around a tagged element: its id is the block's by
+			// convention, but the site may tag an element inside it.
+			const uid =
+				element.closest(`[${UID_ATTRIBUTE}]`)?.getAttribute(UID_ATTRIBUTE) ?? id
+			label.addEventListener('click', () => onSelect(uid))
+			layer.appendChild(label)
 		}
 	}
 
@@ -189,9 +283,10 @@ export const mountStatsOverlay = (
 	observer?.observe(doc.body, { childList: true, subtree: true })
 
 	return {
-		update(nextStats, nextVisible) {
+		update(nextStats, nextVisible, nextChecked) {
 			stats = nextStats
 			visible = nextVisible
+			checked = nextChecked
 			if (frame !== null) {
 				win.cancelAnimationFrame?.(frame)
 				frame = null
