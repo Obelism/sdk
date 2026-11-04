@@ -127,6 +127,8 @@ export type SiteEditorLabels = SharedLabels & {
 	// `{name}`: the block's name, in bold.
 	scopeNoteBlock: string
 	scopeNotePage: string
+	// Back to the block around the selected one; `{name}`: that block's name.
+	scopeUp: string
 	// A block whose type isn't known yet.
 	block: string
 	// `{name}`: the block's name.
@@ -165,6 +167,7 @@ export const DEFAULT_SITE_EDITOR_LABELS: SiteEditorLabels = {
 	scopeNoteBlock: 'Working on {name}. Click another block to switch.',
 	scopeNotePage:
 		'Working on the whole page. Click a block to change only that block.',
+	scopeUp: 'Up to {name}',
 	block: 'Block',
 	previewChip: '{name} · preview',
 	askIntro:

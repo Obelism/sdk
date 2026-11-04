@@ -463,6 +463,54 @@ describe('mountSiteEditor', () => {
 		expect(back().hidden).toBe(true)
 	})
 
+	it('steps up a level at a time, back to the page', async () => {
+		const { bridge, setState, forms } = fakeBridge()
+		const page = {
+			title: 'Home',
+			blocks: [
+				{
+					_uid: 'hero_1',
+					_type: 'heroTitle',
+					links: [{ _uid: 'link_1', _type: 'textLink', label: 'Our work' }],
+				},
+			],
+		}
+		bridge.view.mockImplementation(async () => page as never)
+		unmount = mountSiteEditor(document, bridge)
+		setState({ features: ['prompt', 'form'] })
+		await settle()
+		const note = () => $('.fields .note')
+
+		bridge.select('link_1')
+		expect(note().textContent).toContain('Working on Text link.')
+		button('Up to Hero title', '.fields').click()
+		expect(bridge.select).toHaveBeenLastCalledWith('hero_1')
+		expect(note().hidden).toBe(false)
+
+		button('Whole page', '.fields').click()
+		expect(bridge.select).toHaveBeenLastCalledWith(null)
+		expect(note().hidden).toBe(true)
+
+		bridge.select('link_1')
+		forms[0]!.options.onEscape?.()
+		expect(bridge.select).toHaveBeenLastCalledWith('hero_1')
+	})
+
+	it('finds the block around a new one by the page', async () => {
+		const { bridge, setState } = fakeBridge()
+		document.body.insertAdjacentHTML(
+			'beforeend',
+			'<div data-cms-uid="hero_1"><a data-cms-uid="new_1">New</a></div>',
+		)
+		unmount = mountSiteEditor(document, bridge)
+		setState({ features: ['prompt', 'form'] })
+		await settle()
+
+		bridge.select('new_1')
+		button('Up to Hero title', '.fields').click()
+		expect(bridge.select).toHaveBeenLastCalledWith('hero_1')
+	})
+
 	it('washes the previewed block and names its page', async () => {
 		document.title = 'Home page'
 		const { bridge, setState, answer } = fakeBridge()

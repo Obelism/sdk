@@ -787,6 +787,7 @@ export const mountSiteEditor = (
 	let hoverUid: string | null = null
 	// Block names by uid, from the views; null when it couldn't be read.
 	const names = new Map<string, string | null>()
+	const parents = new Map<string, string | null>()
 	let pageNames: 'idle' | 'loading' | 'done' = 'idle'
 	let destroyed = false
 
@@ -830,13 +831,29 @@ export const mountSiteEditor = (
 		}
 		return names.get(uid) ?? labels.block
 	}
-	const readNames = (value: unknown) => {
-		if (Array.isArray(value)) value.forEach(readNames)
+	const readNames = (value: unknown, parent: string | null = null) => {
+		if (Array.isArray(value)) value.forEach((item) => readNames(item, parent))
 		else if (isRecord(value)) {
-			if (typeof value._uid === 'string' && typeof value._type === 'string')
-				names.set(value._uid, humanize(value._type))
-			Object.values(value).forEach(readNames)
+			let uid = parent
+			if (typeof value._uid === 'string') {
+				uid = value._uid
+				parents.set(uid, parent)
+				if (typeof value._type === 'string')
+					names.set(uid, humanize(value._type))
+			}
+			Object.values(value).forEach((item) => readNames(item, uid))
 		}
+	}
+	// The block around `uid`, null at the top of the page. The page's view
+	// knows; a block added since it was read is found by its place in the DOM.
+	const parentOf = (uid: string): string | null => {
+		if (parents.has(uid)) return parents.get(uid) ?? null
+		return (
+			doc
+				.querySelector(blockSelector(uid))
+				?.parentElement?.closest(`[${UID_ATTRIBUTE}]`)
+				?.getAttribute(UID_ATTRIBUTE) ?? null
+		)
 	}
 	const readPageNames = () => {
 		if (pageNames !== 'idle' || bridge.entryId === null) return
@@ -1201,6 +1218,12 @@ export const mountSiteEditor = (
 		} else {
 			noteText.textContent = labels.scopeNotePage
 		}
+		const parent = state.selectedUid ? parentOf(state.selectedUid) : null
+		const upText = parent
+			? fill(labels.scopeUp, { name: nameOf(parent) })
+			: labels.scopeEntry
+		for (const up of [wholePage, wholePageFields])
+			if (up.textContent !== upText) up.textContent = upText
 		fieldsNote.hidden = creating || !state.selectedUid
 		note.hidden =
 			offerShop || (pageless && !creating && !options.promptWithoutPage)
@@ -1363,13 +1386,18 @@ export const mountSiteEditor = (
 		;(picking ? picker.search : pageButton).focus()
 	}
 
-	// Escape, on the page or in the form: from the pages, from a block to the
-	// whole page. True when it did something.
+	const stepUp = () => {
+		const { selectedUid } = bridge.getState()
+		if (selectedUid) bridge.select(parentOf(selectedUid))
+	}
+
+	// Escape, on the page or in the form: from the pages, from a block a level
+	// up. True when it did something.
 	const stepBack = () => {
 		const state = bridge.getState()
 		if (!panelShown(state)) return false
 		if (picking) setPicking(false)
-		else if (state.selectedUid) bridge.select(null)
+		else if (state.selectedUid) stepUp()
 		else return false
 		return true
 	}
@@ -1493,11 +1521,11 @@ export const mountSiteEditor = (
 	newPage.addEventListener('click', () => setCreating(true))
 	cancelNew.addEventListener('click', () => setCreating(false))
 	wholePage.addEventListener('click', () => {
-		bridge.select(null)
+		stepUp()
 		input.focus()
 	})
 	wholePageFields.addEventListener('click', () => {
-		bridge.select(null)
+		stepUp()
 		focusForm()
 	})
 	shopButton.addEventListener('click', async () => {
