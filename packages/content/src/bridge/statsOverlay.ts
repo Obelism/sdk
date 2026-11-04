@@ -1,11 +1,16 @@
-// Click rates on the page: in the visual editor, a small label on each block
-// that numbers has clicks for ("24% clicked"), from the editor's `stats`
-// message. The editor's "Show click rates" switch turns it on and off. Plain
-// DOM in a shadow root, like the prompt box, in a fixed layer that follows
-// the blocks as the page scrolls, resizes and re-renders.
+import { UID_ATTRIBUTE } from '../editable'
+
+// Click rates on the page: a small label on each block Numbers has clicks
+// for ("24% clicked"), and on each element the site tags a little one: a
+// cross before its first click, an hourglass until enough visitors saw its
+// page for a rate. From the visual editor's `stats` message (its "Show click
+// rates" switch turns them on and off), or on the site from the CMS's site
+// API while blocks are outlined. Plain DOM in a shadow root, like the prompt
+// box, in a fixed layer that follows the blocks as the page scrolls, resizes
+// and re-renders.
 //
 // Sites tag a block's clickable element with `data-numbers-id={block._uid}`
-// and load Obelism numbers' script; the CMS reads the rates from numbers
+// and load Obelism Numbers' script; the CMS reads the rates from Numbers
 // (the CMS's content/docs/guides/canvas.mdx, "Click rates").
 
 export type BlockStats = {
@@ -21,14 +26,44 @@ export type BlockStats = {
 export type StatsLabels = {
 	// `{rate}` is a whole percentage.
 	clicked: string
+	// The same on a link's tag.
+	clickedShort: string
 	// `{clickers}`, `{viewers}`, `{clicks}`.
 	title: string
+	noClicks: string
+	// `{clicks}`, `{viewers}`, and `{needed}`: the visitors a rate takes.
+	counting: string
 }
 
 export const DEFAULT_STATS_LABELS: StatsLabels = {
 	clicked: '{rate}% clicked',
+	clickedShort: '{rate}%',
 	title:
 		'{clickers} of {viewers} visitors of its page clicked it in the last 30 days ({clicks} clicks)',
+	noClicks: 'No clicks yet in the last 30 days',
+	counting:
+		'{clicks} clicks so far: a click rate once {needed} visitors saw its page ({viewers} yet)',
+}
+
+// Fewer visitors than this make a rate noise.
+export const MIN_VIEWERS = 20
+
+export const TAG_ATTRIBUTE = 'data-numbers-id'
+
+export type StatsStatus = 'none' | 'counting' | 'rate'
+
+export const statsStatus = (block: BlockStats | undefined): StatsStatus =>
+	!block || block.clicks === 0
+		? 'none'
+		: block.viewers < MIN_VIEWERS
+			? 'counting'
+			: 'rate'
+
+// Lucide's x and hourglass.
+const ICONS: Record<Exclude<StatsStatus, 'rate'>, string> = {
+	none: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+	counting:
+		'<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>',
 }
 
 const fill = (template: string, values: Record<string, string | number>) =>
@@ -59,43 +94,47 @@ const CSS = `
 	content: ''; width: 8px; height: 8px; border-radius: 50%;
 	background: rgb(212 130 30);
 }
-.badge[data-place='beside'] { transform: translateY(-50%); }
-.badge[data-place='above'] { transform: translate(-100%, -100%); }
-.badge:focus-visible { outline: 2px solid rgb(212 130 30); outline-offset: 2px; }
+.badge:focus-visible, .tag:focus-visible { outline: 2px solid rgb(212 130 30); outline-offset: 2px; }
+.tag {
+	position: absolute; transform: translate(-50%, -50%);
+	display: grid; place-items: center; width: 20px; height: 20px; padding: 0;
+	cursor: pointer; pointer-events: auto; border: 0; border-radius: 50%;
+	color: rgb(242 240 236); background: rgb(23 22 20 / .88);
+	box-shadow: 0 4px 10px -6px rgb(23 22 20 / .5);
+}
+.tag::after { content: ''; position: absolute; inset: -6px; }
+.tag[data-status='counting'] { color: rgb(212 130 30); }
+.tag[data-status='rate'] {
+	width: auto; height: 20px; padding: 0 7px; border-radius: 5em;
+	font-size: 11px; transform: translate(-70%, -50%);
+}
+.tag svg {
+	width: 12px; height: 12px; fill: none; stroke: currentColor;
+	stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
+}
 `
 
-// Inset from a block's top-right corner, or gap beside a small element.
 const INSET = 8
-// Below this an element is a button or a link, not a section: its label goes
-// beside it (or above, without room on the right) so it doesn't cover it.
+// Below this an element is a button or a link, not a section: a tag on its
+// corner rather than a label over it.
 const SMALL_HEIGHT = 64
-// Room a label needs beside an element.
-const LABEL_WIDTH = 140
 
-// Where a label goes for an element's box: inside the top-right corner of a
-// block, beside a small element, or above one at the right edge.
-export const placeLabel = (
-	rect: Pick<DOMRect, 'top' | 'right' | 'height'>,
-	viewportWidth: number,
-) => {
-	if (rect.height >= SMALL_HEIGHT)
-		return {
-			place: 'inside' as const,
-			top: Math.max(rect.top, 0) + INSET,
-			left: rect.right - INSET,
-		}
-	if (rect.right + INSET + LABEL_WIDTH <= viewportWidth)
-		return {
-			place: 'beside' as const,
-			top: rect.top + rect.height / 2,
-			left: rect.right + INSET,
-		}
-	return {
-		place: 'above' as const,
-		top: rect.top - INSET / 2,
-		left: rect.right,
-	}
-}
+// A block's label: inside its top-right corner, in view when it starts above
+// the screen.
+export const placeLabel = (rect: Pick<DOMRect, 'top' | 'right'>) => ({
+	top: Math.max(rect.top, 0) + INSET,
+	left: rect.right - INSET,
+})
+
+// A tag's: on the element's top-right corner, like a notification badge,
+// kept on screen.
+export const placeTag = (
+	rect: Pick<DOMRect, 'top' | 'right'>,
+	viewport: { width: number; height: number },
+) => ({
+	top: Math.min(Math.max(rect.top, 10), viewport.height - 10),
+	left: Math.min(rect.right, viewport.width - 10),
+})
 
 export type StatsOverlay = {
 	// The rates by block uid, and whether to show them.
@@ -110,12 +149,17 @@ export const mountStatsOverlay = (
 	{
 		selector,
 		onSelect,
+		checked,
 		labels: labelOverrides,
 	}: {
 		// The element of a block, by its uid.
 		selector: (uid: string) => string
 		// A label is a way to select its block too.
 		onSelect: (uid: string) => void
+		// Whether the rates were asked for a tagged id, so no rate means no
+		// clicks. Default: the ids of the page's blocks, which the visual
+		// editor asks for.
+		checked?: ((id: string) => boolean) | undefined
 		labels?: Partial<StatsLabels> | undefined
 	},
 ): StatsOverlay => {
@@ -136,38 +180,79 @@ export const mountStatsOverlay = (
 	let visible = false
 	let frame: number | null = null
 
+	const draw = (id: string, element: Element, blocks: ReadonlySet<string>) => {
+		const rect = element.getBoundingClientRect()
+		// Not rendered, or off screen.
+		if (!rect.width && !rect.height) return
+		if (rect.bottom < 0 || rect.top > win.innerHeight) return
+
+		const block = stats[id]
+		const status = statsStatus(block)
+		const label = doc.createElement('button')
+		label.type = 'button'
+		label.dataset.uid = id
+		label.dataset.status = status
+		const rate = block ? Math.round(block.rate * 100) : 0
+		label.title =
+			status === 'rate'
+				? fill(labels.title, {
+						clickers: block!.clickers,
+						viewers: block!.viewers,
+						clicks: block!.clicks,
+					})
+				: status === 'none'
+					? labels.noClicks
+					: fill(labels.counting, {
+							clicks: block!.clicks,
+							viewers: block!.viewers,
+							needed: MIN_VIEWERS,
+						})
+		const { top, left } =
+			status === 'rate' && rect.height >= SMALL_HEIGHT
+				? placeLabel(rect)
+				: placeTag(rect, { width: win.innerWidth, height: win.innerHeight })
+		if (status === 'rate' && rect.height >= SMALL_HEIGHT) {
+			label.className = 'badge'
+			label.textContent = fill(labels.clicked, { rate })
+		} else {
+			label.className = 'tag'
+			if (status === 'rate')
+				label.textContent = fill(labels.clickedShort, { rate })
+			else
+				label.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[status]}</svg>`
+			label.setAttribute('aria-label', label.title)
+		}
+		label.style.top = `${top}px`
+		label.style.left = `${left}px`
+		// Its id names a block by convention; else the block around it.
+		const uid = blocks.has(id)
+			? id
+			: element.closest(`[${UID_ATTRIBUTE}]`)?.getAttribute(UID_ATTRIBUTE)
+		if (uid) label.addEventListener('click', () => onSelect(uid))
+		layer.appendChild(label)
+	}
+
 	const render = () => {
 		frame = null
 		layer.replaceChildren()
 		layer.hidden = !visible
 		if (!visible) return
-		const height = win.innerHeight
-		for (const [uid, block] of Object.entries(stats)) {
-			const element = doc.querySelector(selector(uid))
-			if (!element) continue
-			const rect = element.getBoundingClientRect()
-			// Not rendered, or off screen.
-			if (!rect.width && !rect.height) continue
-			if (rect.bottom < 0 || rect.top > height) continue
-
-			const badge = doc.createElement('button')
-			badge.type = 'button'
-			badge.className = 'badge'
-			badge.dataset.uid = uid
-			badge.textContent = fill(labels.clicked, {
-				rate: Math.round(block.rate * 100),
-			})
-			badge.title = fill(labels.title, {
-				clickers: block.clickers,
-				viewers: block.viewers,
-				clicks: block.clicks,
-			})
-			const { place, top, left } = placeLabel(rect, win.innerWidth)
-			badge.dataset.place = place
-			badge.style.top = `${top}px`
-			badge.style.left = `${left}px`
-			badge.addEventListener('click', () => onSelect(uid))
-			layer.appendChild(badge)
+		const blocks = new Set<string>()
+		for (const element of doc.querySelectorAll(`[${UID_ATTRIBUTE}]`))
+			blocks.add(element.getAttribute(UID_ATTRIBUTE) ?? '')
+		const isChecked = checked ?? ((id: string) => blocks.has(id))
+		const tagged = new Set<string>()
+		for (const element of doc.querySelectorAll(`[${TAG_ATTRIBUTE}]`)) {
+			const id = element.getAttribute(TAG_ATTRIBUTE)
+			if (!id || (!stats[id] && !isChecked(id))) continue
+			tagged.add(id)
+			draw(id, element, blocks)
+		}
+		// Rates of blocks the site doesn't tag an element of.
+		for (const id of Object.keys(stats)) {
+			if (tagged.has(id) || !blocks.has(id)) continue
+			const element = doc.querySelector(selector(id))
+			if (element) draw(id, element, blocks)
 		}
 	}
 

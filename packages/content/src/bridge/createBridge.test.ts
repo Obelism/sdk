@@ -390,7 +390,13 @@ describe('click rates', () => {
 	beforeEach(() => {
 		document.querySelector('[data-cms-uid="b_1"]')!.getBoundingClientRect =
 			() =>
-				({ top: 10, bottom: 60, right: 300, width: 300, height: 50 }) as DOMRect
+				({
+					top: 10,
+					bottom: 310,
+					right: 300,
+					width: 300,
+					height: 300,
+				}) as DOMRect
 	})
 
 	it('keeps the rates and the switch in its state, and shows them on the page', () => {
