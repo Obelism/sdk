@@ -496,7 +496,7 @@ describe('mountSiteEditor', () => {
 		expect(bridge.select).toHaveBeenLastCalledWith('hero_1')
 	})
 
-	it('finds the block around a new one by the page', async () => {
+	it('finds the block around one by the DOM', async () => {
 		const { bridge, setState } = fakeBridge()
 		document.body.insertAdjacentHTML(
 			'beforeend',
