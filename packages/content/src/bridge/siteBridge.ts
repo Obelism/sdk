@@ -296,10 +296,13 @@ export const createSiteBridge = (
 		return { uid, entryId }
 	}
 
-	// What was selected on this page: only their rates show (statsOverlay.ts),
-	// so a few can be compared without every tag at once.
+	// The blocks selected on this page, and the tags clicked outside the
+	// blocks: only their rates show (statsOverlay.ts), so a few can be
+	// compared without every tag at once.
 	const revealed = new Set<string>()
 	let overlay: StatsOverlay | null = null
+	const asked = new Set<string>()
+	const answered = new Set<string>()
 
 	const highlight = (uid: string | null) => {
 		doc.querySelectorAll('[data-cms-selected]').forEach((element) => {
@@ -768,14 +771,16 @@ export const createSiteBridge = (
 		const target = event.target as Element | null
 		const element = target?.closest?.(`[${UID_ATTRIBUTE}]`)
 		// A tagged element outside the blocks (a menu button) can't be
-		// selected: a click shows its rate.
+		// selected: a click shows its rate, when the CMS answered for it.
 		const tag = element ? null : target?.closest?.(`[${TAG_ATTRIBUTE}]`)
 		const tagId = tag?.getAttribute(TAG_ATTRIBUTE)
-		if (tagId) {
+		if (tagId && answered.has(tagId)) {
 			event.preventDefault()
 			event.stopPropagation()
-			revealed.add(tagId)
-			overlay?.refresh()
+			if (!revealed.has(tagId)) {
+				revealed.add(tagId)
+				overlay?.refresh()
+			}
 			return
 		}
 		if (!element) return
@@ -797,8 +802,6 @@ export const createSiteBridge = (
 	// The tags on the page's links (statsOverlay.ts) of what was selected,
 	// while blocks are outlined: the rates of the ids the page tags, asked for
 	// as they appear.
-	const asked = new Set<string>()
-	const answered = new Set<string>()
 	let statsOff = false
 	let statsTimer: ReturnType<typeof setTimeout> | null = null
 	const showStats = () => overlay?.update(state.stats, state.statsVisible)

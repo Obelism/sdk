@@ -385,8 +385,9 @@ visitors saw its page, then its rate ("24%"). In the visual editor the
 editor shows a rate once its block is selected (or, outside the blocks, its
 element clicked) and keeps it while the page is open, so a few can be
 compared. Clicking one selects its block. The rates come from Obelism
-Numbers over the last 30 days, so tag a block's clickable element with its uid and load Numbers'
-script on the site (see the CMS's visual editor guide, "Click rates"):
+Numbers over the last 30 days, so tag a block's clickable element with its
+uid and load Numbers' script on the site (see the CMS's visual editor
+guide, "Click rates"):
 
 ```tsx
 <a href={block.link} data-numbers-id={block._uid}>
