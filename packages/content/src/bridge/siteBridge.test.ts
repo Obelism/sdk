@@ -38,7 +38,8 @@ const site = (answers: Record<string, (body: any) => unknown> = {}) => {
 		addEventListener: (type: string, listener: (event: unknown) => void) =>
 			listeners.set(type, listener),
 		removeEventListener: () => {},
-		requestAnimationFrame: (callback: () => void) => callback(),
+		requestAnimationFrame: (callback: () => void) => setTimeout(callback, 0),
+		cancelAnimationFrame: (id: number) => clearTimeout(id),
 		confirm: () => true,
 	}
 	return { win: win as unknown as Window, calls, reload, assign, listeners }
@@ -867,15 +868,22 @@ describe('createSiteBridge', () => {
 		expect(page?.url).toBe('/shop/mug')
 	})
 
-	it('asks for the clicks of the links the page tags, and tags them while selecting', async () => {
+	it('asks for the clicks of the links the page tags, and tags the ones selected while selecting', async () => {
 		document.body.insertAdjacentHTML(
 			'beforeend',
-			'<main data-cms-entry="entry_home"><a data-numbers-id="hero">Our work</a><a data-numbers-id="hero">Again</a></main>',
+			'<button data-numbers-id="menu">Menu</button>' +
+				'<main data-cms-entry="entry_home">' +
+				'<a data-cms-uid="b_work" data-numbers-id="b_work">Our work</a>' +
+				'<a data-cms-uid="b_contact" data-numbers-id="b_contact">Contact</a>' +
+				'</main>',
 		)
 		for (const element of document.querySelectorAll('[data-numbers-id]'))
 			element.getBoundingClientRect = () =>
 				({ top: 10, bottom: 50, right: 200, width: 100, height: 40 }) as DOMRect
-		const stats = { hero: { clicks: 3, clickers: 2, viewers: 4, rate: 0.5 } }
+		const stats = {
+			b_work: { clicks: 30, clickers: 25, viewers: 100, rate: 0.25 },
+			menu: { clicks: 3, clickers: 2, viewers: 4, rate: 0.5 },
+		}
 		const { win, calls } = site({
 			session: () => SESSION,
 			stats: () => ({ stats }),
@@ -883,22 +891,45 @@ describe('createSiteBridge', () => {
 		const bridge = createSiteBridge(win, '/cms')
 		await vi.waitFor(() => expect(bridge.getState().stats).toEqual(stats))
 		expect(calls.find(({ path }) => path === 'stats')?.body).toEqual({
-			uids: ['hero'],
+			uids: ['menu', 'b_work', 'b_contact'],
 			entries: expect.arrayContaining(['entry_home']),
 		})
 
 		const tags = () =>
+			[
+				...(document
+					.querySelector('[data-obelism-stats]')
+					?.shadowRoot?.querySelectorAll('[data-status]') ?? []),
+			].map(
+				(tag) =>
+					`${tag.getAttribute('data-uid')}:${tag.getAttribute('data-status')}`,
+			)
+		const click = (selector: string) =>
 			document
-				.querySelector('[data-obelism-stats]')
-				?.shadowRoot?.querySelectorAll('[data-status]') ?? []
-		expect(tags()).toHaveLength(0)
+				.querySelector(selector)
+				?.dispatchEvent(
+					new MouseEvent('click', { bubbles: true, cancelable: true }),
+				)
+
 		bridge.setSelecting(true)
-		expect([...tags()].map((tag) => tag.getAttribute('data-status'))).toEqual([
-			'counting',
-			'counting',
-		])
+		expect(tags()).toEqual([])
+		click('[data-cms-uid="b_work"]')
+		await vi.waitFor(() => expect(tags()).toEqual(['b_work:rate']))
+		// The first stays, to compare with.
+		click('[data-cms-uid="b_contact"]')
+		await vi.waitFor(() =>
+			expect(tags()).toEqual(['b_work:rate', 'b_contact:none']),
+		)
+		click('[data-numbers-id="menu"]')
+		await vi.waitFor(() =>
+			expect(tags()).toEqual([
+				'menu:counting',
+				'b_work:rate',
+				'b_contact:none',
+			]),
+		)
 		bridge.setSelecting(false)
-		expect(tags()).toHaveLength(0)
+		expect(tags()).toEqual([])
 		bridge.destroy()
 		expect(document.querySelector('[data-obelism-stats]')).toBeNull()
 	})

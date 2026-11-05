@@ -381,10 +381,13 @@ how often each block is clicked on the page itself: a label on a block
 ("24% clicked"), and a little tag on the corner of each tagged link or
 button — a cross before its first click, an hourglass while fewer than 20
 visitors saw its page, then its rate ("24%"). In the visual editor the
-**Show click rates on the page** switch turns them on and off. Clicking one
-selects its block. The rates come from Obelism Numbers over the last 30
-days, so tag a block's clickable element with its uid and load Numbers'
-script on the site (see the CMS's visual editor guide, "Click rates"):
+**Show click rates on the page** switch turns them on and off. The on-site
+editor shows a rate once its block is selected (or, outside the blocks, its
+element clicked) and keeps it while the page is open, so a few can be
+compared. Clicking one selects its block. The rates come from Obelism
+Numbers over the last 30 days, so tag a block's clickable element with its
+uid and load Numbers' script on the site (see the CMS's visual editor
+guide, "Click rates"):
 
 ```tsx
 <a href={block.link} data-numbers-id={block._uid}>

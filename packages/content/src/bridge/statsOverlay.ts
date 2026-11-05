@@ -150,6 +150,7 @@ export const mountStatsOverlay = (
 		selector,
 		onSelect,
 		checked,
+		shows,
 		labels: labelOverrides,
 	}: {
 		// The element of a block, by its uid.
@@ -160,6 +161,8 @@ export const mountStatsOverlay = (
 		// clicks. Default: the ids of the page's blocks, which the visual
 		// editor asks for.
 		checked?: ((id: string) => boolean) | undefined
+		// Which of the rates to draw, by the id and its element. Default: all.
+		shows?: ((id: string, element: Element) => boolean) | undefined
 		labels?: Partial<StatsLabels> | undefined
 	},
 ): StatsOverlay => {
@@ -246,13 +249,14 @@ export const mountStatsOverlay = (
 			const id = element.getAttribute(TAG_ATTRIBUTE)
 			if (!id || (!stats[id] && !isChecked(id))) continue
 			tagged.add(id)
+			if (shows && !shows(id, element)) continue
 			draw(id, element, blocks)
 		}
 		// Rates of blocks the site doesn't tag an element of.
 		for (const id of Object.keys(stats)) {
 			if (tagged.has(id) || !blocks.has(id)) continue
 			const element = doc.querySelector(selector(id))
-			if (element) draw(id, element, blocks)
+			if (element && (!shows || shows(id, element))) draw(id, element, blocks)
 		}
 	}
 
