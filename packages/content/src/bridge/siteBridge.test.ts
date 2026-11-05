@@ -870,7 +870,7 @@ describe('createSiteBridge', () => {
 	it('asks for the clicks of the links the page tags, and tags them while selecting', async () => {
 		document.body.insertAdjacentHTML(
 			'beforeend',
-			'<a data-numbers-id="hero">Our work</a><a data-numbers-id="hero">Again</a>',
+			'<main data-cms-entry="entry_home"><a data-numbers-id="hero">Our work</a><a data-numbers-id="hero">Again</a></main>',
 		)
 		for (const element of document.querySelectorAll('[data-numbers-id]'))
 			element.getBoundingClientRect = () =>
@@ -884,6 +884,7 @@ describe('createSiteBridge', () => {
 		await vi.waitFor(() => expect(bridge.getState().stats).toEqual(stats))
 		expect(calls.find(({ path }) => path === 'stats')?.body).toEqual({
 			uids: ['hero'],
+			entries: expect.arrayContaining(['entry_home']),
 		})
 
 		const tags = () =>

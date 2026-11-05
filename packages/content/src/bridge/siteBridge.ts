@@ -47,6 +47,7 @@ import {
 
 // The CMS's limit on ids in one stats request.
 const MAX_STATS_IDS = 500
+const MAX_STATS_ENTRIES = 20
 // After the page changes, before asking for the ids it newly tags.
 const STATS_DELAY_MS = 1000
 
@@ -792,9 +793,20 @@ export const createSiteBridge = (
 		const batch = ids.slice(0, MAX_STATS_IDS)
 		if (!batch.length) return
 		batch.forEach((id) => asked.add(id))
+		// So a draft's copy of a live block gets the live one's clicks.
+		const entries = [
+			...new Set(
+				[...doc.querySelectorAll(`[${ENTRY_ATTRIBUTE}]`)].map(
+					(element) => element.getAttribute(ENTRY_ATTRIBUTE) ?? '',
+				),
+			),
+		]
+			.filter(Boolean)
+			.slice(0, MAX_STATS_ENTRIES)
 		try {
 			const { stats } = await api<{ stats?: unknown }>('stats', {
 				uids: batch,
+				...(entries.length > 0 && { entries }),
 			})
 			batch.forEach((id) => answered.add(id))
 			setState({ stats: { ...state.stats, ...readStats(stats) } })
