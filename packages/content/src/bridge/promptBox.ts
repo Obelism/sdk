@@ -19,8 +19,6 @@ import { bridgeView } from './view'
 // entry form (Form mode, `bridge.openForm`), edited live, and goes to any
 // page of the space, drafts included.
 
-export { DEFAULT_PROMPT_LABELS, type PromptLabels } from './labels'
-
 export type PromptBoxOptions = {
 	labels?: Partial<PromptLabels> | undefined
 	// Controls of your own in the box (Content's canvas puts its zoom there):

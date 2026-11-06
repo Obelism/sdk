@@ -1,7 +1,6 @@
 import { expect, test, vi } from 'vitest'
 
 import { ImproveServerSDK } from './server'
-import { diff } from './utils/diff'
 import { ImproveConfiguration } from './types'
 
 type CountObject = {
@@ -62,7 +61,8 @@ test('1000 times getTestValue with new visitor ids', () => {
 		outcomeCount[outcome] = (outcomeCount[outcome] || 0) + 1
 	}
 
-	const delta = diff(...(Object.values(outcomeCount) as [number, number]))
+	const [first = 0, second = 0] = Object.values(outcomeCount)
+	const delta = Math.abs(first - second)
 
 	// getTestValue assigns each variant with Math.random, so a 50/50 split is
 	// binomially distributed: the delta between the two buckets has a standard

@@ -1,6 +1,11 @@
-import { ParsedUserAgent, parseUserAgent } from './utils/parseUserAgent'
-import { getVisitorMatchesAudience } from './utils/getVisitorMatchesAudience'
-import { getRandomTestValue } from './utils/getRandomTestValue'
+import {
+	assign,
+	createVisitor,
+	flagSubject,
+	testSubject,
+	type Visitor,
+} from './assignment'
+import { parseUserAgent } from './utils/parseUserAgent'
 import { BaseImproveSDK } from './base'
 import { type TokenSource, resolveToken } from './tokenSource'
 import { ImproveConfiguration, ImproveSetupArgs } from './types'
@@ -9,16 +14,9 @@ const DEFAULT_MAX_VISITORS = 10_000
 // One visitor id with endless user agents would otherwise grow without bound.
 const MAX_USER_AGENTS_PER_VISITOR = 10
 
-type Visitor = ParsedUserAgent & {
-	[testSlug: string]: string
-}
-
 // A Map, not an object: the user agent is the request's, and `__proto__`
 // would be Object.prototype.
 type VisitorData = Map<string, Visitor>
-
-const assignment = (visitor: Visitor, slug: string) =>
-	Object.hasOwn(visitor, slug) ? visitor[slug] : undefined
 
 type ImproveServerSetupArgs =
 	| (Omit<ImproveSetupArgs, 'config' | 'baseUrl'> & {
@@ -82,8 +80,9 @@ export class ImproveServerSDK extends BaseImproveSDK {
 		if (visitor.size >= MAX_USER_AGENTS_PER_VISITOR) {
 			visitor.delete(visitor.keys().next().value!)
 		}
-		visitor.set(userAgent, parsed)
-		return parsed
+		const fresh = createVisitor(parsed)
+		visitor.set(userAgent, fresh)
+		return fresh
 	}
 
 	getFlagValue = (
@@ -94,33 +93,20 @@ export class ImproveServerSDK extends BaseImproveSDK {
 		// country. The browser can't determine this, so it's passed in here.
 		geo?: { country?: string | undefined },
 	) => {
-		const flagConfig = this.getFlagConfig(flagSlug)
-
-		if (!flagConfig || !this.config) return null
-
-		const defaultValue = flagConfig.options[0]?.slug ?? null
-		if (!visitorId) return defaultValue
+		const config = this.config
+		const flag = this.getFlagConfig(flagSlug)
+		if (!config || !flag) return null
+		if (!visitorId) return flag.options[0]?.slug ?? null
 
 		const visitor = this.#getVisitor(visitorId, userAgent)
-		if (!visitor) return defaultValue
-		if (geo?.country) visitor.country = geo.country
+		if (!visitor) return flag.options[0]?.slug ?? null
+		if (geo?.country) visitor.params.country = geo.country
 
-		const assigned = assignment(visitor, flagSlug)
-		if (assigned) return assigned
-
-		const visitorMatchesAudience = getVisitorMatchesAudience(
-			this.config.audience[flagConfig.audience],
+		return assign(
+			flagSubject(flagSlug, flag),
+			config.audience[flag.audience],
 			visitor,
-		)
-
-		if (!visitorMatchesAudience) return defaultValue
-
-		const flagValue = getRandomTestValue(flagConfig.options)
-
-		if (!flagValue) return null
-
-		visitor[flagSlug] = flagValue
-		return flagValue
+		).value
 	}
 
 	getTestValue = (
@@ -131,39 +117,19 @@ export class ImproveServerSDK extends BaseImproveSDK {
 		// country. The browser can't determine this, so it's passed in here.
 		geo?: { country?: string | undefined },
 	) => {
-		const testConfig = this.getTestConfig(testSlug)
-
-		if (!testConfig || !this.config) return null
-
-		if (!visitorId || !userAgent) return testConfig.defaultValue
+		const config = this.config
+		const test = this.getTestConfig(testSlug)
+		if (!config || !test) return null
+		if (!visitorId) return test.defaultValue
 
 		const visitor = this.#getVisitor(visitorId, userAgent)
-		if (!visitor) return testConfig.defaultValue
-		if (geo?.country) visitor.country = geo.country
+		if (!visitor) return test.defaultValue
+		if (geo?.country) visitor.params.country = geo.country
 
-		const assigned = assignment(visitor, testSlug)
-		if (assigned) return assigned
-
-		const visitorMatchesAudience = getVisitorMatchesAudience(
-			this.config.audience[testConfig.audience],
+		return assign(
+			testSubject(testSlug, test),
+			config.audience[test.audience],
 			visitor,
-		)
-
-		if (!visitorMatchesAudience) return testConfig.defaultValue
-
-		if (
-			testConfig.allocation < 100 &&
-			Math.random() * 100 > testConfig.allocation
-		) {
-			visitor[testSlug] = testConfig.defaultValue
-			return testConfig.defaultValue
-		}
-
-		const testValue = getRandomTestValue(testConfig.options)
-
-		if (!testValue) return null
-
-		visitor[testSlug] = testValue
-		return testValue
+		).value
 	}
 }

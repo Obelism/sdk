@@ -7,6 +7,7 @@ import {
 } from './constants'
 import { detectDevice, getScreenSize } from './device'
 import { getExternalReferrer, getPageContext } from './page'
+import { parseRetryAfterMs } from './retry'
 import type {
 	BeaconCommon,
 	Device,
@@ -109,14 +110,6 @@ export type NumbersClient = {
 }
 
 const SNAKE_CASE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/
-
-const parseRetryAfterMs = (header: string | null) => {
-	if (!header) return undefined
-	const seconds = Number(header)
-	if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000)
-	const date = Date.parse(header)
-	return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now())
-}
 
 const isBrowser = () =>
 	typeof window !== 'undefined' && typeof document !== 'undefined'

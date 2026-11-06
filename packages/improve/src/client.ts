@@ -6,9 +6,15 @@ import {
 	type NumbersClient,
 } from '@obelism/numbers-sdk'
 
-import { ParsedUserAgent, parseUserAgent } from './utils/parseUserAgent'
-import { getVisitorMatchesAudience } from './utils/getVisitorMatchesAudience'
-import { getRandomTestValue } from './utils/getRandomTestValue'
+import {
+	assign,
+	createVisitor,
+	flagSubject,
+	testSubject,
+	type Assignment,
+	type Visitor,
+} from './assignment'
+import { parseUserAgent } from './utils/parseUserAgent'
 import { BaseImproveSDK } from './base'
 import { getCookie, setCookie } from './utils/clientCookie'
 import { ANALYTICS_PATH } from './config/urls'
@@ -18,10 +24,6 @@ import {
 	ImproveEventName,
 	ImproveSetupArgs,
 } from './types'
-
-type Visitor = ParsedUserAgent & {
-	[testSlug: string]: string
-}
 
 /**
  * A real-world tracked event. Test-independent — the server attributes it to a
@@ -92,7 +94,7 @@ export class ImproveClientSDK extends BaseImproveSDK {
 
 		if (!parsedUserAgent) return null
 
-		this.#visitor = parsedUserAgent
+		this.#visitor = createVisitor(parsedUserAgent)
 
 		// The audiences' categories, so numbers reports the same ones.
 		const { pointer, device, browser, os } = parsedUserAgent
@@ -102,104 +104,60 @@ export class ImproveClientSDK extends BaseImproveSDK {
 	}
 
 	getFlagValue = (flagSlug: string) => {
-		if (!this.config) return null
-
-		const flagConfig = this.config.flags[flagSlug]
-
-		if (!flagConfig || !flagConfig.options[0]) return null
+		const config = this.config
+		const flag = config?.flags[flagSlug]
+		if (!config || !flag || !flag.options[0]) return null
 
 		if (!this.#visitor) this.setupVisitor()
-		if (!this.#visitorId || !this.#visitor) return flagConfig.options[0].slug
-		if (this.#visitor?.[flagSlug]) return this.#visitor[flagSlug]
-
-		// Trust a prior assignment (a valid cookie) before re-evaluating audience,
-		// keeping the visitor sticky and honoring a server-side (middleware)
-		// country-targeted assignment.
-		const cookieFlagValue = getCookie(flagSlug)
-		if (
-			cookieFlagValue &&
-			flagConfig.options.some((option) => option.slug === cookieFlagValue)
-		) {
-			this.#visitor[flagSlug] = cookieFlagValue
-			this.#postExposure('flag', flagConfig.id, cookieFlagValue)
-			return cookieFlagValue
-		}
-
-		const visitorMatchesAudience = getVisitorMatchesAudience(
-			this.config.audience[flagConfig.audience],
-			this.#visitor,
+		return this.#settle(
+			assign(
+				flagSubject(flagSlug, flag),
+				config.audience[flag.audience],
+				this.#visitor ?? null,
+				getCookie(flagSlug),
+			),
+			flagSlug,
+			'flag',
+			flag.id,
 		)
-
-		if (!visitorMatchesAudience) return flagConfig.options[0].slug
-
-		const flagValue = getRandomTestValue(flagConfig.options)
-
-		if (!flagValue) return null
-
-		this.#visitor[flagSlug] = flagValue
-
-		setCookie(flagSlug, flagValue)
-
-		// Record the assignment so the visitor's later events can be attributed to
-		// this flag/variant server-side.
-		this.#postExposure('flag', flagConfig.id, flagValue)
-
-		return flagValue
 	}
 
 	getTestValue = (testSlug: string) => {
-		if (!this.config) return null
-
-		const testConfig = this.config.tests[testSlug]
-
-		if (!testConfig) return null
+		const config = this.config
+		const test = config?.tests[testSlug]
+		if (!config || !test) return null
 
 		if (!this.#visitor) this.setupVisitor()
-
-		if (!this.#visitorId || !this.#visitor) return testConfig.defaultValue
-		if (this.#visitor?.[testSlug]) return this.#visitor[testSlug]
-
-		// Trust a prior assignment (a valid cookie) before re-evaluating audience
-		// or allocation, so a bucketed visitor stays sticky. This is also how a
-		// country-targeted test resolves in the browser: middleware bucketed the
-		// visitor server-side (where geo is known) and set the cookie, and here we
-		// honor it and record the exposure.
-		const cookieTestValue = getCookie(testSlug)
-		if (cookieTestValue && this.validateTestValue(testSlug, cookieTestValue)) {
-			this.#visitor[testSlug] = cookieTestValue
-			this.#postExposure('test', testConfig.id, cookieTestValue)
-			return cookieTestValue
-		}
-
-		const visitorMatchesAudience = getVisitorMatchesAudience(
-			this.config.audience[testConfig.audience],
-			this.#visitor,
+		return this.#settle(
+			assign(
+				testSubject(testSlug, test),
+				config.audience[test.audience],
+				this.#visitor ?? null,
+				getCookie(testSlug),
+			),
+			testSlug,
+			'test',
+			test.id,
 		)
+	}
 
-		if (!visitorMatchesAudience) return testConfig.defaultValue
-
-		if (
-			testConfig.allocation < 100 &&
-			Math.random() * 100 > testConfig.allocation
-		) {
-			this.#visitor[testSlug] = testConfig.defaultValue
-			return this.#visitor?.[testSlug]
+	// Keeps a value the visitor got now: in their cookie, and as an exposure so
+	// their later events are attributed to this test or flag. A value from an
+	// earlier call here is already recorded; one from a cookie was assigned
+	// server-side, and gets its exposure here.
+	#settle = (
+		{ value, source }: Assignment,
+		slug: string,
+		kind: 'test' | 'flag',
+		id: string,
+	) => {
+		if (!value) return value
+		if (source === 'cookie') this.#postExposure(kind, id, value)
+		else if (source === 'new') {
+			setCookie(slug, value)
+			this.#postExposure(kind, id, value)
 		}
-
-		const testValue = getRandomTestValue(testConfig.options)
-
-		if (!testValue) return null
-
-		this.#visitor[testSlug] = testValue
-
-		setCookie(testSlug, testValue)
-
-		// Record the assignment so the visitor's later events can be attributed to
-		// this test/variant server-side. Holdout (allocation) and audience-excluded
-		// visitors return above without an exposure — they aren't in the test.
-		this.#postExposure('test', testConfig.id, testValue)
-
-		return testValue
+		return value
 	}
 
 	setAnalyticsUrls = (url: string) => {

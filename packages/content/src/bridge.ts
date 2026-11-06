@@ -23,8 +23,11 @@ export type {
 	SitePage,
 } from './bridge/contract'
 export { INITIAL_STATE } from './bridge/contract'
-export { DEFAULT_PROMPT_LABELS, mountPromptBox } from './bridge/promptBox'
-export { DEFAULT_SITE_EDITOR_LABELS } from './bridge/labels'
+export { mountPromptBox } from './bridge/promptBox'
+export {
+	DEFAULT_PROMPT_LABELS,
+	DEFAULT_SITE_EDITOR_LABELS,
+} from './bridge/labels'
 export { mountSiteEditor } from './bridge/siteEditor'
 export type { SiteEditorOptions } from './bridge/siteEditor'
 export { DEFAULT_STATS_LABELS, mountStatsOverlay } from './bridge/statsOverlay'

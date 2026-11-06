@@ -31,7 +31,7 @@ export type SiteEditorOptions = Omit<PromptBoxOptions, 'labels'> & {
 
 // What the site gives up beside the panel: its 404px and a 16px gap on
 // either side.
-export const DOCK_WIDTH_PX = 436
+const DOCK_WIDTH_PX = 436
 // Narrower than this the panel is a sheet over the page instead.
 const DOCK_QUERY = '(min-width: 768px)'
 const OPEN_KEY = 'obelism-content-editor'

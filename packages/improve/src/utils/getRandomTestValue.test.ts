@@ -1,78 +1,44 @@
 import { expect, test } from 'vitest'
 
 import { getRandomTestValue } from './getRandomTestValue'
-import { diff } from './diff'
 
-type CountObject = {
-	[x: string]: number
+const options = (...splits: number[]) =>
+	splits.map((split, index) => ({
+		name: `Option ${index}`,
+		slug: `option_${index}`,
+		value: '',
+		split,
+	}))
+
+const picks = (splits: number[], samples: number) => {
+	const counts = new Map<string, number>()
+	for (let index = 0; index < samples; index++) {
+		const value = getRandomTestValue(options(...splits))
+		if (value) counts.set(value, (counts.get(value) ?? 0) + 1)
+	}
+	return counts
 }
 
-test('Test: 50/50', () => {
-	const outcomeCount: CountObject = {}
-	const options = [
-		{
-			name: 'Control',
-			slug: 'control',
-			value: '',
-			split: 50,
-		},
-		{
-			name: 'Variation',
-			slug: 'variation',
-			value: '',
-			split: 50,
-		},
-	]
-
-	for (let i = 0; i < 100; i++) {
-		const outcome = getRandomTestValue(options)
-		if (!outcome) continue
-		outcomeCount[outcome] = (outcomeCount[outcome] ?? 0) + 1
-	}
-
-	const delta = diff(outcomeCount.control ?? 0, outcomeCount.variation ?? 0)
-
-	expect(delta).toBeLessThanOrEqual(100)
+test('picks in proportion to the splits', () => {
+	const counts = picks([90, 10], 2000)
+	// 1800 ± 100 is seven standard deviations: only a wrong split breaks it.
+	expect(counts.get('option_0')).toBeGreaterThan(1700)
+	expect(counts.get('option_0')).toBeLessThan(1900)
 })
 
-test('Test: 25/25/25/25', () => {
-	const outcomeCount: CountObject = {}
-
-	const options = [
-		{
-			name: 'A',
-			slug: 'a',
-			value: '',
-			split: 25,
-		},
-		{
-			name: 'B',
-			slug: 'b',
-			value: '',
-			split: 25,
-		},
-		{
-			name: 'C',
-			slug: 'c',
-			value: '',
-			split: 25,
-		},
-		{
-			name: 'D',
-			slug: 'd',
-			value: '',
-			split: 25,
-		},
-	]
-
-	for (let i = 0; i < 4000; i++) {
-		const outcome = getRandomTestValue(options)
-		if (!outcome) continue
-		outcomeCount[outcome] = (outcomeCount[outcome] ?? 0) + 1
+test('gives every option an equal share when the splits are equal', () => {
+	const counts = picks([25, 25, 25, 25], 4000)
+	expect(counts.size).toBe(4)
+	for (const count of counts.values()) {
+		expect(count).toBeGreaterThan(850)
+		expect(count).toBeLessThan(1150)
 	}
+})
 
-	Object.values(outcomeCount).forEach((count) => {
-		const delta = diff(count, 1000)
-		expect(delta).toBeLessThanOrEqual(100)
-	})
+test('picks the only option, whatever its split', () => {
+	expect(getRandomTestValue(options(100))).toBe('option_0')
+})
+
+test('has nothing to pick without options', () => {
+	expect(getRandomTestValue([])).toBeNull()
 })
