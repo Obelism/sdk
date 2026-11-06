@@ -13,7 +13,7 @@ import { createFormSlot } from './formSlot'
 import { DEFAULT_SITE_EDITOR_LABELS, type SiteEditorLabels } from './labels'
 import { createPagesPicker } from './pagesPicker'
 import type { PromptBoxOptions } from './promptBox'
-import { shopCopy, shopKindOf } from './shop'
+import { shopCopy } from './shop'
 import { addShopPage, failure, storeChanges } from './siteActions'
 import { bridgeView } from './view'
 
@@ -1328,10 +1328,6 @@ export const mountSiteEditor = (
 	}
 	const refresh = () => render(bridge.getState())
 
-	const grow = () => {
-		input.style.height = 'auto'
-		input.style.height = `${input.scrollHeight}px`
-	}
 	const scrollDown = () => {
 		scroll.scrollTop = scroll.scrollHeight
 	}
@@ -1526,10 +1522,8 @@ export const mountSiteEditor = (
 		if (stepUp()) focusForm()
 	})
 	shopButton.addEventListener('click', async () => {
-		const kind = shopKindOf(bridge)
-		if (!kind) return
 		shopMessage = null
-		shopMessage = await addShopPage(bridge, labels, kind)
+		shopMessage = await addShopPage(bridge, labels)
 		refresh()
 	})
 	askMode.addEventListener('click', () =>

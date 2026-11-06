@@ -80,8 +80,14 @@ export const assign = (
 	if (!getVisitorMatchesAudience(audience, visitor.params))
 		return { value: subject.fallback, source: 'default' }
 
-	if (subject.allocation < 100 && Math.random() * 100 > subject.allocation)
+	// Out of the allocation stays out: remembered, so a later call doesn't roll
+	// again (no cookie and no exposure: they are not in the test).
+	if (subject.allocation < 100 && Math.random() * 100 > subject.allocation) {
+		if (subject.fallback !== null) {
+			visitor.assigned.set(subject.slug, subject.fallback)
+		}
 		return { value: subject.fallback, source: 'default' }
+	}
 
 	const value = getRandomTestValue(subject.options)
 	if (!value) return { value: null, source: 'none' }

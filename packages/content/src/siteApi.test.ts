@@ -1,23 +1,27 @@
 import { expect, test } from 'vitest'
 
-import { SITE_METHOD, siteApi, siteApiAllows } from './siteApi'
+import { SHOP_KINDS } from './shopKinds'
+import { siteApi, siteApiAllows } from './siteApi'
 
-// What each call is made with. A new call has to add its own sample, or the
-// type of this record stops the build.
-const SAMPLE: Record<keyof typeof siteApi, string[]> = {
-	session: [],
-	pages: [],
-	stats: [],
-	form: [],
-	createEntry: [],
-	shopPages: ['product'],
-	entry: ['entry_1'],
-	preview: ['entry_1'],
-	prompt: ['entry_1'],
-	view: ['entry_1'],
-	apply: ['entry_1'],
-	save: ['entry_1'],
-	publish: ['entry_1'],
+// What each call is made with, and the verb the site's API takes for it: a
+// new call has to add its own, or the type of this record stops the build.
+const SAMPLE: Record<
+	keyof typeof siteApi,
+	{ path: string[]; method: 'GET' | 'POST' }
+> = {
+	session: { path: [], method: 'GET' },
+	pages: { path: [], method: 'GET' },
+	stats: { path: [], method: 'POST' },
+	form: { path: [], method: 'POST' },
+	createEntry: { path: [], method: 'POST' },
+	shopPages: { path: ['product'], method: 'POST' },
+	entry: { path: ['entry_1'], method: 'GET' },
+	preview: { path: ['entry_1'], method: 'POST' },
+	prompt: { path: ['entry_1'], method: 'POST' },
+	view: { path: ['entry_1'], method: 'POST' },
+	apply: { path: ['entry_1'], method: 'POST' },
+	save: { path: ['entry_1'], method: 'POST' },
+	publish: { path: ['entry_1'], method: 'POST' },
 }
 
 const calls = Object.keys(siteApi) as (keyof typeof siteApi)[]
@@ -25,10 +29,15 @@ const calls = Object.keys(siteApi) as (keyof typeof siteApi)[]
 test('every call the bridge makes is one the site forwards', () => {
 	for (const name of calls) {
 		const build = siteApi[name] as (...args: string[]) => string
-		const path = build(...SAMPLE[name])
-		expect(siteApiAllows(SITE_METHOD[name], path), `${name}: ${path}`).toBe(
-			true,
-		)
+		const { path, method } = SAMPLE[name]
+		const route = build(...path)
+		expect(siteApiAllows(method, route), `${name}: ${route}`).toBe(true)
+	}
+})
+
+test('every kind of shop page has a route', () => {
+	for (const kind of SHOP_KINDS) {
+		expect(siteApiAllows('POST', siteApi.shopPages(kind))).toBe(true)
 	}
 })
 

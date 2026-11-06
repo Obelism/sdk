@@ -1,6 +1,6 @@
 import type { BridgeState, ContentBridge } from './contract'
 import type { SharedLabels } from './labels'
-import { SHOP, type ShopKind, shopKindOf } from './shop'
+import { SHOP, shopKindOf, type ShopKind } from './shop'
 
 // What the prompt box and the on-site editor decide alike on the site.
 
@@ -30,8 +30,9 @@ export const pageContext = (
 export const addShopPage = async (
 	bridge: ContentBridge,
 	labels: SharedLabels,
-	kind: ShopKind,
 ) => {
+	const kind = shopKindOf(bridge)
+	if (!kind) return null
 	try {
 		if (kind === 'product') await bridge.createProductPage()
 		else await bridge.createCollectionPage()

@@ -3,7 +3,7 @@ import { element, fitToText, icon as drawIcon, type ICONS } from './dom'
 import { createFormSlot } from './formSlot'
 import { DEFAULT_PROMPT_LABELS, type PromptLabels } from './labels'
 import { createPagesPicker } from './pagesPicker'
-import { shopCopy, shopKindOf } from './shop'
+import { shopCopy } from './shop'
 import { addShopPage, failure as reason, storeChanges } from './siteActions'
 import { bridgeView } from './view'
 
@@ -822,11 +822,6 @@ export const mountPromptBox = (
 	}
 	const refresh = () => render(bridge.getState())
 
-	const grow = () => {
-		input.style.height = 'auto'
-		input.style.height = `${input.scrollHeight}px`
-	}
-
 	const setForm = (next: boolean) => {
 		if (form === next) return
 		form = next
@@ -931,10 +926,8 @@ export const mountPromptBox = (
 	clearBlock.addEventListener('click', () => bridge.select(null))
 	newPage.addEventListener('click', () => setCreating(true))
 	addProduct.addEventListener('click', async () => {
-		const kind = shopKindOf(bridge)
-		if (!kind) return
 		message = null
-		message = await addShopPage(bridge, labels, kind)
+		message = await addShopPage(bridge, labels)
 		refresh()
 	})
 	cancelNew.addEventListener('click', () => setCreating(false))

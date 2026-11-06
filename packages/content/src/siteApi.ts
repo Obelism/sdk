@@ -1,4 +1,4 @@
-import type { ShopKind } from './bridge/shop'
+import { SHOP_KINDS, type ShopKind } from './shopKinds'
 
 // Every call the bridge makes through the site's `/cms/api/…`, and what the
 // site's handler (`createSiteEditing`, ./site) lets through: one list, so a
@@ -34,7 +34,7 @@ const ROUTE: Record<keyof typeof siteApi, string> = {
 	stats: 'stats',
 	form: 'form',
 	createEntry: 'entries',
-	shopPages: '(?:product|collection)-pages',
+	shopPages: `(?:${SHOP_KINDS.join('|')})-pages`,
 	entry: 'entries/[\\w-]+',
 	preview: 'entries/[\\w-]+/preview',
 	prompt: 'entries/[\\w-]+/prompt',

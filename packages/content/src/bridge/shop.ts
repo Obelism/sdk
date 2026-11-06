@@ -6,13 +6,14 @@ import {
 } from '../editable'
 import type { ShopifyItem } from '../types'
 import type { SharedLabels } from '../bridge/labels'
+import type { ShopKind } from '../shopKinds'
+
+export type { ShopKind }
 
 // A product page and a collection page are the same thing to the bridge: a
 // page made for the shop item a page shows. What differs is which attributes
 // mark that item, which page type the CMS files it under, where the site keeps
 // such pages, and what the box calls it — all here.
-
-export type ShopKind = 'product' | 'collection'
 
 type ShopDefinition = {
 	// The attributes `editableProduct` / `editableCollection` set.
@@ -27,6 +28,7 @@ type ShopDefinition = {
 	add: keyof SharedLabels
 	adding: keyof SharedLabels
 	hint: keyof SharedLabels
+	// Said once the CMS made it, before the page reloads.
 	added: keyof SharedLabels
 }
 
