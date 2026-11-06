@@ -6,7 +6,6 @@ export const getRandomTestValue = (
 	if (!first) return null
 	if (options.length === 1) return first.slug
 
-	// Get a random number between 0 and 1
 	const sum = options.reduce((acc, { split }) => acc + split, 0)
 	let value = Math.random() * sum
 

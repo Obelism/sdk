@@ -65,7 +65,6 @@ export class ImproveServerSDK extends BaseImproveSDK {
 			this.#visitors.delete(visitorId)
 			this.#visitors.set(visitorId, visitor)
 		} else {
-			// Evict oldest entries when at capacity
 			if (this.#visitors.size >= this.#maxVisitors) {
 				const oldest = this.#visitors.keys().next().value
 				if (oldest) this.#visitors.delete(oldest)
