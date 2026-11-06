@@ -1,9 +1,5 @@
 import { ENTRY_ATTRIBUTE, UID_ATTRIBUTE } from '../editable'
-import {
-	blockSelector,
-	type BridgeState,
-	type ContentBridge,
-} from './createBridge'
+import { blockSelector, type BridgeState, type ContentBridge } from './contract'
 import {
 	element,
 	fill,

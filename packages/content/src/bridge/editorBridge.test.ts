@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createBridge, readStats, wrapScriptBridge } from './createBridge'
+import { readStats } from './contract'
+import { createBridge } from './editorBridge'
+import { wrapScriptBridge } from './scriptBridge'
 
 const CMS = 'https://content.obelism.studio'
 const entry = { id: 'entry_1', fields: { title: 'Live' } }

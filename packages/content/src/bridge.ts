@@ -1,8 +1,6 @@
-import {
-	type ContentBridge,
-	createBridge,
-	wrapScriptBridge,
-} from './bridge/createBridge'
+import { type ContentBridge, createInertBridge } from './bridge/contract'
+import { createBridge } from './bridge/editorBridge'
+import { wrapScriptBridge } from './bridge/scriptBridge'
 import { mountPromptBox, type PromptBoxOptions } from './bridge/promptBox'
 import { createSiteBridge, readSiteEditing } from './bridge/siteBridge'
 import type { PromptLabels, SiteEditorLabels } from './bridge/labels'
@@ -23,8 +21,8 @@ export type {
 	FormOptions,
 	PromptResult,
 	SitePage,
-} from './bridge/createBridge'
-export { INITIAL_STATE } from './bridge/createBridge'
+} from './bridge/contract'
+export { INITIAL_STATE } from './bridge/contract'
 export { DEFAULT_PROMPT_LABELS, mountPromptBox } from './bridge/promptBox'
 export { DEFAULT_SITE_EDITOR_LABELS } from './bridge/labels'
 export { mountSiteEditor } from './bridge/siteEditor'
@@ -83,10 +81,8 @@ type BridgeWindow = Window & {
 	ObelismBridge?: Parameters<typeof wrapScriptBridge>[0]
 }
 
-const SERVER_BRIDGE: ContentBridge = wrapScriptBridge(
-	{ isEditing: false, entryId: null, on: () => {} },
-	new URLSearchParams(),
-)
+// The bridge on the server, where there is nothing to edit.
+const SERVER_BRIDGE: ContentBridge = createInertBridge()
 
 // The page's bridge if something already started it, else null. Never
 // starts one: for code that has to stay side-effect free, like a React

@@ -1,6 +1,6 @@
 import { getContentBridge, mountPromptBox, mountSiteEditor } from '../bridge'
 import { DEFAULT_URL } from '../config'
-import type { ContentBridge } from './createBridge'
+import type { ContentBridge } from './contract'
 
 // The bridge as one script tag, for sites without a bundler. The CMS serves
 // this build as its /bridge.js (it replaced a hand-written script); npm CDNs

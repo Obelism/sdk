@@ -8,7 +8,7 @@ import {
 	type FormHandle,
 	type FormOptions,
 	INITIAL_STATE,
-} from './createBridge'
+} from './contract'
 import { mountPromptBox } from './promptBox'
 
 const PAGES = [

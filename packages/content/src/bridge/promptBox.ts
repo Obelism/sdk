@@ -1,4 +1,4 @@
-import type { BridgeState, ContentBridge } from './createBridge'
+import type { BridgeState, ContentBridge } from './contract'
 import { element, icon as drawIcon, type ICONS } from './dom'
 import { createFormSlot } from './formSlot'
 import { DEFAULT_PROMPT_LABELS, type PromptLabels } from './labels'

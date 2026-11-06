@@ -11,25 +11,21 @@ import type { Entry, ShopifyItem } from '../types'
 import {
 	type ApplyJsonResult,
 	blockSelector,
-	type BridgeState,
 	type ContentBridge,
 	type CreatePageResult,
 	type CreateCollectionPageResult,
 	type CreateProductPageResult,
-	createEmitter,
+	createBridgeState,
+	createStatsView,
 	type FormHandle,
-	INITIAL_STATE,
 	type PromptResult,
 	readStats,
 	selectionStyle,
+	showSelection,
 	type SitePage,
-} from './createBridge'
+} from './contract'
 import { type FormContent, type FormFrame, mountFormFrame } from './formFrame'
-import {
-	mountStatsOverlay,
-	type StatsOverlay,
-	TAG_ATTRIBUTE,
-} from './statsOverlay'
+import { mountStatsOverlay, TAG_ATTRIBUTE } from './statsOverlay'
 
 // The bridge on a site signed in to edit (`/cms/login`, from
 // @obelism/content/site), outside the visual editor. It plays the editor's
@@ -144,7 +140,7 @@ export const createSiteBridge = (
 	}: SiteBridgeOptions = {},
 ): ContentBridge => {
 	const doc = win.document
-	const emitter = createEmitter()
+	const { on, getState, setState, emit, listeners } = createBridgeState()
 	const cleanup: (() => void)[] = []
 	const working = new Map<string, Working>()
 	// Content before each prompt, newest last, for undo.
@@ -172,11 +168,6 @@ export const createSiteBridge = (
 	let lastFormEdit = -Infinity
 	const renderTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-	let state: BridgeState = INITIAL_STATE
-	const setState = (next: Partial<BridgeState>) => {
-		state = { ...state, ...next }
-		emitter.emit('change', state)
-	}
 	const refreshUnsaved = () =>
 		setState({
 			unsaved: [...working.values()].some(
@@ -286,7 +277,7 @@ export const createSiteBridge = (
 	// The entry a prompt or JSON acts on, for the block `uid` (the selected
 	// one when left out).
 	const target = (option: string | null | undefined) => {
-		const uid = option === undefined ? state.selectedUid : option
+		const uid = option === undefined ? getState().selectedUid : option
 		const entryId = entryFor(uid)
 		if (!entryId) {
 			throw new Error(
@@ -300,37 +291,41 @@ export const createSiteBridge = (
 	// blocks: only their rates show (statsOverlay.ts), so a few can be
 	// compared without every tag at once.
 	const revealed = new Set<string>()
-	let overlay: StatsOverlay | null = null
 	const asked = new Set<string>()
 	const answered = new Set<string>()
+	const stats = createStatsView(() =>
+		mountStatsOverlay(win, {
+			selector: blockSelector,
+			onSelect: (uid) => highlight(uid),
+			checked: (id) => answered.has(id),
+			shows: (id, element) =>
+				revealed.has(
+					element.closest(`[${UID_ATTRIBUTE}]`)?.getAttribute(UID_ATTRIBUTE) ??
+						id,
+				),
+		}),
+	)
 
 	const highlight = (uid: string | null) => {
-		doc.querySelectorAll('[data-cms-selected]').forEach((element) => {
-			element.removeAttribute('data-cms-selected')
-		})
-		if (state.selectedUid !== uid) setState({ selectedUid: uid })
-		if (uid) {
-			doc
-				.querySelector(blockSelector(uid))
-				?.setAttribute('data-cms-selected', '')
-			if (!revealed.has(uid)) {
-				revealed.add(uid)
-				overlay?.refresh()
-			}
+		if (getState().selectedUid !== uid) setState({ selectedUid: uid })
+		showSelection(doc, uid)
+		if (uid && !revealed.has(uid)) {
+			revealed.add(uid)
+			stats.refresh()
 		}
 	}
 
 	// Shows the in-memory content through `update`, shaped like the delivery
 	// API. A page without `update` listeners shows it once saved (it reloads).
 	const render = async (entryId: string) => {
-		if (emitter.listeners.update.size === 0) return
+		if (listeners.update.size === 0) return
 		const content = working.get(entryId)?.content
 		const { entry } = await api<{ entry: Entry }>(
 			`entries/${encodeURIComponent(entryId)}/preview`,
 			{ content, locale: locale() },
 		)
-		emitter.emit('update', { entry, selectedUid: state.selectedUid })
-		win.requestAnimationFrame(() => highlight(state.selectedUid))
+		emit('update', { entry, selectedUid: getState().selectedUid })
+		win.requestAnimationFrame(() => highlight(getState().selectedUid))
 	}
 
 	const logError = (error: unknown) =>
@@ -349,8 +344,8 @@ export const createSiteBridge = (
 	}
 
 	const afterStore = (event: 'saved' | 'published') => {
-		emitter.emit(event, {})
-		if (emitter.listeners.update.size === 0) win.location.reload()
+		emit(event, {})
+		if (listeners.update.size === 0) win.location.reload()
 	}
 
 	const saveAll = async () => {
@@ -369,7 +364,7 @@ export const createSiteBridge = (
 		refreshUnsaved()
 	}
 
-	const has = (feature: string) => state.features.includes(feature)
+	const has = (feature: string) => getState().features.includes(feature)
 
 	const bridge: ContentBridge = {
 		isEditing: true,
@@ -386,8 +381,8 @@ export const createSiteBridge = (
 		get environment() {
 			return session?.environment ?? null
 		},
-		on: emitter.on,
-		getState: () => state,
+		on,
+		getState,
 
 		async prompt(prompt, options = {}): Promise<PromptResult> {
 			const text = prompt.trim()
@@ -419,7 +414,7 @@ export const createSiteBridge = (
 				throw new Error('Say where the page goes, like /pricing')
 			if (!has('create')) throw new Error('You may not add pages here')
 			// Opening the new page would lose them.
-			if (state.unsaved) {
+			if (getState().unsaved) {
 				throw new Error('Save or undo your changes before adding a page')
 			}
 			setState({ prompting: true })
@@ -456,7 +451,7 @@ export const createSiteBridge = (
 				)
 			}
 			if (!has('create')) throw new Error('You may not add pages here')
-			if (state.unsaved) {
+			if (getState().unsaved) {
 				throw new Error('Save or undo your changes before adding a page')
 			}
 			setState({ prompting: true })
@@ -482,7 +477,7 @@ export const createSiteBridge = (
 				)
 			}
 			if (!has('create')) throw new Error('You may not add pages here')
-			if (state.unsaved) {
+			if (getState().unsaved) {
 				throw new Error('Save or undo your changes before adding a page')
 			}
 			setState({ prompting: true })
@@ -570,7 +565,7 @@ export const createSiteBridge = (
 			// changed: prompts, undo, a reload after saving, the selection.
 			const show = () => {
 				if (closed || !frame) return
-				const entryId = entryFor(state.selectedUid)
+				const entryId = entryFor(getState().selectedUid)
 				if (!entryId) return
 				const entry = working.get(entryId)
 				if (!entry) {
@@ -581,7 +576,7 @@ export const createSiteBridge = (
 					entryId,
 					content: entry.content,
 					locale: locale(),
-					selectedUid: state.selectedUid,
+					selectedUid: getState().selectedUid,
 				}
 				if (
 					shown &&
@@ -632,7 +627,7 @@ export const createSiteBridge = (
 					onError: (message) => onError?.(message),
 					onEscape: () => onEscape?.(),
 				})
-				unsubscribe = emitter.on('change', show)
+				unsubscribe = on('change', show)
 				show()
 			}
 			start().catch(fail)
@@ -671,7 +666,7 @@ export const createSiteBridge = (
 
 		openPage(page) {
 			if (
-				state.unsaved &&
+				getState().unsaved &&
 				!win.confirm('Leave this page and lose the changes you have not saved?')
 			) {
 				return
@@ -728,7 +723,7 @@ export const createSiteBridge = (
 
 		signOut() {
 			if (
-				state.unsaved &&
+				getState().unsaved &&
 				!win.confirm('Sign out and lose the changes you have not saved?')
 			) {
 				return
@@ -767,7 +762,7 @@ export const createSiteBridge = (
 	// Capture phase, so a block that is also a link selects instead of
 	// navigating — only while selecting, so the site stays usable.
 	const onClick = (event: MouseEvent) => {
-		if (!state.selecting) return
+		if (!getState().selecting) return
 		const target = event.target as Element | null
 		const element = target?.closest?.(`[${UID_ATTRIBUTE}]`)
 		// A tagged element outside the blocks (a menu button) can't be
@@ -779,7 +774,7 @@ export const createSiteBridge = (
 			event.stopPropagation()
 			if (!revealed.has(tagId)) {
 				revealed.add(tagId)
-				overlay?.refresh()
+				stats.refresh()
 			}
 			return
 		}
@@ -792,7 +787,7 @@ export const createSiteBridge = (
 	cleanup.push(() => doc.removeEventListener('click', onClick, true))
 
 	const onBeforeUnload = (event: BeforeUnloadEvent) => {
-		if (!state.unsaved) return
+		if (!getState().unsaved) return
 		event.preventDefault()
 		event.returnValue = ''
 	}
@@ -804,7 +799,8 @@ export const createSiteBridge = (
 	// as they appear.
 	let statsOff = false
 	let statsTimer: ReturnType<typeof setTimeout> | null = null
-	const showStats = () => overlay?.update(state.stats, state.statsVisible)
+	const showStats = () =>
+		stats.update(getState().stats, getState().statsVisible)
 	const loadStats = async () => {
 		if (statsOff) return
 		const ids = [
@@ -833,22 +829,12 @@ export const createSiteBridge = (
 				...(entries.length > 0 && { entries }),
 			})
 			batch.forEach((id) => answered.add(id))
-			setState({ stats: { ...state.stats, ...readStats(stats) } })
+			setState({ stats: { ...getState().stats, ...readStats(stats) } })
 		} catch {
 			// No tags rather than wrong ones, and no asking again.
 			statsOff = true
 			return
 		}
-		overlay ??= mountStatsOverlay(win, {
-			selector: blockSelector,
-			onSelect: (uid) => highlight(uid),
-			checked: (id) => answered.has(id),
-			shows: (id, element) =>
-				revealed.has(
-					element.closest(`[${UID_ATTRIBUTE}]`)?.getAttribute(UID_ATTRIBUTE) ??
-						id,
-				),
-		})
 		showStats()
 		if (ids.length > batch.length) scheduleStats()
 	}
@@ -867,7 +853,7 @@ export const createSiteBridge = (
 	cleanup.push(() => {
 		statsObserver?.disconnect()
 		if (statsTimer !== null) clearTimeout(statsTimer)
-		overlay?.destroy()
+		stats.destroy()
 	})
 
 	api<SessionInfo>('session')

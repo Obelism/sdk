@@ -6,7 +6,7 @@ import {
 	createEmitter,
 	type FormOptions,
 	INITIAL_STATE,
-} from './createBridge'
+} from './contract'
 import { diffViews, humanize, mountSiteEditor } from './siteEditor'
 
 const PAGES = [

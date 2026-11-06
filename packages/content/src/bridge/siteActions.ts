@@ -1,4 +1,4 @@
-import type { BridgeState, ContentBridge } from './createBridge'
+import type { BridgeState, ContentBridge } from './contract'
 import type { SharedLabels } from './labels'
 
 // What the prompt box and the on-site editor decide alike on the site.
