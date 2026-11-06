@@ -12,13 +12,8 @@ import { createFormSlot } from './formSlot'
 import { DEFAULT_SITE_EDITOR_LABELS, type SiteEditorLabels } from './labels'
 import { createPagesPicker } from './pagesPicker'
 import type { PromptBoxOptions } from './promptBox'
-import {
-	addShopPage,
-	failure,
-	pageContext,
-	shopCopy,
-	storeChanges,
-} from './siteActions'
+import { shopCopy, shopKindOf } from './shop'
+import { addShopPage, failure, pageContext, storeChanges } from './siteActions'
 
 // The on-site editor: editing a site signed in to edit (siteBridge.ts) from
 // a panel docked on the right, the site reflowed beside it. Edit fields (the
@@ -605,7 +600,13 @@ export const mountSiteEditor = (
 	const shopText = element(doc, 'p', { className: 'summary' })
 	const shopButtonText = element(doc, 'span')
 	const shopButton = button('button primary', icon('plus'), shopButtonText)
-	const shop = element(doc, 'div', { className: 'shop' }, shopText, shopButton)
+	const shopBox = element(
+		doc,
+		'div',
+		{ className: 'shop' },
+		shopText,
+		shopButton,
+	)
 	const log = element(doc, 'div', { className: 'log' })
 	log.setAttribute('role', 'log')
 	const scroll = element(
@@ -614,7 +615,7 @@ export const mountSiteEditor = (
 		{ className: 'scroll' },
 		note,
 		intro,
-		shop,
+		shopBox,
 		log,
 	)
 
@@ -1135,7 +1136,7 @@ export const mountSiteEditor = (
 		const storing = state.saving || state.publishing
 		const busy = state.prompting || storing
 		const shown = available && open
-		const { site, canCreate, pageless, shopHere, onlyNew } = pageContext(
+		const { site, canCreate, pageless, shop, onlyNew } = pageContext(
 			bridge,
 			state,
 			options.promptWithoutPage,
@@ -1198,7 +1199,7 @@ export const mountSiteEditor = (
 		ask.hidden = view !== 'ask'
 		fields.hidden = view !== 'fields'
 
-		const offerShop = shopHere !== null && !creating
+		const offerShop = shop !== null && !creating
 		if (creating) {
 			noteText.textContent = labels.newPage
 		} else if (state.selectedUid) {
@@ -1224,12 +1225,15 @@ export const mountSiteEditor = (
 		up.hidden = creating || !state.selectedUid
 		cancelNew.hidden = !creating || onlyNew
 		intro.hidden = answers.length > 0 || offerShop || creating
-		shop.hidden = !offerShop
-		const shopWords = shopCopy(labels, shopHere)
-		shopButtonText.textContent =
-			state.prompting && offerShop ? shopWords.adding : shopWords.add
+		shopBox.hidden = !offerShop
+		const shopWords = shop ? shopCopy(labels, shop) : null
+		shopButtonText.textContent = shopWords
+			? state.prompting && offerShop
+				? shopWords.adding
+				: shopWords.add
+			: ''
 		shopButton.disabled = busy
-		shopText.textContent = shopMessage?.text ?? shopWords.hint
+		shopText.textContent = shopMessage?.text ?? shopWords?.hint ?? ''
 		shopText.className = shopMessage?.error ? 'failure' : 'summary'
 
 		composer.hidden = offerShop
@@ -1523,8 +1527,10 @@ export const mountSiteEditor = (
 		if (stepUp()) focusForm()
 	})
 	shopButton.addEventListener('click', async () => {
+		const kind = shopKindOf(bridge)
+		if (!kind) return
 		shopMessage = null
-		shopMessage = await addShopPage(bridge, labels)
+		shopMessage = await addShopPage(bridge, labels, kind)
 		refresh()
 	})
 	askMode.addEventListener('click', () =>

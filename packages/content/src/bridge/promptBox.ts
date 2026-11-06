@@ -3,11 +3,11 @@ import { element, icon as drawIcon, type ICONS } from './dom'
 import { createFormSlot } from './formSlot'
 import { DEFAULT_PROMPT_LABELS, type PromptLabels } from './labels'
 import { createPagesPicker } from './pagesPicker'
+import { shopCopy, shopKindOf } from './shop'
 import {
 	addShopPage,
 	failure as reason,
 	pageContext,
-	shopCopy as shopWords,
 	storeChanges,
 } from './siteActions'
 
@@ -719,14 +719,13 @@ export const mountPromptBox = (
 		pill.hidden = open || !available
 		viewing.hidden = available || !site
 		panel.hidden = !open || !available
-		const { canCreate, pageless, shopHere, onlyNew } = pageContext(
+		const { canCreate, pageless, shop, onlyNew } = pageContext(
 			bridge,
 			state,
 			options.promptWithoutPage,
 		)
-		const productHere = shopHere !== null
-		const shopCopy = shopWords(labels, shopHere)
-		addProduct.lastChild!.textContent = shopCopy.add
+		const words = shop ? shopCopy(labels, shop) : null
+		addProduct.lastChild!.textContent = words?.add ?? labels.addProductPage
 		if (!canCreate) creating = false
 		if (onlyNew) creating = true
 		if (creating || pageless || !site) form = false
@@ -734,9 +733,9 @@ export const mountPromptBox = (
 		const showForm = open && available && form
 		if (showForm && !formSlot.mounted) formSlot.mount()
 		else if (!showForm && formSlot.mounted) formSlot.unmount()
-		const offerProduct = productHere && !creating
+		const offerProduct = words !== null && !creating
 		pillText.textContent = offerProduct
-			? shopCopy.add
+			? words.add
 			: onlyNew
 				? labels.newPage
 				: labels.open
@@ -815,13 +814,13 @@ export const mountPromptBox = (
 			? creating
 				? labels.creating
 				: offerProduct
-					? shopCopy.adding
+					? words!.adding
 					: labels.working
 			: loadingForm
 				? ''
 				: (message?.text ??
 					(offerProduct
-						? shopCopy.hint
+						? words!.hint
 						: site && !creating && !picking && !state.selectedUid
 							? labels.selectHint
 							: ''))
@@ -940,8 +939,10 @@ export const mountPromptBox = (
 	clearBlock.addEventListener('click', () => bridge.select(null))
 	newPage.addEventListener('click', () => setCreating(true))
 	addProduct.addEventListener('click', async () => {
+		const kind = shopKindOf(bridge)
+		if (!kind) return
 		message = null
-		message = await addShopPage(bridge, labels)
+		message = await addShopPage(bridge, labels, kind)
 		refresh()
 	})
 	cancelNew.addEventListener('click', () => setCreating(false))

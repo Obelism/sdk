@@ -1,19 +1,13 @@
-import {
-	COLLECTION_ATTRIBUTE,
-	COLLECTION_HANDLE_ATTRIBUTE,
-	ENTRY_ATTRIBUTE,
-	PRODUCT_ATTRIBUTE,
-	PRODUCT_HANDLE_ATTRIBUTE,
-	UID_ATTRIBUTE,
-} from '../editable'
+import { ENTRY_ATTRIBUTE, UID_ATTRIBUTE } from '../editable'
+import { parseCookies } from '../cookies'
 import { SITE_EDITING_COOKIE, SITE_REQUEST_HEADER } from '../site'
+import { siteApi } from '../siteApi'
 import type { Entry, ShopifyItem } from '../types'
 import {
 	type ApplyJsonResult,
 	blockSelector,
 	type ContentBridge,
 	type CreatePageResult,
-	type CreateCollectionPageResult,
 	type CreateProductPageResult,
 	createBridgeState,
 	createStatsView,
@@ -25,6 +19,13 @@ import {
 	type SitePage,
 } from './contract'
 import { type FormContent, type FormFrame, mountFormFrame } from './formFrame'
+import {
+	SHOP,
+	type ShopKind,
+	pageShopItem,
+	shopItemOf,
+	shopKindOf,
+} from './shop'
 import { mountStatsOverlay, TAG_ATTRIBUTE } from './statsOverlay'
 
 // The bridge on a site signed in to edit (`/cms/login`, from
@@ -63,17 +64,8 @@ const webUrl = (url: string) => {
 
 // The base path of the site's handler while signed in to edit, else null.
 export const readSiteEditing = (doc: Document): string | null => {
-	for (const part of doc.cookie.split(';')) {
-		const [name, ...value] = part.trim().split('=')
-		if (name !== SITE_EDITING_COOKIE) continue
-		try {
-			const basePath = decodeURIComponent(value.join('='))
-			return BASE_PATH.test(basePath) ? basePath : null
-		} catch {
-			return null
-		}
-	}
-	return null
+	const basePath = parseCookies(doc.cookie).get(SITE_EDITING_COOKIE)
+	return basePath && BASE_PATH.test(basePath) ? basePath : null
 }
 
 type SessionInfo = {
@@ -148,20 +140,18 @@ export const createSiteBridge = (
 	// Entries changed here since the last publish.
 	const touched = new Set<string>()
 	let session: SessionInfo | null = null
-	const productPath = (handle: string, locale: string) =>
-		ownProductPath
-			? ownProductPath(handle, locale)
-			: (session?.productPath ?? '/products/{handle}').replaceAll(
-					'{handle}',
-					encodeURIComponent(handle),
-				)
-	const collectionPath = (handle: string, locale: string) =>
-		ownCollectionPath
-			? ownCollectionPath(handle, locale)
-			: (session?.collectionPath ?? '/collections/{handle}').replaceAll(
-					'{handle}',
-					encodeURIComponent(handle),
-				)
+	// Where a product or collection page is on the site: the site's own
+	// routing when it said, else the environment's setting in the CMS, else
+	// the CMS's default path.
+	const shopPath = (kind: ShopKind, handle: string, locale: string) => {
+		const own = kind === 'product' ? ownProductPath : ownCollectionPath
+		if (own) return own(handle, locale)
+		const { setting, route } = SHOP[kind]
+		return (session?.[setting] ?? route).replaceAll(
+			'{handle}',
+			encodeURIComponent(handle),
+		)
+	}
 	// The open form's, if any; and when the form last changed content, for
 	// undo steps (-Infinity: the next edit starts a new step).
 	let closeForm: (() => void) | null = null
@@ -213,22 +203,6 @@ export const createSiteBridge = (
 		doc.querySelector(`[${ENTRY_ATTRIBUTE}]`)?.getAttribute(ENTRY_ATTRIBUTE) ??
 		null
 
-	// The product the page shows (editableProduct), if it marks one.
-	const pageProduct = (): ShopifyItem | null => {
-		const element = doc.querySelector(`[${PRODUCT_ATTRIBUTE}]`)
-		const id = element?.getAttribute(PRODUCT_ATTRIBUTE)
-		const handle = element?.getAttribute(PRODUCT_HANDLE_ATTRIBUTE)
-		return id && handle ? { id, handle } : null
-	}
-
-	// The collection the page shows (editableCollection), if it marks one.
-	const pageCollection = (): ShopifyItem | null => {
-		const element = doc.querySelector(`[${COLLECTION_ATTRIBUTE}]`)
-		const id = element?.getAttribute(COLLECTION_ATTRIBUTE)
-		const handle = element?.getAttribute(COLLECTION_HANDLE_ATTRIBUTE)
-		return id && handle ? { id, handle } : null
-	}
-
 	const entryFor = (uid: string | null) => {
 		const block = uid ? doc.querySelector(blockSelector(uid)) : null
 		return (
@@ -257,7 +231,7 @@ export const createSiteBridge = (
 		let pending = loading.get(entryId)
 		if (!pending) {
 			pending = api<{ content: unknown; draftRevision: number }>(
-				`entries/${encodeURIComponent(entryId)}`,
+				siteApi.entry(entryId),
 			)
 				.then((entry) => {
 					const fresh = working.get(entryId) ?? {
@@ -320,10 +294,10 @@ export const createSiteBridge = (
 	const render = async (entryId: string) => {
 		if (listeners.update.size === 0) return
 		const content = working.get(entryId)?.content
-		const { entry } = await api<{ entry: Entry }>(
-			`entries/${encodeURIComponent(entryId)}/preview`,
-			{ content, locale: locale() },
-		)
+		const { entry } = await api<{ entry: Entry }>(siteApi.preview(entryId), {
+			content,
+			locale: locale(),
+		})
 		emit('update', { entry, selectedUid: getState().selectedUid })
 		win.requestAnimationFrame(() => highlight(getState().selectedUid))
 	}
@@ -352,7 +326,7 @@ export const createSiteBridge = (
 		for (const [entryId, entry] of working) {
 			if (same(entry.content, entry.saved)) continue
 			const { draftRevision } = await api<{ draftRevision: number }>(
-				`entries/${encodeURIComponent(entryId)}/save`,
+				siteApi.save(entryId),
 				{ content: entry.content, baseRevision: entry.revision },
 			)
 			entry.saved = entry.content
@@ -366,6 +340,34 @@ export const createSiteBridge = (
 
 	const has = (feature: string) => getState().features.includes(feature)
 
+	// Makes the page kind's page for `item`, or the one it has already, and
+	// reloads the page: the site's route finds it now (drafts, while editing).
+	const createShopPage = async (
+		kind: ShopKind,
+		item: ShopifyItem | undefined,
+	): Promise<CreateProductPageResult> => {
+		const shop = SHOP[kind]
+		if (!item) {
+			throw new Error(
+				`Nothing on this page is marked as a ${kind}: add ${shop.marker}`,
+			)
+		}
+		if (!has('create')) throw new Error('You may not add pages here')
+		if (getState().unsaved) {
+			throw new Error('Save or undo your changes before adding a page')
+		}
+		setState({ prompting: true })
+		try {
+			const made = await api<CreateProductPageResult>(siteApi.shopPages(kind), {
+				[kind]: { id: item.id, handle: item.handle },
+			})
+			win.location.reload()
+			return made
+		} finally {
+			setState({ prompting: false })
+		}
+	}
+
 	const bridge: ContentBridge = {
 		isEditing: true,
 		mode: 'site',
@@ -373,10 +375,10 @@ export const createSiteBridge = (
 			return pageEntryId()
 		},
 		get product() {
-			return pageProduct()
+			return pageShopItem(doc, 'product')
 		},
 		get collection() {
-			return pageCollection()
+			return pageShopItem(doc, 'collection')
 		},
 		get environment() {
 			return session?.environment ?? null
@@ -393,7 +395,7 @@ export const createSiteBridge = (
 			try {
 				const entry = await load(entryId)
 				const result = await api<{ content: unknown; summary: string }>(
-					`entries/${encodeURIComponent(entryId)}/prompt`,
+					siteApi.prompt(entryId),
 					{ prompt: text, content: entry.content, locale: locale(), uid },
 				)
 				history.push({ entryId, content: entry.content })
@@ -423,7 +425,7 @@ export const createSiteBridge = (
 					entryId: string
 					path: string
 					summary: string
-				}>('entries', {
+				}>(siteApi.createEntry(), {
 					path,
 					prompt: text,
 					locale: locale(),
@@ -442,63 +444,18 @@ export const createSiteBridge = (
 			}
 		},
 
-		async createProductPage(
-			product = pageProduct() ?? undefined,
-		): Promise<CreateProductPageResult> {
-			if (!product) {
-				throw new Error(
-					'Nothing on this page is marked as a product: add editableProduct(product)',
-				)
-			}
-			if (!has('create')) throw new Error('You may not add pages here')
-			if (getState().unsaved) {
-				throw new Error('Save or undo your changes before adding a page')
-			}
-			setState({ prompting: true })
-			try {
-				const made = await api<CreateProductPageResult>('product-pages', {
-					product: { id: product.id, handle: product.handle },
-				})
-				// The site's product route finds its page now (drafts, while
-				// editing): show it.
-				win.location.reload()
-				return made
-			} finally {
-				setState({ prompting: false })
-			}
-		},
+		createProductPage: (product = pageShopItem(doc, 'product') ?? undefined) =>
+			createShopPage('product', product),
 
-		async createCollectionPage(
-			collection = pageCollection() ?? undefined,
-		): Promise<CreateCollectionPageResult> {
-			if (!collection) {
-				throw new Error(
-					'Nothing on this page is marked as a collection: add editableCollection(collection)',
-				)
-			}
-			if (!has('create')) throw new Error('You may not add pages here')
-			if (getState().unsaved) {
-				throw new Error('Save or undo your changes before adding a page')
-			}
-			setState({ prompting: true })
-			try {
-				const made = await api<CreateCollectionPageResult>('collection-pages', {
-					collection: { id: collection.id, handle: collection.handle },
-				})
-				// The site's collection route finds its page now (drafts, while
-				// editing): show it.
-				win.location.reload()
-				return made
-			} finally {
-				setState({ prompting: false })
-			}
-		},
+		createCollectionPage: (
+			collection = pageShopItem(doc, 'collection') ?? undefined,
+		) => createShopPage('collection', collection),
 
 		async view(options = {}) {
 			const { uid, entryId } = target(options.uid)
 			const entry = await load(entryId)
 			const { view } = await api<{ view: Record<string, unknown> }>(
-				`entries/${encodeURIComponent(entryId)}/view`,
+				siteApi.view(entryId),
 				{ content: entry.content, locale: locale(), uid },
 			)
 			return view
@@ -517,7 +474,7 @@ export const createSiteBridge = (
 					content: unknown
 					changed?: string[]
 					view?: Record<string, unknown> | null
-				}>(`entries/${encodeURIComponent(entryId)}/apply`, {
+				}>(siteApi.apply(entryId), {
 					changes,
 					content: entry.content,
 					locale: locale(),
@@ -618,7 +575,7 @@ export const createSiteBridge = (
 				if (!has('form')) throw new Error('You may not edit content here')
 				await load(target(undefined).entryId)
 				// A fresh one every time: the address works once, for a minute.
-				const { url } = await api<{ url?: unknown }>('form', {})
+				const { url } = await api<{ url?: unknown }>(siteApi.form(), {})
 				if (closed) return
 				const address = typeof url === 'string' ? url : ''
 				frame = mountFormFrame(win, container, address, title, {
@@ -635,7 +592,7 @@ export const createSiteBridge = (
 		},
 
 		async pages() {
-			const { pages } = await api<PagesAnswer>('pages')
+			const { pages } = await api<PagesAnswer>(siteApi.pages())
 			const preferred = [locale(), session?.space.defaultLocale]
 			return pages.flatMap((page): SitePage[] => {
 				// The page's path in this locale, else the default's, else any.
@@ -645,6 +602,8 @@ export const createSiteBridge = (
 					) ?? Object.keys(page.paths)[0]
 				const path = code === undefined ? undefined : page.paths[code]
 				if (code === undefined || path === undefined) return []
+				const shop = shopKindOf(page)
+				const item = shopItemOf(page)
 				return [
 					{
 						entryId: page.entryId,
@@ -652,10 +611,9 @@ export const createSiteBridge = (
 						contentType: page.contentType,
 						status: page.status,
 						path,
-						url: page.product
-							? productPath(page.product.handle, code)
-							: page.collection
-								? collectionPath(page.collection.handle, code)
+						url:
+							shop && item
+								? shopPath(shop, item.handle, code)
 								: pagePath(path, code),
 						product: page.product ?? null,
 						collection: page.collection ?? null,
@@ -712,7 +670,7 @@ export const createSiteBridge = (
 					)
 				}
 				for (const entryId of entries) {
-					await api(`entries/${encodeURIComponent(entryId)}/publish`, {})
+					await api(siteApi.publish(entryId), {})
 					touched.delete(entryId)
 				}
 			} finally {
@@ -824,7 +782,7 @@ export const createSiteBridge = (
 			.filter(Boolean)
 			.slice(0, MAX_STATS_ENTRIES)
 		try {
-			const { stats } = await api<{ stats?: unknown }>('stats', {
+			const { stats } = await api<{ stats?: unknown }>(siteApi.stats(), {
 				uids: batch,
 				...(entries.length > 0 && { entries }),
 			})
@@ -856,7 +814,7 @@ export const createSiteBridge = (
 		stats.destroy()
 	})
 
-	api<SessionInfo>('session')
+	api<SessionInfo>(siteApi.session())
 		.then((info) => {
 			session = info
 			setState({ features: info.features })
