@@ -2,7 +2,7 @@ import { expect, test } from 'vitest'
 
 import { generateImproveProvider } from './index'
 
-test('gives each space its own provider', () => {
+test('gives each call its own provider and hooks', () => {
 	const first = generateImproveProvider({
 		organizationId: 'org_1',
 		environment: 'production',
@@ -12,7 +12,7 @@ test('gives each space its own provider', () => {
 		environment: 'production',
 	})
 
-	// A shared context would hand one space's tests to the other.
+	// One provider per call: a page with two spaces gets two, never a reused one.
 	expect(first.ImproveProvider).not.toBe(second.ImproveProvider)
 	expect(first.useTestValue).not.toBe(second.useTestValue)
 	expect(first.useFlagValue).not.toBe(second.useFlagValue)
