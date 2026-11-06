@@ -1,4 +1,6 @@
 import { DEFAULT_TIMEOUT, DEFAULT_URL, normalizeUrl } from './config'
+import { parseCookies } from './cookies'
+import { siteApiAllows } from './siteApi'
 
 // Editing on your own site, outside the visual editor
 // (https://content.obelism.studio/docs/guides/site-editing). One handler
@@ -78,22 +80,6 @@ export const readSiteToken = (
 	return parseCookies(cookies).get(SITE_TOKEN_COOKIE) || null
 }
 
-const parseCookies = (header: string) => {
-	const cookies = new Map<string, string>()
-	for (const part of header.split(';')) {
-		const index = part.indexOf('=')
-		if (index < 0) continue
-		const name = part.slice(0, index).trim()
-		if (!name || cookies.has(name)) continue
-		try {
-			cookies.set(name, decodeURIComponent(part.slice(index + 1).trim()))
-		} catch {
-			cookies.set(name, part.slice(index + 1).trim())
-		}
-	}
-	return cookies
-}
-
 type CookieOptions = {
 	maxAge: number
 	path: string
@@ -150,27 +136,6 @@ export const safeReturnTo = (value: string | null | undefined) => {
 
 const normalizeBasePath = (basePath: string) =>
 	`/${basePath.replace(/^\/+|\/+$/g, '')}`
-
-// What the browser may reach through `/cms/api/…`: reads, and the writes
-// the prompt bar makes. Nothing else of the site API is exposed.
-const PROXY_ROUTES: { method: string; pattern: RegExp }[] = [
-	{ method: 'GET', pattern: /^session$/ },
-	{ method: 'GET', pattern: /^pages$/ },
-	{ method: 'GET', pattern: /^entries\/[\w-]+$/ },
-	{ method: 'POST', pattern: /^entries$/ },
-	// "Add a product page" on a product the site marks (editableProduct),
-	// "Add a collection page" on a collection (editableCollection).
-	{ method: 'POST', pattern: /^product-pages$/ },
-	{ method: 'POST', pattern: /^collection-pages$/ },
-	// The one-time address of the CMS's entry form (the prompt box's Form).
-	{ method: 'POST', pattern: /^form$/ },
-	// Clicks on the links the page tags, from Numbers.
-	{ method: 'POST', pattern: /^stats$/ },
-	{
-		method: 'POST',
-		pattern: /^entries\/[\w-]+\/(preview|prompt|view|apply|save|publish)$/,
-	},
-]
 
 export type SiteEditingHandler = (request: Request) => Promise<Response>
 
@@ -337,12 +302,7 @@ export const createSiteEditing = ({
 
 		if (path?.startsWith('api/')) {
 			const route = path.slice('api/'.length)
-			if (
-				!PROXY_ROUTES.some(
-					({ method, pattern }) =>
-						method === request.method && pattern.test(route),
-				)
-			) {
+			if (!siteApiAllows(request.method, route)) {
 				return Response.json({ error: 'Not found' }, { status: 404 })
 			}
 			if (

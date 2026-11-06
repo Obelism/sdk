@@ -1,4 +1,4 @@
-import { BRIDGE_SOURCE } from './createBridge'
+import { BRIDGE_SOURCE } from './contract'
 
 // The CMS's entry form in an iframe, for editing on the site (the prompt
 // box's Form mode). The CMS renders the form at a one-time URL (`/site/form#

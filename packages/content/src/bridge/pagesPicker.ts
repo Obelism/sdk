@@ -1,4 +1,4 @@
-import type { ContentBridge, SitePage } from './createBridge'
+import type { ContentBridge, SitePage } from './contract'
 import { element, icon } from './dom'
 import type { SharedLabels } from './labels'
 

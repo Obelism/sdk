@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { blockSelector } from './createBridge'
+import { blockSelector } from './contract'
 import {
 	mountStatsOverlay,
 	placeLabel,

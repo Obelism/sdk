@@ -1,18 +1,12 @@
 import { UID_ATTRIBUTE } from '../editable'
-import { PREVIEW_PARAMS } from '../preview'
 import type { Entry, ShopifyItem } from '../types'
-import {
-	type BlockStats,
-	mountStatsOverlay,
-	type StatsOverlay,
-} from './statsOverlay'
-import { createViewportUnits } from './viewportUnits'
+import type { BlockStats, StatsOverlay } from './statsOverlay'
 
-// The site's half of the visual editor (the CMS's public/bridge.js, as a
-// module). Inside the editor's iframe it outlines blocks, tells the editor
-// which one was clicked, hands the editor's live, unsaved entry to listeners
-// and sends the editor prompts. Outside the editor it does nothing.
-//
+// What every bridge to the visual editor offers, and the pieces both of them
+// are built from: the state and its emitter, block selection, the click-rate
+// labels. The editor's own bridge is editorBridge.ts, editing on the site is
+// siteBridge.ts, and the CMS's old script tag is scriptBridge.ts.
+
 // Messages are only exchanged with the CMS origin, and only with the parent
 // window:
 // - site → editor: { source: 'obelism-content-bridge', type: 'ready' |
@@ -20,7 +14,6 @@ import { createViewportUnits } from './viewportUnits'
 // - editor → site: { source: 'obelism-content-editor', type: 'connect' |
 //   'update' | 'select' | 'saved' | 'published' | 'features' |
 //   'promptResult' | 'promptState' | 'stats' | 'viewport', … }
-
 export const BRIDGE_SOURCE = 'obelism-content-bridge'
 export const EDITOR_SOURCE = 'obelism-content-editor'
 
@@ -71,6 +64,19 @@ export type BridgeState = {
 	// site can also use them.
 	stats: Readonly<Record<string, BlockStats>>
 	statsVisible: boolean
+}
+
+export const INITIAL_STATE: BridgeState = {
+	features: [],
+	selectedUid: null,
+	prompting: false,
+	canUndo: false,
+	unsaved: false,
+	saving: false,
+	publishing: false,
+	selecting: false,
+	stats: {},
+	statsVisible: false,
 }
 
 export type PromptResult = { summary: string }
@@ -231,18 +237,9 @@ export const selectionStyle = (scope = '') =>
 	`${scope}[${UID_ATTRIBUTE}]:hover{outline:2px dashed ${OUTLINE};outline-offset:2px}` +
 	`${scope}[${UID_ATTRIBUTE}][data-cms-selected]{outline:2px solid ${OUTLINE};outline-offset:2px}`
 
-export const INITIAL_STATE: BridgeState = {
-	features: [],
-	selectedUid: null,
-	prompting: false,
-	canUndo: false,
-	unsaved: false,
-	saving: false,
-	publishing: false,
-	selecting: false,
-	stats: {},
-	statsVisible: false,
-}
+// The selector of the element marked with a block's uid.
+export const blockSelector = (uid: string) =>
+	`[${UID_ATTRIBUTE}="${uid.replace(/["\\]/g, '\\$&')}"]`
 
 type Listeners = { [E in BridgeEvent]: Set<BridgeListener<E>> }
 
@@ -271,6 +268,75 @@ export const createEmitter = () => {
 			}
 		},
 	}
+}
+
+// The state both bridges keep, and the emitter that says it changed.
+export const createBridgeState = (initial: BridgeState = INITIAL_STATE) => {
+	const emitter = createEmitter()
+	let state = initial
+	return {
+		...emitter,
+		getState: () => state,
+		setState(next: Partial<BridgeState>) {
+			state = { ...state, ...next }
+			emitter.emit('change', state)
+		},
+	}
+}
+
+// Outlines the block's element on the page, and nothing else, in view when
+// `scroll`.
+export const showSelection = (
+	doc: Document,
+	uid: string | null | undefined,
+	scroll = false,
+) => {
+	for (const element of doc.querySelectorAll('[data-cms-selected]')) {
+		element.removeAttribute('data-cms-selected')
+	}
+	const element = uid ? doc.querySelector(blockSelector(uid)) : null
+	if (!element) return
+	element.setAttribute('data-cms-selected', '')
+	if (scroll) element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+// The click rates on the page: mounted with the first rates, so a page
+// without Numbers never gets it, then kept.
+export const createStatsView = (mount: () => StatsOverlay) => {
+	let overlay: StatsOverlay | null = null
+	return {
+		update(stats: Readonly<Record<string, BlockStats>>, visible: boolean) {
+			if (!overlay && Object.keys(stats).length === 0) return
+			overlay ??= mount()
+			overlay.update(stats, visible)
+		},
+		refresh: () => overlay?.refresh(),
+		destroy: () => overlay?.destroy(),
+	}
+}
+
+// The rates the page can show, from the editor's `stats` message: only
+// well-formed entries.
+const isCount = (value: unknown): value is number =>
+	typeof value === 'number' && Number.isFinite(value) && value >= 0
+
+export const readStats = (value: unknown): Record<string, BlockStats> => {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+	const stats: Record<string, BlockStats> = {}
+	for (const [uid, block] of Object.entries(value)) {
+		const { clicks, clickers, viewers, rate } = (block ?? {}) as Record<
+			string,
+			unknown
+		>
+		if (
+			isCount(clicks) &&
+			isCount(clickers) &&
+			isCount(viewers) &&
+			isCount(rate)
+		)
+			stats[uid] = { clicks, clickers, viewers, rate }
+	}
+	return stats
 }
 
 const inertPrompt = () =>
@@ -309,310 +375,17 @@ export const INERT_METHODS = {
 	setSelecting: () => {},
 } satisfies Partial<ContentBridge>
 
-const isCount = (value: unknown): value is number =>
-	typeof value === 'number' && Number.isFinite(value) && value >= 0
-
-// The editor's `stats`, keeping only well-formed entries.
-export const readStats = (value: unknown): Record<string, BlockStats> => {
-	if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-	const stats: Record<string, BlockStats> = {}
-	for (const [uid, block] of Object.entries(value)) {
-		const { clicks, clickers, viewers, rate } = (block ?? {}) as Record<
-			string,
-			unknown
-		>
-		if (
-			isCount(clicks) &&
-			isCount(clickers) &&
-			isCount(viewers) &&
-			isCount(rate)
-		)
-			stats[uid] = { clicks, clickers, viewers, rate }
-	}
-	return stats
-}
-
-// The selector of the element marked with a block's uid.
-export const blockSelector = (uid: string) =>
-	`[${UID_ATTRIBUTE}="${uid.replace(/["\\]/g, '\\$&')}"]`
-
-// `cmsOrigin` is the only origin messages are accepted from and sent to.
-export const createBridge = (win: Window, cmsOrigin: string): ContentBridge => {
-	const params = new URLSearchParams(win.location.search)
-	const isEditing = win.parent !== win && params.has(PREVIEW_PARAMS.preview)
+// A bridge for a page where nothing can be edited.
+export const createInertBridge = (): ContentBridge => {
 	const emitter = createEmitter()
-	const cleanup: (() => void)[] = []
-
-	let state: BridgeState = { ...INITIAL_STATE, selecting: true }
-	const setState = (next: Partial<BridgeState>) => {
-		state = { ...state, ...next }
-		emitter.emit('change', state)
-	}
-
-	const bridge: ContentBridge = {
-		isEditing,
-		mode: isEditing ? 'editor' : null,
-		entryId: params.get(PREVIEW_PARAMS.entry),
-		environment: params.get(PREVIEW_PARAMS.environment),
+	return {
+		isEditing: false,
+		mode: null,
+		entryId: null,
+		environment: null,
 		product: null,
 		collection: null,
 		on: emitter.on,
-		getState: () => state,
-		...INERT_METHODS,
-		destroy: () => {
-			cleanup.splice(0).forEach((undo) => undo())
-		},
-	}
-	if (!isEditing) return bridge
-
-	const doc = win.document
-
-	const send = (type: string, data: Record<string, unknown> = {}) => {
-		win.parent.postMessage({ source: BRIDGE_SOURCE, type, ...data }, cmsOrigin)
-	}
-
-	const style = doc.createElement('style')
-	style.textContent = selectionStyle()
-	doc.head.appendChild(style)
-	cleanup.push(() => style.remove())
-
-	const highlight = (uid: string | null | undefined, scroll: boolean) => {
-		doc.querySelectorAll('[data-cms-selected]').forEach((element) => {
-			element.removeAttribute('data-cms-selected')
-		})
-		if (state.selectedUid !== (uid ?? null)) {
-			setState({ selectedUid: uid ?? null })
-		}
-		if (!uid) return
-		const element = doc.querySelector(blockSelector(uid))
-		if (!element) return
-		element.setAttribute('data-cms-selected', '')
-		if (scroll) element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-	}
-
-	// Capture phase, so a block that is also a link selects instead of
-	// navigating away.
-	const onClick = (event: MouseEvent) => {
-		const target = event.target as Element | null
-		const element = target?.closest?.(`[${UID_ATTRIBUTE}]`)
-		if (!element) return
-		event.preventDefault()
-		event.stopPropagation()
-		const uid = element.getAttribute(UID_ATTRIBUTE)
-		highlight(uid, false)
-		send('select', { uid })
-	}
-	doc.addEventListener('click', onClick, true)
-	cleanup.push(() => doc.removeEventListener('click', onClick, true))
-
-	// The page's height, which an editor on another origin can't read: the
-	// canvas makes its frame as tall as the page. With `ready`, and as `size`
-	// whenever it changes.
-	const pageHeight = () =>
-		Math.ceil(
-			Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight ?? 0),
-		)
-	let sentHeight = 0
-	const ready = () => {
-		sentHeight = pageHeight()
-		send('ready', { url: win.location.href, height: sentHeight })
-	}
-	const Observer = (win as Window & typeof globalThis).ResizeObserver
-	if (typeof Observer === 'function') {
-		const observer = new Observer(() => {
-			const height = pageHeight()
-			if (height === sentHeight) return
-			sentHeight = height
-			send('size', { height })
-		})
-		observer.observe(doc.documentElement)
-		if (doc.body) observer.observe(doc.body)
-		cleanup.push(() => observer.disconnect())
-	}
-
-	// Prompts waiting for the editor's answer, by id.
-	const pending = new Map<
-		string,
-		{
-			resolve: (result: PromptResult) => void
-			reject: (error: Error) => void
-			timer: ReturnType<typeof setTimeout>
-		}
-	>()
-	let nextId = 0
-	const settle = (id: string) => {
-		const waiting = pending.get(id)
-		if (!waiting) return null
-		clearTimeout(waiting.timer)
-		pending.delete(id)
-		if (pending.size === 0) setState({ prompting: false })
-		return waiting
-	}
-
-	bridge.prompt = (prompt, options = {}) => {
-		const text = prompt.trim()
-		if (!text) return Promise.reject(new Error('Say what to change'))
-		if (!state.features.includes('prompt')) {
-			return Promise.reject(new Error('The editor does not offer prompts here'))
-		}
-		const id = `prompt_${++nextId}`
-		const uid = options.uid === undefined ? state.selectedUid : options.uid
-		return new Promise<PromptResult>((resolve, reject) => {
-			const timer = setTimeout(() => {
-				settle(id)?.reject(new Error('The editor did not answer in time'))
-			}, PROMPT_TIMEOUT_MS)
-			pending.set(id, { resolve, reject, timer })
-			setState({ prompting: true })
-			send('prompt', { id, prompt: text, uid })
-		})
-	}
-	bridge.undo = () => send('undo')
-	bridge.select = (uid) => {
-		highlight(uid, false)
-		send('select', { uid })
-	}
-
-	// Mounted with the first rates, so pages without numbers never get it.
-	let overlay: StatsOverlay | null = null
-	const showStats = () => {
-		if (!overlay && !Object.keys(state.stats).length) return
-		overlay ??= mountStatsOverlay(win, {
-			selector: blockSelector,
-			onSelect: (uid) => bridge.select(uid),
-		})
-		overlay.update(state.stats, state.statsVisible)
-	}
-	cleanup.push(() => overlay?.destroy())
-	cleanup.push(() => {
-		for (const id of pending.keys()) {
-			settle(id)?.reject(new Error('The bridge was destroyed'))
-		}
-	})
-
-	const viewportUnits = createViewportUnits(doc)
-	cleanup.push(() => viewportUnits.destroy())
-
-	const onMessage = (event: MessageEvent) => {
-		if (event.origin !== cmsOrigin || event.source !== win.parent) return
-		const data = event.data as {
-			source?: unknown
-			type?: unknown
-			entry?: Entry
-			uid?: string | null
-			selectedUid?: string | null
-			features?: unknown
-			id?: unknown
-			ok?: unknown
-			summary?: unknown
-			error?: unknown
-			canUndo?: unknown
-			stats?: unknown
-			visible?: unknown
-			height?: unknown
-		} | null
-		if (!data || data.source !== EDITOR_SOURCE) return
-
-		if (data.type === 'connect') {
-			// The editor asks once its listener is up: the first `ready` may
-			// have been sent before it was listening.
-			ready()
-		} else if (data.type === 'update' && data.entry) {
-			emitter.emit('update', {
-				entry: data.entry,
-				selectedUid: data.selectedUid ?? null,
-			})
-			// Re-apply the selection to whatever the site rendered.
-			win.requestAnimationFrame(() => highlight(data.selectedUid, false))
-			overlay?.refresh()
-		} else if (data.type === 'select') {
-			highlight(data.uid, true)
-		} else if (data.type === 'saved' || data.type === 'published') {
-			emitter.emit(data.type, {})
-			if (emitter.listeners.update.size === 0) win.location.reload()
-		} else if (data.type === 'features' && Array.isArray(data.features)) {
-			setState({
-				features: data.features.filter(
-					(feature): feature is string => typeof feature === 'string',
-				),
-			})
-		} else if (data.type === 'stats') {
-			// An editor from before the switch sends no `visible`: show them.
-			setState({
-				stats: readStats(data.stats),
-				statsVisible: data.visible !== false,
-			})
-			showStats()
-		} else if (data.type === 'viewport' && typeof data.height === 'number') {
-			// The canvas: the frame is as tall as the page (`size`), so `vh`
-			// sizes are fixed at the screen height it stands for.
-			viewportUnits.freeze(data.height)
-		} else if (data.type === 'promptState') {
-			setState({ canUndo: data.canUndo === true })
-		} else if (data.type === 'promptResult' && typeof data.id === 'string') {
-			const waiting = settle(data.id)
-			if (!waiting) return
-			if (data.ok === true) {
-				waiting.resolve({
-					summary: typeof data.summary === 'string' ? data.summary : '',
-				})
-			} else {
-				waiting.reject(
-					new Error(
-						typeof data.error === 'string' ? data.error : 'The prompt failed',
-					),
-				)
-			}
-		}
-	}
-	win.addEventListener('message', onMessage)
-	cleanup.push(() => win.removeEventListener('message', onMessage))
-
-	if (doc.readyState === 'loading') {
-		doc.addEventListener('DOMContentLoaded', ready, { once: true })
-		cleanup.push(() => doc.removeEventListener('DOMContentLoaded', ready))
-	} else {
-		ready()
-	}
-
-	return bridge
-}
-
-// The bridge from the CMS's <script src=".../bridge.js"> tag, if a page has
-// both: one bridge per page, so this wraps it instead of starting a second.
-// That script predates prompts, so this bridge offers none.
-type ScriptBridge = {
-	isEditing: boolean
-	entryId: string | null
-	on: (event: string, listener: (payload: unknown) => void) => void
-}
-
-export const wrapScriptBridge = (
-	script: ScriptBridge,
-	params: URLSearchParams,
-): ContentBridge => {
-	const emitter = createEmitter()
-	script.on('saved', () => emitter.emit('saved', {}))
-	script.on('published', () => emitter.emit('published', {}))
-	// Only once something listens: bridge.js reloads after a save while it has
-	// no `update` listener, and has no way to remove one.
-	let forwardingUpdates = false
-	return {
-		isEditing: script.isEditing,
-		mode: script.isEditing ? 'editor' : null,
-		entryId: script.entryId,
-		environment: params.get(PREVIEW_PARAMS.environment),
-		product: null,
-		collection: null,
-		on: (event, listener) => {
-			if (event === 'update' && !forwardingUpdates) {
-				forwardingUpdates = true
-				script.on('update', (payload) => {
-					const entry = (payload as { entry?: Entry } | null)?.entry
-					if (entry) emitter.emit('update', { entry, selectedUid: null })
-				})
-			}
-			return emitter.on(event, listener)
-		},
 		getState: () => INITIAL_STATE,
 		...INERT_METHODS,
 		destroy: () => {},

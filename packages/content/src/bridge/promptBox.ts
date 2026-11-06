@@ -1,15 +1,11 @@
-import type { BridgeState, ContentBridge } from './createBridge'
-import { element, icon as drawIcon, type ICONS } from './dom'
+import type { BridgeState, ContentBridge } from './contract'
+import { element, fitToText, icon as drawIcon, type ICONS } from './dom'
 import { createFormSlot } from './formSlot'
 import { DEFAULT_PROMPT_LABELS, type PromptLabels } from './labels'
 import { createPagesPicker } from './pagesPicker'
-import {
-	addShopPage,
-	failure as reason,
-	pageContext,
-	shopCopy as shopWords,
-	storeChanges,
-} from './siteActions'
+import { shopCopy } from './shop'
+import { addShopPage, failure as reason, storeChanges } from './siteActions'
+import { bridgeView } from './view'
 
 // The prompt box: a small bar at the bottom of the page, inside the visual
 // editor or on a site signed in to edit, where an editor types what to
@@ -22,8 +18,6 @@ import {
 // editor around the site does that. On the site it also shows the CMS's own
 // entry form (Form mode, `bridge.openForm`), edited live, and goes to any
 // page of the space, drafts included.
-
-export { DEFAULT_PROMPT_LABELS, type PromptLabels } from './labels'
 
 export type PromptBoxOptions = {
 	labels?: Partial<PromptLabels> | undefined
@@ -712,31 +706,33 @@ export const mountPromptBox = (
 	const failure = (error: unknown) => ({ text: reason(error), error: true })
 
 	const render = (state: BridgeState) => {
-		const available = state.features.includes('prompt')
-		const storing = state.saving || state.publishing
-		const busy = state.prompting || storing
+		const page = bridgeView(
+			bridge,
+			state,
+			{ creating },
+			{
+				promptWithoutPage: options.promptWithoutPage,
+				signOut: options.signOut,
+				labels,
+			},
+		)
+		const { available, busy, canCreate, site, pageless, onlyNew } = page
+		const { offerShop, canForm } = page
+		creating = page.creating
+		if (!canForm) form = false
 		root.hidden = !available && !site
 		pill.hidden = open || !available
 		viewing.hidden = available || !site
 		panel.hidden = !open || !available
-		const { canCreate, pageless, shopHere, onlyNew } = pageContext(
-			bridge,
-			state,
-			options.promptWithoutPage,
-		)
-		const productHere = shopHere !== null
-		const shopCopy = shopWords(labels, shopHere)
-		addProduct.lastChild!.textContent = shopCopy.add
-		if (!canCreate) creating = false
-		if (onlyNew) creating = true
-		if (creating || pageless || !site) form = false
+		const words = page.shop ? shopCopy(labels, page.shop) : null
+		addProduct.lastChild!.textContent = words?.add ?? labels.addProductPage
 		// The form is there only while shown in the open panel.
 		const showForm = open && available && form
 		if (showForm && !formSlot.mounted) formSlot.mount()
 		else if (!showForm && formSlot.mounted) formSlot.unmount()
-		const offerProduct = productHere && !creating
+		const offerProduct = offerShop
 		pillText.textContent = offerProduct
-			? shopCopy.add
+			? words!.add
 			: onlyNew
 				? labels.newPage
 				: labels.open
@@ -756,9 +752,7 @@ export const mountPromptBox = (
 		formLoader.hidden = !formSlot.loading
 		toolbar.hidden = picking
 		pagesSection.hidden = !picking
-		input.placeholder = creating
-			? labels.newPagePlaceholder
-			: labels.placeholder
+		input.placeholder = page.placeholder
 		scopeText.textContent = state.selectedUid
 			? labels.scopeBlock
 			: pageless
@@ -786,19 +780,16 @@ export const mountPromptBox = (
 		minimize.setAttribute('aria-expanded', String(!minimized))
 		minimizeIcon.hidden = minimized
 		expandIcon.hidden = !minimized
-		send.disabled =
-			busy ||
-			input.value.trim() === '' ||
-			(creating && pathInput.value.trim() === '')
+		send.disabled = !page.canSend(input.value, pathInput.value)
 		input.disabled = busy
-		save.hidden = !state.features.includes('save') || pageless
+		save.hidden = !page.canSave
 		save.disabled = busy || !state.unsaved
 		save.textContent = state.saving ? labels.saving : labels.save
-		publish.hidden = !state.features.includes('publish') || pageless
+		publish.hidden = !page.canPublish
 		publish.disabled = busy
 		publish.textContent = state.publishing ? labels.publishing : labels.publish
-		signOut.hidden = !site || options.signOut === false
-		pillSignOut.hidden = options.signOut === false
+		signOut.hidden = !page.showSignOut
+		pillSignOut.hidden = !page.showSignOut
 		if (options.actions) {
 			options.actions.slot =
 				open && available ? 'actions-footer' : 'actions-bar'
@@ -815,13 +806,13 @@ export const mountPromptBox = (
 			? creating
 				? labels.creating
 				: offerProduct
-					? shopCopy.adding
+					? words!.adding
 					: labels.working
 			: loadingForm
 				? ''
 				: (message?.text ??
 					(offerProduct
-						? shopCopy.hint
+						? words!.hint
 						: site && !creating && !picking && !state.selectedUid
 							? labels.selectHint
 							: ''))
@@ -830,11 +821,6 @@ export const mountPromptBox = (
 		status.className = `status${working ? ' working' : ''}${!busy && !loadingForm && message?.error ? ' error' : ''}`
 	}
 	const refresh = () => render(bridge.getState())
-
-	const grow = () => {
-		input.style.height = 'auto'
-		input.style.height = `${input.scrollHeight}px`
-	}
 
 	const setForm = (next: boolean) => {
 		if (form === next) return
@@ -862,7 +848,7 @@ export const mountPromptBox = (
 				message = { text: summary, error: false }
 			}
 			input.value = ''
-			grow()
+			fitToText(input)
 		} catch (error) {
 			message = failure(error)
 		}
@@ -966,7 +952,7 @@ export const mountPromptBox = (
 		void submit()
 	})
 	input.addEventListener('input', () => {
-		grow()
+		fitToText(input)
 		refresh()
 	})
 	input.addEventListener('keydown', (event) => {

@@ -1,12 +1,9 @@
 import { ENTRY_ATTRIBUTE, UID_ATTRIBUTE } from '../editable'
-import {
-	blockSelector,
-	type BridgeState,
-	type ContentBridge,
-} from './createBridge'
+import { blockSelector, type BridgeState, type ContentBridge } from './contract'
 import {
 	element,
 	fill,
+	fitToText,
 	icon as drawIcon,
 	MARKS,
 	svgSpan,
@@ -16,13 +13,9 @@ import { createFormSlot } from './formSlot'
 import { DEFAULT_SITE_EDITOR_LABELS, type SiteEditorLabels } from './labels'
 import { createPagesPicker } from './pagesPicker'
 import type { PromptBoxOptions } from './promptBox'
-import {
-	addShopPage,
-	failure,
-	pageContext,
-	shopCopy,
-	storeChanges,
-} from './siteActions'
+import { shopCopy } from './shop'
+import { addShopPage, failure, storeChanges } from './siteActions'
+import { bridgeView } from './view'
 
 // The on-site editor: editing a site signed in to edit (siteBridge.ts) from
 // a panel docked on the right, the site reflowed beside it. Edit fields (the
@@ -38,7 +31,7 @@ export type SiteEditorOptions = Omit<PromptBoxOptions, 'labels'> & {
 
 // What the site gives up beside the panel: its 404px and a 16px gap on
 // either side.
-export const DOCK_WIDTH_PX = 436
+const DOCK_WIDTH_PX = 436
 // Narrower than this the panel is a sheet over the page instead.
 const DOCK_QUERY = '(min-width: 768px)'
 const OPEN_KEY = 'obelism-content-editor'
@@ -609,7 +602,13 @@ export const mountSiteEditor = (
 	const shopText = element(doc, 'p', { className: 'summary' })
 	const shopButtonText = element(doc, 'span')
 	const shopButton = button('button primary', icon('plus'), shopButtonText)
-	const shop = element(doc, 'div', { className: 'shop' }, shopText, shopButton)
+	const shopBox = element(
+		doc,
+		'div',
+		{ className: 'shop' },
+		shopText,
+		shopButton,
+	)
 	const log = element(doc, 'div', { className: 'log' })
 	log.setAttribute('role', 'log')
 	const scroll = element(
@@ -618,7 +617,7 @@ export const mountSiteEditor = (
 		{ className: 'scroll' },
 		note,
 		intro,
-		shop,
+		shopBox,
 		log,
 	)
 
@@ -1135,19 +1134,21 @@ export const mountSiteEditor = (
 
 	const render = (state: BridgeState) => {
 		if (destroyed) return
-		const available = state.features.includes('prompt')
-		const storing = state.saving || state.publishing
-		const busy = state.prompting || storing
-		const shown = available && open
-		const { site, canCreate, pageless, shopHere, onlyNew } = pageContext(
+		const page = bridgeView(
 			bridge,
 			state,
-			options.promptWithoutPage,
+			{ creating },
+			{
+				promptWithoutPage: options.promptWithoutPage,
+				signOut: options.signOut,
+				labels,
+			},
 		)
-		if (!canCreate) creating = false
-		if (onlyNew) creating = true
-		const hasForm =
-			site && !creating && !pageless && state.features.includes('form')
+		const { available, busy, canCreate, pageless, site, shop, onlyNew } = page
+		const { storing } = page
+		const hasForm = page.canForm && state.features.includes('form')
+		const shown = available && open
+		creating = page.creating
 		view = hasForm ? mode : 'ask'
 		const waiting = pending().length > 0
 		if (!waiting || view === 'fields') gated = false
@@ -1166,7 +1167,7 @@ export const mountSiteEditor = (
 		eye.setAttribute('aria-pressed', String(!outlines))
 		eyeOn.hidden = !outlines
 		eyeOff.hidden = outlines
-		exit.hidden = options.signOut === false
+		exit.hidden = !page.showSignOut
 
 		// The site beside the panel, wide enough; a sheet over it otherwise.
 		const docked = shown && wide
@@ -1202,7 +1203,7 @@ export const mountSiteEditor = (
 		ask.hidden = view !== 'ask'
 		fields.hidden = view !== 'fields'
 
-		const offerShop = shopHere !== null && !creating
+		const offerShop = page.offerShop
 		if (creating) {
 			noteText.textContent = labels.newPage
 		} else if (state.selectedUid) {
@@ -1228,34 +1229,32 @@ export const mountSiteEditor = (
 		up.hidden = creating || !state.selectedUid
 		cancelNew.hidden = !creating || onlyNew
 		intro.hidden = answers.length > 0 || offerShop || creating
-		shop.hidden = !offerShop
-		const shopWords = shopCopy(labels, shopHere)
-		shopButtonText.textContent =
-			state.prompting && offerShop ? shopWords.adding : shopWords.add
+		shopBox.hidden = !offerShop
+		const shopWords = shop ? shopCopy(labels, shop) : null
+		shopButtonText.textContent = shopWords
+			? state.prompting && offerShop
+				? shopWords.adding
+				: shopWords.add
+			: ''
 		shopButton.disabled = busy
-		shopText.textContent = shopMessage?.text ?? shopWords.hint
+		shopText.textContent = shopMessage?.text ?? shopWords?.hint ?? ''
 		shopText.className = shopMessage?.error ? 'failure' : 'summary'
 
 		composer.hidden = offerShop
 		pathRow.hidden = !creating
 		pathInput.disabled = busy
-		input.placeholder = creating
-			? labels.newPagePlaceholder
-			: labels.placeholder
+		input.placeholder = page.placeholder
 		input.disabled = busy
-		send.disabled =
-			busy ||
-			input.value.trim() === '' ||
-			(creating && pathInput.value.trim() === '')
+		send.disabled = !page.canSend(input.value, pathInput.value)
 		send.setAttribute('aria-busy', String(state.prompting))
 		sendIcon.hidden = state.prompting
 		sendWorking.hidden = !state.prompting
 
 		undo.hidden = waiting || !state.canUndo || creating
 		undo.disabled = busy
-		save.hidden = !state.features.includes('save') || pageless
+		save.hidden = !page.canSave
 		save.disabled = busy || waiting || !state.unsaved
-		publish.hidden = !state.features.includes('publish') || pageless
+		publish.hidden = !page.canPublish
 		publish.disabled = busy || waiting
 		if (options.actions)
 			options.actions.slot = shown ? 'actions-footer' : 'actions-bar'
@@ -1329,10 +1328,6 @@ export const mountSiteEditor = (
 	}
 	const refresh = () => render(bridge.getState())
 
-	const grow = () => {
-		input.style.height = 'auto'
-		input.style.height = `${input.scrollHeight}px`
-	}
 	const scrollDown = () => {
 		scroll.scrollTop = scroll.scrollHeight
 	}
@@ -1478,7 +1473,7 @@ export const mountSiteEditor = (
 			),
 		)
 		input.value = ''
-		grow()
+		fitToText(input)
 		const answer = addAnswer(prompt, uid)
 		refresh()
 		scrollDown()
@@ -1569,7 +1564,7 @@ export const mountSiteEditor = (
 		void submit()
 	})
 	input.addEventListener('input', () => {
-		grow()
+		fitToText(input)
 		refresh()
 	})
 	input.addEventListener('keydown', (event) => {

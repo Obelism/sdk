@@ -1,4 +1,4 @@
-import type { ContentBridge, FormHandle } from './createBridge'
+import type { ContentBridge, FormHandle } from './contract'
 
 // The CMS's form (`bridge.openForm`) in a container, while shown: a fresh
 // one, and one-time address, every time it mounts.

@@ -1,11 +1,15 @@
 import {
+	createVisitorId,
+	isVisitorId,
+	parseRetryAfterMs,
+} from '@obelism/numbers-sdk'
+
+import {
 	CONFIG_RETRY_BASE_DELAY_MS,
 	CONFIG_RETRY_COUNT,
 	CONFIG_RETRY_MAX_DELAY_MS,
 	COOKIE_NAME_VISITOR,
-	VISITOR_ID_LENGTH,
-	VISITOR_ID_PREFIX,
-	VISITOR_ID_SEPARATOR,
+	LEGACY_VISITOR_COOKIE,
 } from './config/constants'
 import { CONFIG_PATH, BASE_URL } from './config/urls'
 import {
@@ -16,9 +20,8 @@ import {
 } from './types'
 import { delay } from './utils/delay'
 import { getReasonFromStatus, ImproveFetchError } from './utils/errors'
-import { getRandomString } from './utils/getRandomString'
 import { normalizeConfig } from './utils/normalizeConfig'
-import { getBackoffDelayMs, parseRetryAfterMs } from './utils/retry'
+import { getBackoffDelayMs } from './utils/retry'
 import { timeoutFetch } from './utils/timeoutFetch'
 
 type ConfigFetch = {
@@ -167,14 +170,13 @@ export class BaseImproveSDK {
 		this.config = config
 	}
 
-	generateVisitorId = () => {
-		return [
-			VISITOR_ID_PREFIX,
-			getRandomString(VISITOR_ID_LENGTH).toUpperCase(),
-		].join(VISITOR_ID_SEPARATOR)
-	}
+	generateVisitorId = () => createVisitorId()
 
 	getVisitorCookieName = () => COOKIE_NAME_VISITOR
+
+	// The name before it was namespaced: still read, so an existing visitor
+	// stays one.
+	getLegacyVisitorCookieName = () => LEGACY_VISITOR_COOKIE
 
 	/**
 	 * Emit a development warning, unless warnings were disabled via the
@@ -202,10 +204,6 @@ export class BaseImproveSDK {
 		)
 	}
 
-	validateVisitorId = (possibleVisitorId: string) => {
-		const visitorIdParts = possibleVisitorId.split(VISITOR_ID_SEPARATOR)
-		if (visitorIdParts.length !== 2) return false
-		const [key, value] = visitorIdParts as [string, string]
-		return key === VISITOR_ID_PREFIX && value.length === VISITOR_ID_LENGTH
-	}
+	validateVisitorId = (possibleVisitorId: string) =>
+		isVisitorId(possibleVisitorId)
 }

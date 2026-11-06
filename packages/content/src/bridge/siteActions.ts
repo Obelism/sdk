@@ -1,5 +1,6 @@
-import type { BridgeState, ContentBridge } from './createBridge'
+import type { BridgeState, ContentBridge } from './contract'
 import type { SharedLabels } from './labels'
+import { SHOP, shopKindOf, type ShopKind } from './shop'
 
 // What the prompt box and the on-site editor decide alike on the site.
 
@@ -18,33 +19,11 @@ export const pageContext = (
 	const pageless = site && bridge.entryId === null
 	// …unless it shows a product (collection): then Add a product
 	// (collection) page first.
-	const shopHere =
-		!pageless || !canCreate
-			? null
-			: bridge.product
-				? ('product' as const)
-				: bridge.collection
-					? ('collection' as const)
-					: null
-	const onlyNew = pageless && canCreate && !shopHere && !promptWithoutPage
-	return { site, canCreate, pageless, shopHere, onlyNew }
+	const shop: ShopKind | null =
+		pageless && canCreate ? shopKindOf(bridge) : null
+	const onlyNew = pageless && canCreate && !shop && !promptWithoutPage
+	return { site, canCreate, pageless, shop, onlyNew }
 }
-
-export const shopCopy = (
-	labels: SharedLabels,
-	shopHere: 'product' | 'collection' | null,
-) =>
-	shopHere === 'collection'
-		? {
-				add: labels.addCollectionPage,
-				adding: labels.addingCollectionPage,
-				hint: labels.collectionPageHint,
-			}
-		: {
-				add: labels.addProductPage,
-				adding: labels.addingProductPage,
-				hint: labels.productPageHint,
-			}
 
 // Makes the page's product (collection) page; the bridge then reloads, and
 // the answer shows until it does.
@@ -52,13 +31,12 @@ export const addShopPage = async (
 	bridge: ContentBridge,
 	labels: SharedLabels,
 ) => {
+	const kind = shopKindOf(bridge)
+	if (!kind) return null
 	try {
-		if (bridge.product) {
-			await bridge.createProductPage()
-			return { text: labels.addedProductPage, error: false }
-		}
-		await bridge.createCollectionPage()
-		return { text: labels.addedCollectionPage, error: false }
+		if (kind === 'product') await bridge.createProductPage()
+		else await bridge.createCollectionPage()
+		return { text: labels[SHOP[kind].added], error: false }
 	} catch (error) {
 		return { text: failure(error), error: true }
 	}
