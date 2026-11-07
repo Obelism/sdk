@@ -5,7 +5,8 @@ const utm = (params: URLSearchParams, name: string) =>
 	params.get(name)?.slice(0, MAX_FIELD_LENGTH) || undefined
 
 // Events come in bursts on one page, so the context is worked out once per
-// path and query string and shared until the URL changes.
+// path and query string and shared until the URL changes. Callers copy it
+// into a beacon; none of them mutate it.
 let contextKey: string | undefined
 let pageContext: PageContext | undefined
 

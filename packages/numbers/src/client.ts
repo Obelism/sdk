@@ -138,7 +138,7 @@ export const createNumbers = ({
 	const exposed = new Set<string>()
 	const warned = new Set<string>()
 
-	const remember = (set: Set<string>, key: string) => {
+	const rememberKey = (set: Set<string>, key: string) => {
 		// Oldest first: a long session with many keys keeps only the recent ones.
 		if (set.size >= MAX_KEYS) set.delete(set.values().next().value!)
 		set.add(key)
@@ -183,6 +183,7 @@ export const createNumbers = ({
 		// body either way: skip the encode when nothing would hear the warning.
 		if (
 			!disableWarnings &&
+			typeof TextEncoder !== 'undefined' &&
 			new TextEncoder().encode(serialized).length > MAX_BODY_BYTES
 		)
 			warn(
@@ -225,7 +226,7 @@ export const createNumbers = ({
 		if (dedupeKey !== undefined) {
 			const key = `${event}:${dedupeKey}`
 			if (sentKeys.has(key)) return null
-			remember(sentKeys, key)
+			rememberKey(sentKeys, key)
 		}
 
 		const body: EventBeacon = {
@@ -283,7 +284,7 @@ export const createNumbers = ({
 		if (!current || paused()) return null
 		const key = `${exposure.subjectKind}:${exposure.subjectId}`
 		if (exposed.has(key)) return null
-		remember(exposed, key)
+		rememberKey(exposed, key)
 		return send({ ...common('exposure', current), ...exposure }, key)
 	}
 
@@ -328,57 +329,63 @@ export const createNumbers = ({
 			onNavigate()
 		}
 
+		// A click on a link to another site or a file, scoped to its tag, its
+		// destination or its name.
+		const trackLink = (target: Element) => {
+			const link = target.closest?.('a[href]') as HTMLAnchorElement | null
+			if (!link) return
+			let url: URL
+			try {
+				url = new URL(link.href, location.href)
+			} catch {
+				return
+			}
+			// Only http(s): a data: URL's path is its whole payload, and
+			// mailto:/tel: aren't destinations.
+			if (!/^https?:$/.test(url.protocol)) return
+			const id = link
+				.closest('[data-numbers-id]')
+				?.getAttribute('data-numbers-id')
+			const fileName = url.pathname.split('/').pop() || url.pathname
+			const extension = fileName.includes('.')
+				? fileName.split('.').pop()!.toLowerCase()
+				: ''
+			if (downloads && isDownload(url, link))
+				track(
+					'file_download',
+					id ?? fileName,
+					id
+						? undefined
+						: {
+								params: {
+									file_name: extension
+										? fileName.slice(0, -(extension.length + 1))
+										: fileName,
+									...(extension && { file_extension: extension }),
+								},
+							},
+				)
+			else if (outbound && url.origin !== location.origin)
+				track(
+					'outbound_click',
+					id ?? `${url.origin}${url.pathname}`,
+					id ? undefined : { params: { link_domain: url.hostname } },
+				)
+		}
+
 		if (clicks || outbound || downloads) {
 			// One listener for both kinds of click, captured so a handler that
 			// stops the click still counts it.
 			const onClick = (event: MouseEvent) => {
 				const target = event.target as Element | null
+				if (!target) return
 				if (clicks) {
 					const id = target
-						?.closest?.('[data-numbers-id]')
+						.closest?.('[data-numbers-id]')
 						?.getAttribute('data-numbers-id')
 					if (id) track('click', id)
 				}
-				if (!outbound && !downloads) return
-				const link = target?.closest?.('a[href]') as HTMLAnchorElement | null
-				if (!link) return
-				let url: URL
-				try {
-					url = new URL(link.href, location.href)
-				} catch {
-					return
-				}
-				// Only http(s): a data: URL's path is its whole payload, and
-				// mailto:/tel: aren't destinations.
-				if (!/^https?:$/.test(url.protocol)) return
-				const id = link
-					.closest('[data-numbers-id]')
-					?.getAttribute('data-numbers-id')
-				const fileName = url.pathname.split('/').pop() || url.pathname
-				const extension = fileName.includes('.')
-					? fileName.split('.').pop()!.toLowerCase()
-					: ''
-				if (downloads && isDownload(url, link))
-					track(
-						'file_download',
-						id ?? fileName,
-						id
-							? undefined
-							: {
-									params: {
-										file_name: extension
-											? fileName.slice(0, -(extension.length + 1))
-											: fileName,
-										...(extension && { file_extension: extension }),
-									},
-								},
-					)
-				else if (outbound && url.origin !== location.origin)
-					track(
-						'outbound_click',
-						id ?? `${url.origin}${url.pathname}`,
-						id ? undefined : { params: { link_domain: url.hostname } },
-					)
+				if (outbound || downloads) trackLink(target)
 			}
 			document.addEventListener('click', onClick, true)
 			stops.push(() => document.removeEventListener('click', onClick, true))

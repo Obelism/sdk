@@ -13,6 +13,7 @@ npm install            # at the root only: one package-lock.json
 npm run build          # turbo, every package and example
 npm run lint           # oxlint + tsc --noEmit
 npm run test:ci        # vitest, once
+npm run size           # the script-tag build's size budget
 npm run format         # Prettier
 npm run changeset      # before a release
 

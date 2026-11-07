@@ -209,6 +209,18 @@ describe('track', () => {
 		).not.toBeNull()
 	})
 
+	it('remembers the last thousand exposures, and no more', () => {
+		const numbers = numbersFor()
+		const exposure = (index: number) => ({
+			subjectKind: 'test' as const,
+			subjectId: `test_${index}`,
+			variant: 'a',
+		})
+		for (let index = 0; index <= 1000; index++) numbers.expose(exposure(index))
+		expect(numbers.expose(exposure(1000))).toBeNull()
+		expect(numbers.expose(exposure(0))).not.toBeNull()
+	})
+
 	it('pauses after a 429 for its Retry-After', async () => {
 		vi.useFakeTimers({ now: 0, toFake: ['Date'] })
 		fetchMock.mockResolvedValueOnce(

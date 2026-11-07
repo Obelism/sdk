@@ -11,11 +11,12 @@
 		"test:ci": "turbo run test:ci",
 		"lint-staged": "lint-staged",
 		"clean": "turbo run clean",
+		"size": "turbo run size",
 		"format": "prettier --write --ignore-unknown .",
 		"format:check": "prettier --check --ignore-unknown .",
 		"changeset": "changeset",
 		"version": "changeset version",
-		"publish-packages": "turbo run build && turbo run lint test:ci && changeset publish",
+		"publish-packages": "turbo run build && turbo run lint test:ci size && changeset publish",
 		"workspace:list": "npm query .workspace | jq -r '.[].location'"
 	},
 	"devDependencies": {

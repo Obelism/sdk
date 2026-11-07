@@ -66,11 +66,7 @@ const readStoredVisitor = (storage: 'cookie' | 'session') => {
 	return readCookie(VISITOR_COOKIE) || readCookie(LEGACY_VISITOR_COOKIE)
 }
 
-const writeStoredVisitor = (
-	storage: 'cookie' | 'session',
-	id: string,
-	recurring: boolean,
-) => {
+const writeStoredVisitor = (storage: 'cookie' | 'session', id: string) => {
 	if (storage === 'session') {
 		try {
 			sessionStorage.setItem(VISITOR_SESSION_KEY, id)
@@ -82,10 +78,11 @@ const writeStoredVisitor = (
 	writeCookie(VISITOR_COOKIE, id)
 	// Keep the old cookie in step, for a deprecation window: a site that still
 	// runs an older improve SDK reads only `visitorId` and would mint a second
-	// id for the same person. Drop this with the legacy read. A visitor that
-	// already had the id was given both cookies together: only a new one
-	// needs the second write.
-	if (!recurring) writeCookie(LEGACY_VISITOR_COOKIE, id)
+	// id for the same person. Drop this with the legacy read. Only write it
+	// when it is missing or stale, so a returning visitor costs one cookie
+	// write instead of two.
+	if (readCookie(LEGACY_VISITOR_COOKIE) !== id)
+		writeCookie(LEGACY_VISITOR_COOKIE, id)
 }
 
 // The visitor in its storage, or a new one; either way it is written again, so
@@ -96,6 +93,6 @@ export const loadVisitor = (storage: VisitorStorage = 'cookie'): Visitor => {
 	const existing = readStoredVisitor(storage)
 	const recurring = isVisitorId(existing)
 	const id = recurring ? existing : createVisitorId()
-	writeStoredVisitor(storage, id, recurring)
+	writeStoredVisitor(storage, id)
 	return { id, recurring }
 }
