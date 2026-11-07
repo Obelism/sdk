@@ -11,7 +11,13 @@ const IPHONE =
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>
 
 const sentBodies = () =>
-	fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init!.body)))
+	fetchMock.mock.calls.flatMap(([, init]) => {
+		const body = JSON.parse(String(init!.body))
+		return Array.isArray(body) ? body : [body]
+	})
+
+// The client flushes on a microtask: let it run before the assertions.
+const settle = () => Promise.resolve()
 
 const clearCookies = () => {
 	for (const row of document.cookie.split('; ')) {
@@ -142,9 +148,10 @@ describe('track', () => {
 		})
 	})
 
-	it('names the space when it has one', () => {
+	it('names the space when it has one', async () => {
 		numbersFor({ spaceId: 'space_1' }).track('sign_up', 'footer_form')
 		numbersFor().track('sign_up', 'footer_form')
+		await settle()
 
 		const [withSpace, without] = sentBodies()
 		expect(withSpace).toMatchObject({
@@ -154,13 +161,14 @@ describe('track', () => {
 		expect(without).not.toHaveProperty('spaceId')
 	})
 
-	it('scopes to the path without a scope, and caps what numbers would refuse', () => {
+	it('scopes to the path without a scope, and caps what numbers would refuse', async () => {
 		history.replaceState(null, '', '/about')
 		numbersFor().track('a'.repeat(300), '', {
 			currency: 'EUROPEANS',
 			value: Number.NaN,
 			params: [1, 2] as unknown as Record<string, unknown>,
 		})
+		await settle()
 		const [body] = sentBodies()
 		expect(body.scope).toBe('/about')
 		expect(body.event).toHaveLength(256)
@@ -169,7 +177,7 @@ describe('track', () => {
 		expect(body).not.toHaveProperty('params')
 	})
 
-	it('sends every call, or once per dedupeKey', () => {
+	it('sends every call in one request, or once per dedupeKey', async () => {
 		const numbers = numbersFor()
 		numbers.track('click', 'cta')
 		numbers.track('click', 'cta')
@@ -180,16 +188,20 @@ describe('track', () => {
 			numbers.track('view_item', 'list', { dedupeKey: 'sku_1' }),
 		).toBeNull()
 		numbers.track('view_item', 'list', { dedupeKey: 'sku_2' })
-		expect(fetchMock).toHaveBeenCalledTimes(4)
+		await settle()
+		expect(sentBodies()).toHaveLength(4)
+		// The four calls of this task went out together.
+		expect(fetchMock).toHaveBeenCalledTimes(1)
 		expect(sentBodies()[2]).not.toHaveProperty('dedupeKey')
 	})
 
-	it('reads the page context again after a navigation', () => {
+	it('reads the page context again after a navigation', async () => {
 		const numbers = numbersFor()
 		history.replaceState(null, '', '/one?utm_source=first')
 		numbers.track('one', 'x')
 		history.replaceState(null, '', '/two?utm_source=second')
 		numbers.track('two', 'x')
+		await settle()
 		expect(sentBodies().map((body) => [body.path, body.utmSource])).toEqual([
 			['/one', 'first'],
 			['/two', 'second'],
@@ -250,7 +262,7 @@ describe('track', () => {
 		expect(warn.mock.calls[1]![0]).toContain('over 8192 bytes')
 	})
 
-	it('goes to another endpoint, with the device given', () => {
+	it('goes to another endpoint, with the device given', async () => {
 		const numbers = numbersFor({
 			endpoint: 'https://example.com/numbers',
 			device: {
@@ -269,6 +281,7 @@ describe('track', () => {
 			os: 'unix',
 		})
 		numbers.track('two', 'x')
+		await settle()
 		expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
 			'https://example.com/numbers',
 			'https://example.com/elsewhere',
@@ -280,14 +293,68 @@ describe('track', () => {
 	})
 })
 
+describe('batching', () => {
+	it('sends the events of one task in one request, as an array', async () => {
+		const numbers = numbersFor()
+		numbers.track('one', 'x')
+		numbers.track('two', 'y')
+		await settle()
+		expect(fetchMock).toHaveBeenCalledTimes(1)
+		const body = JSON.parse(String(fetchMock.mock.calls[0]![1]!.body))
+		expect(body.map((event: { event: string }) => event.event)).toEqual([
+			'one',
+			'two',
+		])
+	})
+
+	it('sends separately when the events are in different tasks', async () => {
+		const numbers = numbersFor()
+		await numbers.track('one', 'x')
+		await numbers.track('two', 'y')
+		expect(fetchMock).toHaveBeenCalledTimes(2)
+		expect(
+			JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)),
+		).not.toBeInstanceOf(Array)
+	})
+
+	it('sends at most ten events in a request', async () => {
+		const numbers = numbersFor()
+		for (let index = 0; index < 11; index++) numbers.track('view_item', 'list')
+		await settle()
+		expect(fetchMock).toHaveBeenCalledTimes(2)
+		expect(sentBodies()).toHaveLength(11)
+	})
+
+	it('flushes what is queued when asked', async () => {
+		const numbers = numbersFor()
+		numbers.track('one', 'x')
+		expect(fetchMock).not.toHaveBeenCalled()
+		await numbers.flush()
+		expect(fetchMock).toHaveBeenCalledTimes(1)
+	})
+
+	it('pauses every event in a batch after a 429', async () => {
+		fetchMock.mockResolvedValueOnce(
+			new Response('', { status: 429, headers: { 'Retry-After': '30' } }),
+		)
+		const numbers = numbersFor()
+		const first = numbers.track('one', 'x')
+		const second = numbers.track('two', 'y')
+		await expect(first).resolves.toBeInstanceOf(Response)
+		await expect(second).resolves.toBeInstanceOf(Response)
+		expect(numbers.track('three', 'x')).toBeNull()
+	})
+})
+
 describe('pageView', () => {
-	it('sends the referrer from another site on the first page view only', () => {
+	it('sends the referrer from another site on the first page view only', async () => {
 		vi.spyOn(document, 'referrer', 'get').mockReturnValue(
 			'https://news.example/story?id=1',
 		)
 		const numbers = numbersFor()
 		numbers.pageView()
 		numbers.pageView()
+		await settle()
 		const [first, second] = sentBodies()
 		expect(first).toMatchObject({
 			event: 'page_view',
@@ -298,17 +365,18 @@ describe('pageView', () => {
 		expect(second).not.toHaveProperty('referrer')
 	})
 
-	it('leaves out a referrer from the site itself', () => {
+	it('leaves out a referrer from the site itself', async () => {
 		vi.spyOn(document, 'referrer', 'get').mockReturnValue(
 			`${location.origin}/home`,
 		)
 		numbersFor().pageView()
+		await settle()
 		expect(sentBodies()[0]).not.toHaveProperty('referrer')
 	})
 })
 
 describe('expose', () => {
-	it('sends an exposure once per subject', () => {
+	it('sends an exposure once per subject', async () => {
 		const numbers = numbersFor()
 		const exposure = {
 			subjectKind: 'test',
@@ -318,6 +386,7 @@ describe('expose', () => {
 		numbers.expose(exposure)
 		expect(numbers.expose(exposure)).toBeNull()
 		numbers.expose({ ...exposure, subjectKind: 'flag' })
+		await settle()
 		expect(sentBodies()).toMatchObject([
 			{
 				type: 'exposure',
@@ -332,7 +401,7 @@ describe('expose', () => {
 })
 
 describe('autoTrack', () => {
-	it('sends a page view now and on each new path, until stopped', () => {
+	it('sends a page view now and on each new path, until stopped', async () => {
 		const numbers = numbersFor()
 		const stop = numbers.autoTrack({ clicks: false })
 		history.pushState(null, '', '/one')
@@ -340,10 +409,11 @@ describe('autoTrack', () => {
 		history.pushState(null, '', '/two')
 		stop()
 		history.pushState(null, '', '/three')
+		await settle()
 		expect(sentBodies().map((body) => body.path)).toEqual(['/', '/one', '/two'])
 	})
 
-	it('sends a click for a tagged element, also when the click is stopped', () => {
+	it('sends a click for a tagged element, also when the click is stopped', async () => {
 		document.body.innerHTML =
 			'<section data-numbers-id="block_1"><button>Go</button></section><p>plain</p>'
 		const button = document.querySelector('button')!
@@ -353,10 +423,11 @@ describe('autoTrack', () => {
 		document.querySelector('p')!.click()
 		stop()
 		button.click()
+		await settle()
 		expect(sentBodies()).toMatchObject([{ event: 'click', scope: 'block_1' }])
 	})
 
-	it('replaces the previous autoTrack instead of stacking listeners', () => {
+	it('replaces the previous autoTrack instead of stacking listeners', async () => {
 		document.body.innerHTML =
 			'<a id="out" href="https://elsewhere.example/x">out</a>'
 		document.body.addEventListener('click', (event) => event.preventDefault())
@@ -374,22 +445,24 @@ describe('autoTrack', () => {
 				new MouseEvent('click', { bubbles: true, cancelable: true }),
 			)
 		stop()
+		await settle()
 		expect(sentBodies()).toMatchObject([
 			{ event: 'page_view', path: '/' },
 			{ event: 'outbound_click', path: '/one' },
 		])
 	})
 
-	it('does not count the page again when a second autoTrack keeps page views', () => {
+	it('does not count the page again when a second autoTrack keeps page views', async () => {
 		const numbers = numbersFor()
 		numbers.autoTrack({ clicks: false })
 		const stop = numbers.autoTrack({ clicks: false })
 		history.pushState(null, '', '/one')
 		stop()
+		await settle()
 		expect(sentBodies().map((body) => body.path)).toEqual(['/', '/one'])
 	})
 
-	it('counts outbound links and downloads when asked', () => {
+	it('counts outbound links and downloads when asked', async () => {
 		document.body.innerHTML = `
 			<a id="out" href="https://elsewhere.example/path?q=1">out</a>
 			<a id="file" href="/files/report.pdf">pdf</a>
@@ -409,6 +482,7 @@ describe('autoTrack', () => {
 					new MouseEvent('click', { bubbles: true, cancelable: true }),
 				)
 		stop()
+		await settle()
 		expect(sentBodies()).toMatchObject([
 			{
 				event: 'outbound_click',
@@ -425,7 +499,7 @@ describe('autoTrack', () => {
 		])
 	})
 
-	it('counts a download attribute, and leaves out data: URLs and image links', () => {
+	it('counts a download attribute, and leaves out data: URLs and image links', async () => {
 		document.body.innerHTML = `
 			<a id="named" href="/export" download>export</a>
 			<a id="image" href="/photo.jpg">photo</a>
@@ -444,6 +518,7 @@ describe('autoTrack', () => {
 					new MouseEvent('click', { bubbles: true, cancelable: true }),
 				)
 		stop()
+		await settle()
 		expect(sentBodies()).toMatchObject([
 			{
 				event: 'file_download',
@@ -454,7 +529,7 @@ describe('autoTrack', () => {
 		expect(sentBodies()).toHaveLength(1)
 	})
 
-	it('counts a form_submit, by its data-numbers-id, id or action', () => {
+	it('counts a form_submit, by its data-numbers-id, id or action', async () => {
 		document.body.innerHTML = `
 			<form id="signup" action="/newsletter"></form>
 			<form data-numbers-id="footer_form"></form>`
@@ -468,17 +543,19 @@ describe('autoTrack', () => {
 				new Event('submit', { bubbles: true, cancelable: true }),
 			)
 		stop()
+		await settle()
 		expect(sentBodies()).toMatchObject([
 			{ event: 'form_submit', scope: 'signup' },
 			{ event: 'form_submit', scope: 'footer_form' },
 		])
 	})
 
-	it('sends a form_submit by hand', () => {
+	it('sends a form_submit by hand', async () => {
 		document.body.innerHTML = '<form action="/checkout"></form>'
 		const form = document.querySelector('form') as HTMLFormElement
 		numbersFor().formSubmit(form)
 		numbersFor().formSubmit(form, 'paid_order')
+		await settle()
 		expect(sentBodies()).toMatchObject([
 			{ event: 'form_submit', scope: '/checkout' },
 			{ event: 'form_submit', scope: 'paid_order' },

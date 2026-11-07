@@ -3,8 +3,8 @@
 import { readFileSync } from 'node:fs'
 import { brotliCompressSync, constants } from 'node:zlib'
 
-const MINIFIED_BUDGET = 8 * 1024
-const BROTLI_BUDGET = 3.3 * 1024
+const MINIFIED_BUDGET = 8.5 * 1024
+const BROTLI_BUDGET = 3.5 * 1024
 
 const file = new URL('../dist/script.global.js', import.meta.url)
 let source

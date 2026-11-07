@@ -10,4 +10,4 @@ A leaner client, with the same events:
 - A visitor that already has an id is only written to the legacy `visitorId` cookie when it is missing or stale, not on every page.
 - The dedupe keys and exposures a client remembers are capped at 1000 (oldest out first), so a long session can't grow them without bound.
 
-`dist/script.global.js` is 7.20 kB minified and 3.01 kB brotli, and CI now fails if it passes 8 kB / 3.3 kB.
+`dist/script.global.js` is 7.73 kB minified and 3.23 kB brotli; the budget moves to 8.5 kB / 3.5 kB for the batching code.

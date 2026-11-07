@@ -70,7 +70,14 @@ numbers.track('add_to_cart', 'product_page', {
 numbers.track('view_item', 'list', { dedupeKey: 'sku_1' }) // once per key
 numbers.formSubmit(form, 'newsletter') // or autoTrack({ forms: true })
 numbers.pageView() // by hand, without autoTrack
+numbers.flush() // send what is queued now, instead of on the next microtask
 ```
+
+Events made in the same task go to numbers together: a checkout that tracks
+its items, or a page that reports a list of impressions, is one request of up
+to ten events (and at most 4 KB of JSON) instead of many. Events made in
+different tasks (a page view, then a click) are separate requests, so nothing
+waits to be collected.
 
 `autoTrack({ outbound: true })` sends `outbound_click` for links to another
 site, `downloads: true` sends `file_download` for links to a file, and

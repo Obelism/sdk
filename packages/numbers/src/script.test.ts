@@ -13,6 +13,9 @@ const scriptTag = (attributes: Record<string, string>) => {
 
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>
 
+// The client flushes on a microtask: let it run before the assertions.
+const settle = () => Promise.resolve()
+
 const clearCookies = () => {
 	for (const row of document.cookie.split('; ')) {
 		const name = row.split('=')[0]
@@ -35,7 +38,7 @@ afterEach(() => {
 })
 
 describe('startScript', () => {
-	it('sends a page view to the origin it came from and puts the client on window.numbers', () => {
+	it('sends a page view to the origin it came from and puts the client on window.numbers', async () => {
 		const numbers = startScript(
 			window,
 			scriptTag({
@@ -45,6 +48,7 @@ describe('startScript', () => {
 			}),
 		)
 		expect((window as ScriptWindow).numbers).toBe(numbers)
+		await settle()
 		const [url, init] = fetchMock.mock.calls[0]!
 		expect(url).toBe('https://numbers.obelism.studio/api/log')
 		expect(JSON.parse(String(init!.body))).toMatchObject({
@@ -54,7 +58,7 @@ describe('startScript', () => {
 		})
 	})
 
-	it('defaults to numbers when a CDN serves the file', () => {
+	it('defaults to numbers when a CDN serves the file', async () => {
 		startScript(
 			window,
 			scriptTag({
@@ -62,10 +66,11 @@ describe('startScript', () => {
 				'data-organization': 'org_1',
 			}),
 		)
+		await settle()
 		expect(fetchMock.mock.calls[0]![0]).toBe(DEFAULT_ENDPOINT)
 	})
 
-	it('takes data-space', () => {
+	it('takes data-space', async () => {
 		startScript(
 			window,
 			scriptTag({
@@ -74,11 +79,12 @@ describe('startScript', () => {
 				'data-space': 'space_1',
 			}),
 		)
+		await settle()
 		const [, init] = fetchMock.mock.calls[0]!
 		expect(JSON.parse(String(init!.body)).spaceId).toBe('space_1')
 	})
 
-	it('warns about a data-space it has to drop, with data-debug', () => {
+	it('warns about a data-space it has to drop, with data-debug', async () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 		startScript(
 			window,
@@ -92,6 +98,7 @@ describe('startScript', () => {
 		expect(warn).toHaveBeenCalledWith(
 			expect.stringContaining('data-space "Example Shop"'),
 		)
+		await settle()
 		expect(
 			JSON.parse(String(fetchMock.mock.calls[0]![1]!.body)),
 		).not.toHaveProperty('spaceId')
@@ -139,7 +146,7 @@ describe('startScript', () => {
 		)
 	})
 
-	it('takes data-endpoint, and production by default', () => {
+	it('takes data-endpoint, and production by default', async () => {
 		startScript(
 			window,
 			scriptTag({
@@ -148,6 +155,7 @@ describe('startScript', () => {
 				'data-endpoint': 'https://example.com/e',
 			}),
 		)
+		await settle()
 		const [url, init] = fetchMock.mock.calls[0]!
 		expect(url).toBe('https://example.com/e')
 		expect(JSON.parse(String(init!.body)).environment).toBe('production')

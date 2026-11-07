@@ -103,6 +103,8 @@ export type NumbersClient = {
 	formSubmit: (form: HTMLFormElement, scope?: string) => Sent | null
 	/** Sends a test's or flag's assignment, once per subject per client. */
 	expose: (exposure: Exposure) => Sent | null
+	/** Sends what is queued now instead of on the next microtask. */
+	flush: () => Promise<void>
 	/** Starts automatic tracking; returns a function that stops it. */
 	autoTrack: (options?: AutoTrackOptions) => () => void
 }
@@ -111,6 +113,11 @@ const SNAKE_CASE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/
 
 // How many dedupe keys and exposures one client remembers.
 const MAX_KEYS = 1000
+
+// How many events one request carries, and how big (in JSON characters) a
+// batch may get before it is split.
+const MAX_BATCH_EVENTS = 10
+const MAX_BATCH_CHARS = 4096
 
 const isBrowser = () =>
 	typeof window !== 'undefined' && typeof document !== 'undefined'
@@ -176,26 +183,30 @@ export const createNumbers = ({
 		}
 	}
 
+	// Events made in one task go out together: a page that fires a purchase and
+	// its items, or a list of impressions, sends one request instead of many.
+	// The flush is a microtask, so nothing is delayed to collect a batch.
+	type Pending = {
+		json: string
+		url: string
+		resolve: (response: Response | undefined) => void
+	}
+
+	let pending: Pending[] = []
+	let flushScheduled = false
+
 	// A `keepalive` fetch, so it outlives a navigation. Never rejects.
-	const send = (body: EventBeacon | ExposureBeacon, label: string): Sent => {
-		const serialized = JSON.stringify(body)
-		// The size is only checked to warn about it, and numbers refuses the
-		// body either way: skip the encode when nothing would hear the warning.
-		if (
-			!disableWarnings &&
-			typeof TextEncoder !== 'undefined' &&
-			new TextEncoder().encode(serialized).length > MAX_BODY_BYTES
-		)
-			warn(
-				`size:${label}`,
-				`"${label}" is over ${MAX_BODY_BYTES} bytes and will be refused: trim its \`params\`.`,
-			)
-		return fetch(url, {
+	const post = (items: Pending[]) =>
+		fetch(items[0]!.url, {
 			method: 'POST',
 			// A CORS-safelisted type, so a browser sends the event without a
-			// preflight; numbers parses the body as JSON either way.
+			// preflight; numbers parses the body as JSON either way. A batch is
+			// an array of the same bodies.
 			headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-			body: serialized,
+			body:
+				items.length === 1
+					? items[0]!.json
+					: `[${items.map((item) => item.json).join(',')}]`,
 			keepalive: true,
 		}).then(
 			(response) => {
@@ -205,10 +216,63 @@ export const createNumbers = ({
 						Date.now() +
 						(parseRetryAfterMs(response.headers.get('Retry-After')) ??
 							RATE_LIMIT_COOLDOWN_MS)
-				return response
+				for (const item of items) item.resolve(response)
 			},
-			() => undefined,
+			() => {
+				for (const item of items) item.resolve(undefined)
+			},
 		)
+
+	// Sends what is queued, in chunks that each stay under the body limit.
+	// `json.length` is never more than the UTF-8 size, so the target leaves
+	// room for the byte count of non-ASCII text.
+	const flush = () => {
+		flushScheduled = false
+		if (!pending.length) return Promise.resolve()
+		const batch = pending
+		pending = []
+		const chunks: Pending[][] = []
+		let chunk: Pending[] = []
+		let chars = 2
+		for (const item of batch) {
+			if (
+				chunk.length &&
+				(item.url !== chunk[0]!.url ||
+					chars + item.json.length + 1 > MAX_BATCH_CHARS)
+			) {
+				chunks.push(chunk)
+				chunk = []
+				chars = 2
+			}
+			chunk.push(item)
+			chars += item.json.length + 1
+		}
+		chunks.push(chunk)
+		return Promise.all(chunks.map(post)).then(() => undefined)
+	}
+
+	const send = (body: EventBeacon | ExposureBeacon, label: string): Sent => {
+		const json = JSON.stringify(body)
+		// The size is only checked to warn about it, and numbers refuses the
+		// body either way: skip the encode when nothing would hear the warning.
+		if (
+			!disableWarnings &&
+			typeof TextEncoder !== 'undefined' &&
+			new TextEncoder().encode(json).length > MAX_BODY_BYTES
+		)
+			warn(
+				`size:${label}`,
+				`"${label}" is over ${MAX_BODY_BYTES} bytes and will be refused: trim its \`params\`.`,
+			)
+		const sent = new Promise<Response | undefined>((resolve) =>
+			pending.push({ json, url, resolve }),
+		)
+		if (pending.length >= MAX_BATCH_EVENTS) void flush()
+		else if (!flushScheduled) {
+			flushScheduled = true
+			queueMicrotask(() => void flush())
+		}
+		return sent
 	}
 
 	const paused = () => Date.now() < pausedUntil
@@ -423,6 +487,7 @@ export const createNumbers = ({
 		pageView,
 		formSubmit,
 		expose,
+		flush,
 		autoTrack,
 	}
 }
