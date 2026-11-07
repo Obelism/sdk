@@ -20,6 +20,10 @@
 		"test:ci": {
 			"dependsOn": ["^build"]
 		},
+		"size": {
+			"dependsOn": ["build"],
+			"outputs": []
+		},
 		"clean": {}
 	}
 }

@@ -48,7 +48,7 @@ export type AutoTrackOptions = {
 
 // Documents, archives and media, not images a browser shows inline (a link
 // with `download` still counts, whatever it points at).
-const DOWNLOAD_EXTENSIONS = [
+const DOWNLOAD_EXTENSIONS = new Set([
 	'7z',
 	'avi',
 	'csv',
@@ -69,13 +69,11 @@ const DOWNLOAD_EXTENSIONS = [
 	'xlsx',
 	'xml',
 	'zip',
-]
+])
 
 const isDownload = (url: URL, link: HTMLAnchorElement) =>
 	link.hasAttribute('download') ||
-	DOWNLOAD_EXTENSIONS.includes(
-		url.pathname.split('.').pop()?.toLowerCase() ?? '',
-	)
+	DOWNLOAD_EXTENSIONS.has(url.pathname.split('.').pop()?.toLowerCase() ?? '')
 
 /** What a send resolves to: the response, or nothing when it failed. */
 export type Sent = Promise<Response | undefined>
@@ -111,6 +109,9 @@ export type NumbersClient = {
 
 const SNAKE_CASE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/
 
+// How many dedupe keys and exposures one client remembers.
+const MAX_KEYS = 1000
+
 const isBrowser = () =>
 	typeof window !== 'undefined' && typeof document !== 'undefined'
 
@@ -136,6 +137,12 @@ export const createNumbers = ({
 	const sentKeys = new Set<string>()
 	const exposed = new Set<string>()
 	const warned = new Set<string>()
+
+	const remember = (set: Set<string>, key: string) => {
+		// Oldest first: a long session with many keys keeps only the recent ones.
+		if (set.size >= MAX_KEYS) set.delete(set.values().next().value!)
+		set.add(key)
+	}
 
 	const warn = (key: string, message: string) => {
 		if (disableWarnings || warned.has(key)) return
@@ -172,8 +179,10 @@ export const createNumbers = ({
 	// A `keepalive` fetch, so it outlives a navigation. Never rejects.
 	const send = (body: EventBeacon | ExposureBeacon, label: string): Sent => {
 		const serialized = JSON.stringify(body)
+		// The size is only checked to warn about it, and numbers refuses the
+		// body either way: skip the encode when nothing would hear the warning.
 		if (
-			typeof TextEncoder !== 'undefined' &&
+			!disableWarnings &&
 			new TextEncoder().encode(serialized).length > MAX_BODY_BYTES
 		)
 			warn(
@@ -216,7 +225,7 @@ export const createNumbers = ({
 		if (dedupeKey !== undefined) {
 			const key = `${event}:${dedupeKey}`
 			if (sentKeys.has(key)) return null
-			sentKeys.add(key)
+			remember(sentKeys, key)
 		}
 
 		const body: EventBeacon = {
@@ -237,7 +246,7 @@ export const createNumbers = ({
 
 	const track: NumbersClient['track'] = (event, scope, options = {}) => {
 		if (!isBrowser()) return null
-		if (!SNAKE_CASE.test(event))
+		if (!disableWarnings && !SNAKE_CASE.test(event))
 			warn(
 				`name:${event}`,
 				`"${event}" isn't snake_case. Prefer GA4-style names like "add_to_cart" or "sign_up"; \`disableWarnings: true\` silences this.`,
@@ -274,7 +283,7 @@ export const createNumbers = ({
 		if (!current || paused()) return null
 		const key = `${exposure.subjectKind}:${exposure.subjectId}`
 		if (exposed.has(key)) return null
-		exposed.add(key)
+		remember(exposed, key)
 		return send({ ...common('exposure', current), ...exposure }, key)
 	}
 
@@ -319,22 +328,18 @@ export const createNumbers = ({
 			onNavigate()
 		}
 
-		if (clicks) {
-			// Captured, so a handler that stops the click still counts it.
+		if (clicks || outbound || downloads) {
+			// One listener for both kinds of click, captured so a handler that
+			// stops the click still counts it.
 			const onClick = (event: MouseEvent) => {
 				const target = event.target as Element | null
-				const id = target
-					?.closest?.('[data-numbers-id]')
-					?.getAttribute('data-numbers-id')
-				if (id) track('click', id)
-			}
-			document.addEventListener('click', onClick, true)
-			stops.push(() => document.removeEventListener('click', onClick, true))
-		}
-
-		if (outbound || downloads) {
-			const onLinkClick = (event: MouseEvent) => {
-				const target = event.target as Element | null
+				if (clicks) {
+					const id = target
+						?.closest?.('[data-numbers-id]')
+						?.getAttribute('data-numbers-id')
+					if (id) track('click', id)
+				}
+				if (!outbound && !downloads) return
 				const link = target?.closest?.('a[href]') as HTMLAnchorElement | null
 				if (!link) return
 				let url: URL
@@ -375,8 +380,8 @@ export const createNumbers = ({
 						id ? undefined : { params: { link_domain: url.hostname } },
 					)
 			}
-			document.addEventListener('click', onLinkClick, true)
-			stops.push(() => document.removeEventListener('click', onLinkClick, true))
+			document.addEventListener('click', onClick, true)
+			stops.push(() => document.removeEventListener('click', onClick, true))
 		}
 
 		if (forms) {
