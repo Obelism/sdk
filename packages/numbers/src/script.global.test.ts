@@ -20,6 +20,9 @@ import type { ScriptWindow } from './script'
 let code: string
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>
 
+// The client flushes on a microtask: let it run before the assertions.
+const settle = () => Promise.resolve()
+
 beforeAll(async () => {
 	const output = Array.isArray(scriptConfig.output)
 		? scriptConfig.output[0]!
@@ -58,13 +61,14 @@ const bodies = () =>
 	fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init!.body)))
 
 describe('dist/script.global.js', () => {
-	it('sends a page view to /api/log on the host it is served from', () => {
+	it('sends a page view to /api/log on the host it is served from', async () => {
 		expect(
 			run({
 				src: 'https://numbers.obelism.studio/script.js',
 				'data-organization': 'org_1',
 			}),
 		).toBeDefined()
+		await settle()
 		const [url] = fetchMock.mock.calls[0]!
 		expect(url).toBe('https://numbers.obelism.studio/api/log')
 		expect(bodies()[0]).toMatchObject({
@@ -74,20 +78,22 @@ describe('dist/script.global.js', () => {
 		})
 	})
 
-	it('sends to the origin that served it locally', () => {
+	it('sends to the origin that served it locally', async () => {
 		run({
 			src: 'http://localhost:8790/script.js',
 			'data-organization': 'org_1',
 		})
+		await settle()
 		expect(fetchMock.mock.calls[0]![0]).toBe('http://localhost:8790/api/log')
 	})
 
-	it('takes data-endpoint, and production by default', () => {
+	it('takes data-endpoint, and production by default', async () => {
 		run({
 			src: 'https://numbers.obelism.studio/script.js',
 			'data-organization': 'org_1',
 			'data-endpoint': 'https://example.com/e',
 		})
+		await settle()
 		expect(fetchMock.mock.calls[0]![0]).toBe('https://example.com/e')
 		expect(bodies()[0].environment).toBe('production')
 	})

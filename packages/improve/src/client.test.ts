@@ -33,11 +33,17 @@ const config: ImproveConfiguration = {
 
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>
 
+// The numbers client batches the events of one task into an array.
 const sent = () =>
-	fetchMock.mock.calls.map(([url, init]) => ({
-		url,
-		body: JSON.parse(String(init!.body)),
-	}))
+	fetchMock.mock.calls.flatMap(([url, init]) => {
+		const body = JSON.parse(String(init!.body))
+		return (Array.isArray(body) ? body : [body]).map((item) => ({
+			url,
+			body: item,
+		}))
+	})
+
+const settle = () => Promise.resolve()
 
 const createSdk = (
 	args: Partial<ConstructorParameters<typeof ImproveClientSDK>[0]> = {},
@@ -67,11 +73,12 @@ afterEach(() => {
 })
 
 describe('ImproveClientSDK through the numbers SDK', () => {
-	test('sends exposures and events to numbers, as the cookie’s visitor with the audience categories', () => {
+	test('sends exposures and events to numbers, as the cookie’s visitor with the audience categories', async () => {
 		const sdk = createSdk()
 		expect(sdk.getTestValue('hero')).toBe('b')
 		sdk.postAnalytic('sign_up', 'hero', { value: 10, currency: 'EUR' })
 
+		await settle()
 		expect(sent()).toMatchObject([
 			{
 				url: 'https://numbers.obelism.studio/api/log',
@@ -106,7 +113,7 @@ describe('ImproveClientSDK through the numbers SDK', () => {
 		])
 	})
 
-	test('sends an event once per name, or once per dedupeKey', () => {
+	test('sends an event once per name, or once per dedupeKey', async () => {
 		const sdk = createSdk()
 		sdk.postAnalytic('page_view', '/')
 		expect(sdk.postAnalytic('page_view', '/')).toBeNull()
@@ -115,6 +122,7 @@ describe('ImproveClientSDK through the numbers SDK', () => {
 		expect(
 			sdk.postAnalytic('view_item', 'list', { dedupeKey: 'sku_1' }),
 		).toBeNull()
+		await settle()
 		expect(sent().map(({ body }) => body.event)).toEqual([
 			'page_view',
 			'view_item',
@@ -144,11 +152,12 @@ describe('ImproveClientSDK through the numbers SDK', () => {
 		expect(window.dataLayer).toEqual([])
 	})
 
-	test('keeps a custom baseUrl’s /api/log, and follows setAnalyticsUrls', () => {
+	test('keeps a custom baseUrl’s /api/log, and follows setAnalyticsUrls', async () => {
 		const sdk = createSdk({ baseUrl: 'http://localhost:8788' })
 		sdk.postAnalytic('one', 'x')
 		sdk.setAnalyticsUrls('https://example.com/proxy')
 		sdk.postAnalytic('two', 'x')
+		await settle()
 		expect(sent().map(({ url }) => url)).toEqual([
 			'http://localhost:8788/api/log',
 			'https://example.com/proxy',
