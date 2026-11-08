@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest'
 
 import { ImproveServerSDK } from './server'
+import { parseUserAgent } from './utils/parseUserAgent'
 import { ImproveConfiguration } from './types'
 
 type CountObject = {
@@ -177,4 +178,241 @@ test('keeps a bounded number of user agents per visitor', () => {
 		'variation',
 	)
 	random.mockRestore()
+})
+
+const seedNames = ({
+	cookies,
+}: ReturnType<ImproveServerSDK['seedTestCookies']>) =>
+	cookies.map(({ name }) => name)
+
+test('seedTestCookies seeds the visitor and a cookie per test and flag', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: FLAG_CONFIG,
+	})
+	const seed = sdk.seedTestCookies({ userAgent: UA, maxAgeDays: 7 })
+
+	expect(seedNames(seed).sort()).toEqual(
+		['new-checkout', 'obelism_visitor_id', 'startpage-visual'].sort(),
+	)
+	expect(
+		seed.cookies.every(({ header }) =>
+			header.endsWith('; Path=/; Max-Age=604800; SameSite=Lax; Secure'),
+		),
+	).toBe(true)
+
+	const test = seed.assignments.find(({ slug }) => slug === 'startpage-visual')
+	expect(test).toMatchObject({ kind: 'test', included: true })
+	expect(['control', 'variation']).toContain(test?.value)
+	expect(
+		seed.assignments.find(({ slug }) => slug === 'new-checkout'),
+	).toMatchObject({ kind: 'flag', value: 'on', included: true })
+	expect(seed.assignments).toHaveLength(2)
+})
+
+test('seedTestCookies keeps the cookies a visitor already has', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: FLAG_CONFIG,
+	})
+	const visitorId = sdk.generateVisitorId()
+	const seed = sdk.seedTestCookies({
+		userAgent: UA,
+		cookieHeader: `obelism_visitor_id=${visitorId}; startpage-visual=variation; new-checkout=off`,
+	})
+
+	expect(seed.visitorId).toBe(visitorId)
+	expect(seed.cookies).toEqual([])
+	expect(seed.assignments).toContainEqual({
+		slug: 'startpage-visual',
+		kind: 'test',
+		value: 'variation',
+		included: true,
+	})
+	expect(seed.assignments).toContainEqual({
+		slug: 'new-checkout',
+		kind: 'flag',
+		value: 'off',
+		included: true,
+	})
+})
+
+test('seedTestCookies migrates the legacy visitor cookie', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: FLAG_CONFIG,
+	})
+	const visitorId = sdk.generateVisitorId()
+	const seed = sdk.seedTestCookies({
+		userAgent: UA,
+		cookieHeader: `visitorId=${visitorId}`,
+	})
+
+	expect(seed.visitorId).toBe(visitorId)
+	expect(seed.cookies).toContainEqual(
+		expect.objectContaining({ name: 'obelism_visitor_id', value: visitorId }),
+	)
+})
+
+test('seedTestCookies leaves a visitor out of a test, with the default option', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: {
+			...TEST_CONFIG,
+			tests: {
+				'startpage-visual': {
+					...TEST_CONFIG.tests['startpage-visual']!,
+					allocation: 0,
+				},
+			},
+		},
+	})
+	const random = vi.spyOn(Math, 'random')
+	random.mockReturnValue(0.99)
+
+	const first = sdk.seedTestCookies({ userAgent: UA })
+	expect(seedNames(first)).toEqual(['obelism_visitor_id'])
+	expect(first.assignments).toContainEqual({
+		slug: 'startpage-visual',
+		kind: 'test',
+		value: 'control',
+		included: false,
+	})
+
+	// Remembered as out, so a second request doesn't roll for them.
+	const second = sdk.seedTestCookies({
+		userAgent: UA,
+		cookieHeader: `obelism_visitor_id=${first.visitorId}`,
+	})
+	expect(seedNames(second)).toEqual([])
+	expect(second.assignments).toContainEqual({
+		slug: 'startpage-visual',
+		kind: 'test',
+		value: 'control',
+		included: false,
+	})
+	random.mockRestore()
+})
+
+test('seedTestCookies replaces a cookie naming an option the block no longer has', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: FLAG_CONFIG,
+	})
+	const visitorId = sdk.generateVisitorId()
+	const seed = sdk.seedTestCookies({
+		userAgent: UA,
+		cookieHeader: `obelism_visitor_id=${visitorId}; startpage-visual=gone`,
+	})
+
+	const cookie = seed.cookies.find(({ name }) => name === 'startpage-visual')
+	expect(cookie?.value).not.toBe('gone')
+	expect(
+		seed.assignments.find(({ slug }) => slug === 'startpage-visual'),
+	).toMatchObject({ included: true })
+})
+
+test('seedTestCookies seeds nothing for a visitor without a user agent', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: TEST_CONFIG,
+	})
+	const seed = sdk.seedTestCookies({ userAgent: '' })
+
+	expect(seedNames(seed)).toEqual(['obelism_visitor_id'])
+	expect(seed.assignments).toEqual([
+		{
+			slug: 'startpage-visual',
+			kind: 'test',
+			value: 'control',
+			included: false,
+		},
+	])
+})
+
+test('seedTestCookies needs a config', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		token: 'imp_test',
+	})
+	expect(() => sdk.seedTestCookies({ userAgent: UA })).toThrow(
+		'Config is required before seeding',
+	)
+})
+
+test('seedTestCookies follows the audience, and the country it is given', () => {
+	const params = parseUserAgent(UA)!
+	const config: ImproveConfiguration = {
+		...TEST_CONFIG,
+		audience: {
+			matching: {
+				pointer: params.pointer,
+				device: params.device,
+				browser: params.browser,
+				os: params.os,
+				country: 'NL',
+			},
+		},
+		tests: {
+			'startpage-visual': {
+				...TEST_CONFIG.tests['startpage-visual']!,
+				audience: 'matching',
+			},
+		},
+	}
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config,
+	})
+
+	const outside = sdk.seedTestCookies({
+		userAgent: UA,
+		geo: { country: 'US' },
+	})
+	expect(seedNames(outside)).toEqual(['obelism_visitor_id'])
+	expect(outside.assignments).toContainEqual({
+		slug: 'startpage-visual',
+		kind: 'test',
+		value: 'control',
+		included: false,
+	})
+
+	const inside = sdk.seedTestCookies({
+		userAgent: UA,
+		geo: { country: 'NL' },
+		cookieHeader: `obelism_visitor_id=${outside.visitorId}`,
+	})
+	expect(seedNames(inside)).toContain('startpage-visual')
+	expect(inside.assignments).toContainEqual(
+		expect.objectContaining({ slug: 'startpage-visual', included: true }),
+	)
+})
+
+test('seedTestCookies does not echo a visitor id it would not mint', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: TEST_CONFIG,
+	})
+	// 26 characters, so it passes the id check, but not the alphabet.
+	const crafted = `visi_${'A'.repeat(24)};;`
+	const seed = sdk.seedTestCookies({
+		userAgent: UA,
+		cookieHeader: `obelism_visitor_id=${crafted}`,
+	})
+
+	expect(seed.visitorId).not.toBe(crafted)
+	expect(sdk.validateVisitorId(seed.visitorId)).toBe(true)
+	expect(seed.cookies[0]).toMatchObject({
+		name: 'obelism_visitor_id',
+		kind: 'visitor',
+	})
 })
