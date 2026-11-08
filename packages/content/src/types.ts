@@ -134,6 +134,11 @@ export type ImproveBlock<TBlock extends Block = Block> = Block<
 	{
 		kind: 'test' | 'flag'
 		slug: string
+		// The option a visitor who isn't in the test or flag sees, written when
+		// the entry is published: the test's default, or a flag's first option.
+		// Absent from a draft, and from an entry published before Content set
+		// it; pickImproveVariant then takes the first variant.
+		fallback?: string
 		variants: Record<string, TBlock[]>
 	},
 	'_improve'

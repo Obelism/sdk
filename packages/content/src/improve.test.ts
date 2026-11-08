@@ -30,6 +30,14 @@ describe('pickImproveVariant', () => {
 		)
 	})
 
+	it("falls back to the block's own fallback without being told", () => {
+		const withFallback = { ...block, fallback: 'bolder-copy' }
+		expect(pickImproveVariant(withFallback, null)[0]?._uid).toBe('b')
+		expect(pickImproveVariant(withFallback, 'unknown')[0]?._uid).toBe('b')
+		// A caller's own fallback still wins.
+		expect(pickImproveVariant(withFallback, null, 'control')[0]?._uid).toBe('a')
+	})
+
 	it('tells the block apart from others', () => {
 		expect(isImproveBlock(block)).toBe(true)
 		expect(isImproveBlock({ _uid: 'x', _type: 'hero' })).toBe(false)
