@@ -184,6 +184,43 @@ describe('track', () => {
 		expect(sentBodies()[2]).not.toHaveProperty('dedupeKey')
 	})
 
+	it('reads the page context again after a navigation', () => {
+		const numbers = numbersFor()
+		history.replaceState(null, '', '/one?utm_source=first')
+		numbers.track('one', 'x')
+		history.replaceState(null, '', '/two?utm_source=second')
+		numbers.track('two', 'x')
+		expect(sentBodies().map((body) => [body.path, body.utmSource])).toEqual([
+			['/one', 'first'],
+			['/two', 'second'],
+		])
+	})
+
+	it('remembers the last thousand dedupe keys, and no more', () => {
+		const numbers = numbersFor()
+		for (let index = 0; index <= 1000; index++)
+			numbers.track('view_item', 'list', { dedupeKey: `sku_${index}` })
+		expect(
+			numbers.track('view_item', 'list', { dedupeKey: 'sku_1000' }),
+		).toBeNull()
+		// The first is the one that fell out of the window.
+		expect(
+			numbers.track('view_item', 'list', { dedupeKey: 'sku_0' }),
+		).not.toBeNull()
+	})
+
+	it('remembers the last thousand exposures, and no more', () => {
+		const numbers = numbersFor()
+		const exposure = (index: number) => ({
+			subjectKind: 'test' as const,
+			subjectId: `test_${index}`,
+			variant: 'a',
+		})
+		for (let index = 0; index <= 1000; index++) numbers.expose(exposure(index))
+		expect(numbers.expose(exposure(1000))).toBeNull()
+		expect(numbers.expose(exposure(0))).not.toBeNull()
+	})
+
 	it('pauses after a 429 for its Retry-After', async () => {
 		vi.useFakeTimers({ now: 0, toFake: ['Date'] })
 		fetchMock.mockResolvedValueOnce(

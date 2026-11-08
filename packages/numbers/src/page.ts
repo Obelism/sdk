@@ -4,19 +4,30 @@ import type { PageContext } from './types'
 const utm = (params: URLSearchParams, name: string) =>
 	params.get(name)?.slice(0, MAX_FIELD_LENGTH) || undefined
 
+// Events come in bursts on one page, so the context is worked out once per
+// path and query string and shared until the URL changes. Callers copy it
+// into a beacon; none of them mutate it.
+let contextKey: string | undefined
+let pageContext: PageContext | undefined
+
 // The page now: its path (without the query string, which numbers drops too)
 // and the UTM tags.
 export const getPageContext = (): PageContext => {
-	const params = new URLSearchParams(location.search)
-	const context: PageContext = {
-		path: location.pathname.slice(0, MAX_URL_LENGTH),
+	const { pathname, search } = location
+	const key = `${pathname}${search}`
+	if (key === contextKey) return pageContext!
+	const context: PageContext = { path: pathname.slice(0, MAX_URL_LENGTH) }
+	if (search) {
+		const params = new URLSearchParams(search)
+		const utmSource = utm(params, 'utm_source')
+		const utmMedium = utm(params, 'utm_medium')
+		const utmCampaign = utm(params, 'utm_campaign')
+		if (utmSource) context.utmSource = utmSource
+		if (utmMedium) context.utmMedium = utmMedium
+		if (utmCampaign) context.utmCampaign = utmCampaign
 	}
-	const utmSource = utm(params, 'utm_source')
-	const utmMedium = utm(params, 'utm_medium')
-	const utmCampaign = utm(params, 'utm_campaign')
-	if (utmSource) context.utmSource = utmSource
-	if (utmMedium) context.utmMedium = utmMedium
-	if (utmCampaign) context.utmCampaign = utmCampaign
+	contextKey = key
+	pageContext = context
 	return context
 }
 

@@ -38,6 +38,7 @@
 		"test": "vitest",
 		"test:coverage": "vitest run --coverage",
 		"test:ci": "vitest run",
+		"size": "node scripts/size.mjs",
 		"lint": "npm-run-all --parallel lint:*",
 		"lint:oxlint": "oxlint",
 		"lint:types": "tsc --noEmit",

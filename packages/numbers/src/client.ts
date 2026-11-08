@@ -48,7 +48,7 @@ export type AutoTrackOptions = {
 
 // Documents, archives and media, not images a browser shows inline (a link
 // with `download` still counts, whatever it points at).
-const DOWNLOAD_EXTENSIONS = [
+const DOWNLOAD_EXTENSIONS = new Set([
 	'7z',
 	'avi',
 	'csv',
@@ -69,13 +69,11 @@ const DOWNLOAD_EXTENSIONS = [
 	'xlsx',
 	'xml',
 	'zip',
-]
+])
 
 const isDownload = (url: URL, link: HTMLAnchorElement) =>
 	link.hasAttribute('download') ||
-	DOWNLOAD_EXTENSIONS.includes(
-		url.pathname.split('.').pop()?.toLowerCase() ?? '',
-	)
+	DOWNLOAD_EXTENSIONS.has(url.pathname.split('.').pop()?.toLowerCase() ?? '')
 
 /** What a send resolves to: the response, or nothing when it failed. */
 export type Sent = Promise<Response | undefined>
@@ -111,6 +109,9 @@ export type NumbersClient = {
 
 const SNAKE_CASE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/
 
+// How many dedupe keys and exposures one client remembers.
+const MAX_KEYS = 1000
+
 const isBrowser = () =>
 	typeof window !== 'undefined' && typeof document !== 'undefined'
 
@@ -136,6 +137,12 @@ export const createNumbers = ({
 	const sentKeys = new Set<string>()
 	const exposed = new Set<string>()
 	const warned = new Set<string>()
+
+	const rememberKey = (set: Set<string>, key: string) => {
+		// Oldest first: a long session with many keys keeps only the recent ones.
+		if (set.size >= MAX_KEYS) set.delete(set.values().next().value!)
+		set.add(key)
+	}
 
 	const warn = (key: string, message: string) => {
 		if (disableWarnings || warned.has(key)) return
@@ -172,7 +179,10 @@ export const createNumbers = ({
 	// A `keepalive` fetch, so it outlives a navigation. Never rejects.
 	const send = (body: EventBeacon | ExposureBeacon, label: string): Sent => {
 		const serialized = JSON.stringify(body)
+		// The size is only checked to warn about it, and numbers refuses the
+		// body either way: skip the encode when nothing would hear the warning.
 		if (
+			!disableWarnings &&
 			typeof TextEncoder !== 'undefined' &&
 			new TextEncoder().encode(serialized).length > MAX_BODY_BYTES
 		)
@@ -216,7 +226,7 @@ export const createNumbers = ({
 		if (dedupeKey !== undefined) {
 			const key = `${event}:${dedupeKey}`
 			if (sentKeys.has(key)) return null
-			sentKeys.add(key)
+			rememberKey(sentKeys, key)
 		}
 
 		const body: EventBeacon = {
@@ -237,7 +247,7 @@ export const createNumbers = ({
 
 	const track: NumbersClient['track'] = (event, scope, options = {}) => {
 		if (!isBrowser()) return null
-		if (!SNAKE_CASE.test(event))
+		if (!disableWarnings && !SNAKE_CASE.test(event))
 			warn(
 				`name:${event}`,
 				`"${event}" isn't snake_case. Prefer GA4-style names like "add_to_cart" or "sign_up"; \`disableWarnings: true\` silences this.`,
@@ -274,7 +284,7 @@ export const createNumbers = ({
 		if (!current || paused()) return null
 		const key = `${exposure.subjectKind}:${exposure.subjectId}`
 		if (exposed.has(key)) return null
-		exposed.add(key)
+		rememberKey(exposed, key)
 		return send({ ...common('exposure', current), ...exposure }, key)
 	}
 
@@ -319,64 +329,66 @@ export const createNumbers = ({
 			onNavigate()
 		}
 
-		if (clicks) {
-			// Captured, so a handler that stops the click still counts it.
+		// A click on a link to another site or a file, scoped to its tag, its
+		// destination or its name.
+		const trackLink = (target: Element) => {
+			const link = target.closest?.('a[href]') as HTMLAnchorElement | null
+			if (!link) return
+			let url: URL
+			try {
+				url = new URL(link.href, location.href)
+			} catch {
+				return
+			}
+			// Only http(s): a data: URL's path is its whole payload, and
+			// mailto:/tel: aren't destinations.
+			if (!/^https?:$/.test(url.protocol)) return
+			const id = link
+				.closest('[data-numbers-id]')
+				?.getAttribute('data-numbers-id')
+			const fileName = url.pathname.split('/').pop() || url.pathname
+			const extension = fileName.includes('.')
+				? fileName.split('.').pop()!.toLowerCase()
+				: ''
+			if (downloads && isDownload(url, link))
+				track(
+					'file_download',
+					id ?? fileName,
+					id
+						? undefined
+						: {
+								params: {
+									file_name: extension
+										? fileName.slice(0, -(extension.length + 1))
+										: fileName,
+									...(extension && { file_extension: extension }),
+								},
+							},
+				)
+			else if (outbound && url.origin !== location.origin)
+				track(
+					'outbound_click',
+					id ?? `${url.origin}${url.pathname}`,
+					id ? undefined : { params: { link_domain: url.hostname } },
+				)
+		}
+
+		if (clicks || outbound || downloads) {
+			// One listener for both kinds of click, captured so a handler that
+			// stops the click still counts it.
 			const onClick = (event: MouseEvent) => {
 				const target = event.target as Element | null
-				const id = target
-					?.closest?.('[data-numbers-id]')
-					?.getAttribute('data-numbers-id')
-				if (id) track('click', id)
+				if (!target) return
+				if (clicks) {
+					const id = target
+						.closest?.('[data-numbers-id]')
+						?.getAttribute('data-numbers-id')
+					if (id) track('click', id)
+				}
+				if (outbound || downloads) trackLink(target)
 			}
 			document.addEventListener('click', onClick, true)
 			stops.push(() => document.removeEventListener('click', onClick, true))
-		}
-
-		if (outbound || downloads) {
-			const onLinkClick = (event: MouseEvent) => {
-				const target = event.target as Element | null
-				const link = target?.closest?.('a[href]') as HTMLAnchorElement | null
-				if (!link) return
-				let url: URL
-				try {
-					url = new URL(link.href, location.href)
-				} catch {
-					return
-				}
-				// Only http(s): a data: URL's path is its whole payload, and
-				// mailto:/tel: aren't destinations.
-				if (!/^https?:$/.test(url.protocol)) return
-				const id = link
-					.closest('[data-numbers-id]')
-					?.getAttribute('data-numbers-id')
-				const fileName = url.pathname.split('/').pop() || url.pathname
-				const extension = fileName.includes('.')
-					? fileName.split('.').pop()!.toLowerCase()
-					: ''
-				if (downloads && isDownload(url, link))
-					track(
-						'file_download',
-						id ?? fileName,
-						id
-							? undefined
-							: {
-									params: {
-										file_name: extension
-											? fileName.slice(0, -(extension.length + 1))
-											: fileName,
-										...(extension && { file_extension: extension }),
-									},
-								},
-					)
-				else if (outbound && url.origin !== location.origin)
-					track(
-						'outbound_click',
-						id ?? `${url.origin}${url.pathname}`,
-						id ? undefined : { params: { link_domain: url.hostname } },
-					)
-			}
-			document.addEventListener('click', onLinkClick, true)
-			stops.push(() => document.removeEventListener('click', onLinkClick, true))
 		}
 
 		if (forms) {

@@ -76,10 +76,13 @@ const writeStoredVisitor = (storage: 'cookie' | 'session', id: string) => {
 		return
 	}
 	writeCookie(VISITOR_COOKIE, id)
-	// Write the old cookie too, for a deprecation window: a site that still
+	// Keep the old cookie in step, for a deprecation window: a site that still
 	// runs an older improve SDK reads only `visitorId` and would mint a second
-	// id for the same person. Drop this with the legacy read.
-	writeCookie(LEGACY_VISITOR_COOKIE, id)
+	// id for the same person. Drop this with the legacy read. Only write it
+	// when it is missing or stale, so a returning visitor costs one cookie
+	// write instead of two.
+	if (readCookie(LEGACY_VISITOR_COOKIE) !== id)
+		writeCookie(LEGACY_VISITOR_COOKIE, id)
 }
 
 // The visitor in its storage, or a new one; either way it is written again, so

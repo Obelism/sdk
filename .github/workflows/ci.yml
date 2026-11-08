@@ -25,4 +25,4 @@ jobs:
         run: npm run format:check
 
       - name: Build, lint and test
-        run: npx turbo run build lint test:ci
+        run: npx turbo run build lint test:ci size
