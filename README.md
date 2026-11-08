@@ -32,7 +32,6 @@ a site and A/B test a block. See [its README](plugin/README.md).
 - `improve-hono`: a Hono app with the improve server SDK; [preview](https://hono.improve.obelism.studio)
 - `improve-react`: a React app with the improve React SDK; [preview](https://react.improve.obelism.studio)
 - `improve-nextjs`: a Next.js app with the improve Next.js and React SDK; [preview](https://nextjs.improve.obelism.studio)
-- `improve-nextjs-vercel`: the same with Vercel Edge Config; [preview](https://nextjs-vercel.improve.obelism.studio)
 - `improve-nextjs-rsc`: resolving the variant in a React Server Component; [preview](https://nextjs-rsc.improve.obelism.studio)
 - `content-nextjs`: a Next.js site with the Content SDKs and live preview in the visual editor
 
