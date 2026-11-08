@@ -12,11 +12,16 @@ import type { ParsedUserAgent } from './utils/parseUserAgent'
 export type Visitor = {
 	params: ParsedUserAgent
 	assigned: Map<string, string>
+	// The subjects a visitor was left out of, which are remembered so a later
+	// call doesn't roll again. Kept apart from `assigned` so the source stays
+	// `default`: a holdout is not in the test.
+	heldOut: Set<string>
 }
 
 export const createVisitor = (params: ParsedUserAgent): Visitor => ({
 	params,
 	assigned: new Map(),
+	heldOut: new Set(),
 })
 
 // A test or flag as the decision needs it.
@@ -70,10 +75,20 @@ export const assign = (
 	if (!visitor) return { value: subject.fallback, source: 'default' }
 
 	const assigned = visitor.assigned.get(subject.slug)
-	if (assigned !== undefined) return { value: assigned, source: 'visitor' }
+	// A value that outlived its option (the datafile changed under a live
+	// visitor) is not theirs any more.
+	if (
+		assigned !== undefined &&
+		subject.options.some(({ slug }) => slug === assigned)
+	)
+		return {
+			value: assigned,
+			source: visitor.heldOut.has(subject.slug) ? 'default' : 'visitor',
+		}
 
 	if (known && subject.options.some(({ slug }) => slug === known)) {
 		visitor.assigned.set(subject.slug, known)
+		visitor.heldOut.delete(subject.slug)
 		return { value: known, source: 'cookie' }
 	}
 
@@ -85,6 +100,7 @@ export const assign = (
 	if (subject.allocation < 100 && Math.random() * 100 > subject.allocation) {
 		if (subject.fallback !== null) {
 			visitor.assigned.set(subject.slug, subject.fallback)
+			visitor.heldOut.add(subject.slug)
 		}
 		return { value: subject.fallback, source: 'default' }
 	}
@@ -93,5 +109,6 @@ export const assign = (
 	if (!value) return { value: null, source: 'none' }
 
 	visitor.assigned.set(subject.slug, value)
+	visitor.heldOut.delete(subject.slug)
 	return { value, source: 'new' }
 }
