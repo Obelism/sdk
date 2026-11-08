@@ -108,10 +108,6 @@ The SDK communicates with two endpoints (see `packages/improve/src/config/urls.t
 - **Analytics/Events** — conversion tracking events posted to the API, tied to test slugs. Conversion rate = visitors reaching the goal / total visitors.
 - **Environments** — `develop`, `staging`, `production`. Each has its own config from the API.
 
-### Vercel Edge Config Integration
-
-Optional integration syncs the datafile to Vercel Edge Config (`@vercel/edge-config`) for edge-optimized middleware. The store is named `obelism_improve_{organisation}`. Only active tests/flags/audiences are synced; draft tests load directly from the API.
-
 ## Content (`packages/content`, `content-react`)
 
 - `packages/content` → `@obelism/content`
