@@ -6,24 +6,27 @@ import {
 	getRequestHeader,
 	type H3Event,
 	setCookie,
+	setResponseHeader,
 } from 'h3'
 
 import { extendedBotCheck } from './extendedBotCheck'
-
-export type CookieOptions = NonNullable<Parameters<typeof setCookie>[3]>
 import { matchesRoute } from './matchesRoute'
 
 const DEFAULT_COOKIE_TTL = 60 * 60 * 24 * 7
+// The cookie is echoed back, so only an id of the alphabet the SDK mints, as
+// in the server SDK's seedTestCookies.
+const SAFE_ID = /^[A-Za-z0-9_-]+$/
 
 // The crawlers Next's `userAgent().isBot` knows, which improve-next relies on.
 const CRAWLERS =
 	/Googlebot|Mediapartners-Google|AdsBot-Google|googleweblight|Storebot-Google|Google-PageRenderer|Google-InspectionTool|Bingbot|BingPreview|Slurp|DuckDuckBot|baiduspider|yandex|sogou|LinkedInBot|bitlybot|tumblr|vkShare|quora link preview|facebookexternalhit|facebookcatalog|Twitterbot|applebot|redditbot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|ia_archiver|GPTBot/i
 
+export type CookieOptions = NonNullable<Parameters<typeof setCookie>[3]>
+
 export type ServerABTestConfig = {
 	// Needs to match an A/B test in Improve.
 	slug: string
-	// The page route to decide it on, as Nuxt names it: `/`, `/products/[id]`,
-	// `/blog/[...slug]`.
+	// The page route to decide it on: `/`, `/products/[id]`, `/blog/[...slug]`.
 	routeHandler: string
 }
 
@@ -38,7 +41,7 @@ export type GenerateImproveNuxtMiddlewareArgs = {
 		| undefined
 }
 
-// The variants decided for this request, by test slug.
+// By test slug.
 export type ImproveEventContext = Record<string, string>
 
 declare module 'h3' {
@@ -47,21 +50,43 @@ declare module 'h3' {
 	}
 }
 
-// The variants the middleware decided for this request, by test slug. Empty
-// for a bot, a route without a server test, or when the datafile is missing.
+// The variants the middleware decided for this request. Empty for a bot, a
+// route without a server test, or when the datafile is missing.
 export const getImproveContext = (event: H3Event): ImproveEventContext =>
 	event.context.improve ?? {}
 
-// A Nitro server middleware (`server/middleware/improve.ts`) that decides the
-// visitor's variant before the page renders, keeps it in cookies, and leaves
-// it on `event.context.improve` for the page to render. The URL stays the
-// same: Nuxt hydrates the route the browser shows, so the page renders the
-// variant itself instead of being rewritten to another route.
+// Nuxt's own requests (`/_nuxt/`, `/__nuxt_error`, payloads), server routes
+// and files reach server middleware too; only pages get a decision.
+const isPage = (event: H3Event) => {
+	if (event.method !== 'GET' && event.method !== 'HEAD') return false
+	const path = event.path.split('?')[0] ?? ''
+	if (path.startsWith('/_') || path.startsWith('/api/')) return false
+	return !path.slice(path.lastIndexOf('/')).includes('.')
+}
+
+// A Nitro server middleware. Nuxt hydrates the route the browser shows, so
+// instead of rewriting to another route it leaves the variants on
+// `event.context.improve` for the page to render.
 export const generateImproveNuxtMiddleware = (
 	args: GenerateImproveNuxtMiddlewareArgs,
-) =>
-	defineEventHandler(async (event) => {
+) => {
+	// Concurrent first requests share one fetch.
+	let loading: ReturnType<ImproveServerSDK['fetchConfig']> | null = null
+	const ready = () =>
+		(loading ??= args.improveSdk.fetchConfig().finally(() => {
+			loading = null
+		}))
+
+	const cookie = (override: CookieOptions | undefined): CookieOptions => ({
+		path: '/',
+		maxAge: DEFAULT_COOKIE_TTL,
+		...override,
+	})
+
+	return defineEventHandler(async (event) => {
 		try {
+			if (!isPage(event)) return
+
 			const ua = getRequestHeader(event, 'user-agent') ?? ''
 			if (CRAWLERS.test(ua) || extendedBotCheck(ua)) return
 
@@ -70,7 +95,7 @@ export const generateImproveNuxtMiddleware = (
 			)
 			if (tests.length === 0) return
 
-			await args.improveSdk.fetchConfig()
+			await ready()
 
 			const visitorCookieName = args.improveSdk.getVisitorCookieName()
 			// The name before it was namespaced: keep an existing visitor.
@@ -78,7 +103,9 @@ export const generateImproveNuxtMiddleware = (
 				getCookie(event, visitorCookieName) ??
 				getCookie(event, args.improveSdk.getLegacyVisitorCookieName())
 			const visitorId =
-				cookieVisitorId && args.improveSdk.validateVisitorId(cookieVisitorId)
+				cookieVisitorId &&
+				args.improveSdk.validateVisitorId(cookieVisitorId) &&
+				SAFE_ID.test(cookieVisitorId)
 					? cookieVisitorId
 					: args.improveSdk.generateVisitorId()
 
@@ -100,8 +127,6 @@ export const generateImproveNuxtMiddleware = (
 						? value
 						: null
 
-				// A query parameter (for testing a variant), the cookie, or a new
-				// decision.
 				const value =
 					valid(query[slug]) ??
 					valid(getCookie(event, slug)) ??
@@ -109,21 +134,21 @@ export const generateImproveNuxtMiddleware = (
 				if (value == null) continue
 
 				decided[slug] = value
-				setCookie(event, slug, value, {
-					path: '/',
-					maxAge: DEFAULT_COOKIE_TTL,
-					...args.options?.testValue,
-				})
+				setCookie(event, slug, value, cookie(args.options?.testValue))
 			}
 			if (Object.keys(decided).length === 0) return
 
-			setCookie(event, visitorCookieName, visitorId, {
-				path: '/',
-				maxAge: DEFAULT_COOKIE_TTL,
-				...args.options?.visitorId,
-			})
+			setCookie(
+				event,
+				visitorCookieName,
+				visitorId,
+				cookie(args.options?.visitorId),
+			)
+			// The page differs per visitor: a shared cache must not keep it.
+			setResponseHeader(event, 'cache-control', 'private')
 			event.context.improve = { ...event.context.improve, ...decided }
 		} catch (e) {
 			console.error('[Improve SDK]', e)
 		}
 	})
+}

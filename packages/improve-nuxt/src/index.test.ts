@@ -33,20 +33,21 @@ const CONFIG: ImproveConfiguration = {
 const UA =
 	'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'
 
-const setup = (improveSdk = sdk()) => {
+const setup = (improveSdk = sdk(), routeHandler = '/') => {
 	const app = createApp()
 	app.use(
 		generateImproveNuxtMiddleware({
 			improveSdk,
-			serverABtests: [{ slug: 'startpage-visual', routeHandler: '/' }],
+			serverABtests: [{ slug: 'startpage-visual', routeHandler }],
 		}),
 	)
 	// Stands in for the page: shows what the middleware left it.
 	app.use(eventHandler((event) => getImproveContext(event)))
 	const handle = toWebHandler(app)
-	return (path: string, headers: Record<string, string> = {}) =>
+	return (path: string, headers: Record<string, string> = {}, method = 'GET') =>
 		handle(
 			new Request(`http://localhost${path}`, {
+				method,
 				headers: { 'user-agent': UA, ...headers },
 			}),
 		)
@@ -76,6 +77,21 @@ describe('generateImproveNuxtMiddleware', () => {
 		expect(set['startpage-visual']).toBe(decided['startpage-visual'])
 		expect(set['obelism_visitor_id']).toMatch(/.+/)
 		expect(response.headers.get('set-cookie')).toContain('Path=/')
+		expect(response.headers.get('cache-control')).toBe('private')
+	})
+
+	it("only keeps a visitor id of the SDK's alphabet", async () => {
+		const request = setup()
+		const kept = await request('/', {
+			cookie: 'obelism_visitor_id=visi_ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+		})
+		const odd = await request('/', {
+			cookie: 'obelism_visitor_id=visi_ABCDEFGHIJKLMNOPQRSTUVW%3BX',
+		})
+		expect(cookies(kept)['obelism_visitor_id']).toBe(
+			'visi_ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+		)
+		expect(cookies(odd)['obelism_visitor_id']).not.toContain('%')
 	})
 
 	it('keeps the variant a cookie names', async () => {
@@ -110,6 +126,44 @@ describe('generateImproveNuxtMiddleware', () => {
 		]) {
 			expect(await response.json()).toEqual({})
 			expect(response.headers.getSetCookie()).toEqual([])
+			expect(response.headers.get('cache-control')).toBeNull()
+		}
+	})
+
+	it("decides only for pages, not for Nuxt's own requests", async () => {
+		const request = setup(sdk(), '/[...slug]')
+		expect(await (await request('/products/shoes')).json()).toHaveProperty(
+			'startpage-visual',
+		)
+		for (const response of [
+			await request('/_nuxt/entry.js'),
+			await request('/__nuxt_error'),
+			await request('/api/cart'),
+			await request('/favicon.ico'),
+			await request('/products/_payload.json'),
+			await request('/products/shoes', {}, 'POST'),
+		]) {
+			expect(response.headers.getSetCookie()).toEqual([])
+		}
+	})
+
+	it('shares one datafile fetch between concurrent first requests', async () => {
+		const shared = new ImproveServerSDK({
+			organizationId: 'org_1',
+			environment: 'production',
+			token: 'imp_test',
+		})
+		const fetchConfig = vi.fn(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 10))
+			shared.loadConfig(CONFIG)
+			return CONFIG
+		})
+		shared.fetchConfig = fetchConfig
+		const request = setup(shared)
+		const responses = await Promise.all([request('/'), request('/')])
+		expect(fetchConfig).toHaveBeenCalledTimes(1)
+		for (const response of responses) {
+			expect(await response.json()).toHaveProperty('startpage-visual')
 		}
 	})
 

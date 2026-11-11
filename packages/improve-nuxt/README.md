@@ -21,6 +21,9 @@ const improveSdk = new ImproveServerSDK({
 	organizationId: process.env.IMPROVE_ORGANIZATION_ID!,
 	environment: 'production',
 	token: process.env.IMPROVE_API_TOKEN!,
+	// Pages wait for the datafile: fail fast rather than retry.
+	configRetries: 0,
+	fetchTimeout: 2000,
 })
 
 export default generateImproveNuxtMiddleware({
@@ -31,8 +34,11 @@ export default generateImproveNuxtMiddleware({
 
 For each request on a route with a server test, the middleware:
 
-- leaves bots alone;
-- fetches the datafile once per server instance;
+- leaves bots, non-GET requests, Nuxt's own requests (`/_nuxt/`,
+  `/__nuxt_error`, payloads), `/api/` and files alone;
+- fetches the datafile on the first request a server instance gets, and keeps
+  it: a test changed after that reaches the instance when it restarts or
+  through a deploy;
 - reads the visitor and the variant from their cookies, or a query parameter
   named after the test (`/?startpage-visual=variation`, for testing a
   variant), and decides only when there is nothing to reuse;
@@ -41,23 +47,28 @@ For each request on a route with a server test, the middleware:
 - sets the `obelism_visitor_id` cookie and one named after the test;
 - leaves the variants on `event.context.improve`.
 
-`routeHandler` is the page route as Nuxt names it: `/`, `/products/[id]`,
-`/blog/[...slug]`.
+`routeHandler` is the page route: a path (`/`), a parameter
+(`/products/[id]`, letters, digits and `-`) or a catch-all
+(`/blog/[...slug]`). Optional parameters (`[[id]]`) don't match. With
+`app.baseURL` set, include it.
 
 ## Render the variant
 
 Unlike Next.js, the request isn't rewritten to another route: Nuxt hydrates
-the route the browser shows, so the page renders the variant itself. Read it
-into `useState`, so the browser gets the server's value:
+the route the browser shows, so the page renders the variant itself. Hand the
+server's decision to the browser with `useState`, and render the value of
+`useTestValue` from `@obelism/improve-sdk-vue` with it as the fallback:
 
 ```vue
 <script setup lang="ts">
 import { getImproveContext } from '@obelism/improve-sdk-nuxt'
+import { useTestValue } from '~/improve'
 
-const variant = useState('improve:startpage-visual', () => {
+const decided = useState('improve:startpage-visual', () => {
 	const event = useRequestEvent()
-	return (event && getImproveContext(event)['startpage-visual']) || 'control'
+	return (event && getImproveContext(event)['startpage-visual']) || null
 })
+const variant = useTestValue('startpage-visual', decided.value ?? 'control')
 </script>
 
 <template>
@@ -66,9 +77,11 @@ const variant = useState('improve:startpage-visual', () => {
 </template>
 ```
 
-The decision on the server is not an exposure. Read the same test in the
-browser with `useTestValue` from `@obelism/improve-sdk-vue`, with the server's
-value as fallback: it reads the cookie and records the exposure.
+- On a page load the server decided: the first paint has the variant, and the
+  browser reads the same value from the cookie once the SDK is set up, which
+  records the exposure. The decision on the server alone is not one.
+- After a client-side navigation no request reached the middleware, so the
+  browser decides (and keeps it in the same cookie).
 
 Keep tested routes out of prerendering and route caches (`prerender`, `swr`,
 `isr` in `routeRules`): a cached page shows one variant to everyone.
