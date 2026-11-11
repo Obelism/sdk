@@ -1,5 +1,22 @@
 # @obelism/content
 
+## 0.29.0
+
+### Minor Changes
+
+- 6d46034: `pickImproveVariant` uses the improve block's own `fallback` when the caller names none, and `ImproveBlock` carries `fallback?: string`. Content writes it when an entry is published: it is the option a visitor who isn't in the test or flag sees, which Improve counts as its default and which is not always the first variant in the block.
+
+  ```ts
+  // Before: a visitor outside the test got the block's first variant.
+  const blocks = pickImproveVariant(block, improve.getTestValue(block.slug))
+  ```
+
+  A caller's own `fallback` argument still wins. An entry published before Content wrote the field, or a draft, has none, and the first variant is used as before.
+
+### Patch Changes
+
+- e07ebf9: `ContentClient` asks the delivery API on its token's scoped path (`/api/delivery/v1/{space}/{environment}/…`) once the API has sent it there, skipping the redirect on every later request. Requests for drafts stay on the unscoped path, and a refused scoped request is asked again unscoped.
+
 ## 0.28.4
 
 ### Patch Changes
