@@ -105,6 +105,10 @@ export type PageLookup<TEntry extends Entry = Entry> =
 
 const trimSlashes = (path: string) => path.replace(/^\/+|\/+$/g, '')
 
+// `/space_…/<environment>`: the part of a scoped delivery path between
+// DELIVERY_PATH and the operation.
+const SCOPE = /^\/space_[^/]+\/[^/]+$/
+
 // Reads one space environment's content through the delivery API. The token
 // decides the space, the environment and whether drafts are visible (for a
 // host token, with `drafts`).
@@ -115,6 +119,11 @@ export class ContentClient {
 	readonly url: string
 	#token: TokenSource
 	#place: Record<string, string>
+	// Where the API answers this client's token: it sends a token that reads
+	// published content to `/api/delivery/v1/{space}/{environment}/…` with a
+	// 308, so the client asks there directly after the first one. Never used
+	// for a request that reads drafts, which the scoped path refuses.
+	#scope: string | null = null
 	#defaults: Pick<RequestOptions, 'locale' | 'depth' | 'richText' | 'drafts'>
 	#timeout: number
 	#init: RequestInit | undefined
@@ -284,7 +293,12 @@ export class ContentClient {
 		{
 			notFound = false,
 			defaults = true,
-		}: { notFound?: boolean | 'body'; defaults?: boolean } = {},
+			scoped = true,
+		}: {
+			notFound?: boolean | 'body'
+			defaults?: boolean
+			scoped?: boolean
+		} = {},
 	): Promise<T | null> {
 		// Checked here rather than in the constructor, so a module creating a
 		// client still loads (and a build still runs) without the variable.
@@ -299,7 +313,8 @@ export class ContentClient {
 			if (value !== undefined) params.set(key, String(value))
 		}
 		const search = params.size > 0 ? `?${params}` : ''
-		const url = `${this.url}${DELIVERY_PATH}${path}${search}`
+		const scope = drafts || !scoped ? null : this.#scope
+		const url = `${this.url}${DELIVERY_PATH}${scope ?? ''}${path}${search}`
 
 		const merged = { ...this.#init, ...init }
 		const timeout = AbortSignal.timeout(this.#timeout)
@@ -320,6 +335,21 @@ export class ContentClient {
 				: timeout,
 		})
 
+		// A token that changed, or now reads drafts, is refused on the path
+		// learned for the one before it: ask unscoped once, and learn again.
+		if (scope && (response.status === 401 || response.status === 403)) {
+			if (this.#scope === scope) this.#scope = null
+			await response.body?.cancel()
+			return this.#request(
+				path,
+				query,
+				{ init, ...options },
+				{ notFound, defaults, scoped: false },
+			)
+		}
+		if (!scope && !drafts && response.redirected)
+			this.#learnScope(response, path)
+
 		if (notFound === true && response.status === 404) return null
 
 		const text = await response.text()
@@ -334,6 +364,27 @@ export class ContentClient {
 		}
 		if (!response.ok) throw new ContentApiError(response.status, url, body)
 		return body as T
+	}
+
+	#learnScope(response: Response, path: string) {
+		let redirected: URL
+		try {
+			redirected = new URL(response.url)
+		} catch {
+			return
+		}
+		const { origin, pathname } = redirected
+		if (
+			origin !== new URL(this.url).origin ||
+			!pathname.startsWith(`${DELIVERY_PATH}/`) ||
+			!pathname.endsWith(path)
+		)
+			return
+		const scope = pathname.slice(
+			DELIVERY_PATH.length,
+			pathname.length - path.length,
+		)
+		if (SCOPE.test(scope)) this.#scope = scope
 	}
 }
 
