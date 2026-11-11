@@ -5,6 +5,7 @@ import { join, relative } from 'node:path'
 import { DEFAULT_URL, MANAGEMENT_PATH } from '../config'
 import type { ModelFile } from '../types'
 import { buildExamples, type ImproveStatus } from './examples'
+import { IMPROVE_GUIDE } from './improveGuide'
 import { CliError, runModelCommand } from './model'
 
 // `content init`: starts a site's repository on a Space Environment, the
@@ -13,7 +14,8 @@ import { CliError, runModelCommand } from './model'
 // 1. Pulls the model file (content/content-model.json), like `model pull`.
 // 2. Writes an example of what the delivery API answers per content type to
 //    content/examples/<apiId>.json, and of the built-in improve block while
-//    the organization has improve on (examples.ts).
+//    the organization has improve on (examples.ts), with how a site renders
+//    it (_improve.md, improveGuide.ts).
 // 3. Installs @obelism/content with the project's package manager. Only the
 //    JS SDK: React's (@obelism/content-react) is the project's own choice.
 // 4. Adds the token variables to .env.example, empty.
@@ -197,11 +199,14 @@ export const runInitCommand = async ({
 	for (const [apiId, example] of Object.entries(examples)) {
 		await writeJson(join(examplesDir, `${apiId}.json`), example)
 	}
+	if (improve.enabled) {
+		await writeFile(join(examplesDir, '_improve.md'), IMPROVE_GUIDE)
+	}
 	const count = Object.keys(examples).length
 	log(
 		`Wrote ${count} ${count === 1 ? 'example' : 'examples'} to ${join(dir, 'examples')}${
 			improve.enabled
-				? ', with the A/B test or flag block (_improve.json): improve is on'
+				? ', with the A/B test or flag block (_improve.json) and how to render it (_improve.md): improve is on'
 				: ''
 		}.`,
 	)
@@ -221,7 +226,7 @@ export const runInitCommand = async ({
 			'- Fetch content with ContentClient from @obelism/content; the examples show what each type looks like.',
 			...(improve.enabled
 				? [
-						"- Render _improve blocks: ask improve's SDK for the visitor's option (getTestValue / getFlagValue with the block's slug) and render pickImproveVariant(block, option).",
+						`- Render _improve blocks as ${join(dir, 'examples', '_improve.md')} says: every variant tagged in the page, a script in the head, seedTestCookies at the edge and an exposure after paint (or pickImproveVariant on a page rendered per request).`,
 					]
 				: []),
 			`- Keep the model in step with \`content model pull|plan|apply\` (${join(dir, 'content-model.json')}).`,

@@ -130,6 +130,7 @@ describe('buildExamples', () => {
 						{ slug: 'control', name: 'Control' },
 						{ slug: 'bolder-copy', name: 'Bolder copy' },
 					],
+					defaultValue: 'bolder-copy',
 				},
 			],
 		}) as Record<string, any>
@@ -139,6 +140,8 @@ describe('buildExamples', () => {
 			_type: '_improve',
 			kind: 'test',
 			slug: 'homepage-hero',
+			fallback: 'bolder-copy',
+			mode: 'instant',
 			variants: {
 				control: [{ _type: 'hero' }],
 				'bolder-copy': [{ _type: 'hero' }],
@@ -163,6 +166,7 @@ describe('buildExamples', () => {
 		}) as Record<string, any>
 		expect(examples._improve).toMatchObject({
 			slug: 'example-test',
+			fallback: 'control',
 			variants: { control: expect.any(Array), variation: expect.any(Array) },
 		})
 	})

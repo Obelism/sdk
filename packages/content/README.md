@@ -477,8 +477,18 @@ const blocks = layout.flatMap((block) => {
 ```
 
 `pickImproveVariant(block, option, fallback?)` falls back to `fallback`'s
-variant, else the first one, when the option is `null` (the test isn't
-active or the visitor isn't in it) or has no variant.
+variant, else the block's own `fallback`, else the first one, when the option
+is `null` (the test isn't active or the visitor isn't in it) or has no
+variant.
+
+That is for a page rendered per request. A prerendered page carries every
+variant, tagged, and a script in its head shows the visitor's before the
+first paint, with `seedTestCookies` from `@obelism/improve-sdk/server` at the
+edge; the block's `mode` (`instant` or `after-load`, from the page type's
+fold) says whether the other variants are markup or JSON. `content init`
+writes the whole pattern to `content/examples/_improve.md`, and Content's
+[A/B tests guide](https://content.obelism.studio/docs/guides/ab-tests) has
+the same.
 
 ## Shopify
 
@@ -545,7 +555,8 @@ npx @obelism/content init
 
 It writes the model file (`content/content-model.json`), an example of what
 the delivery API answers for every content type (`content/examples/`, with
-the A/B test or flag block while your organization has improve on),
+the A/B test or flag block and how to render it while your organization has
+improve on),
 installs `@obelism/content` with your package manager, and adds the token variables to
 `.env.example`. Options: `--dir` (default `content`), `--url`,
 `--skip-install`. Agents get the same steps from the CMS's

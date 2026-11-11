@@ -73,10 +73,15 @@ what you prepared and ask before you:
 2. `content_publishEntry` on the page (publishing checks that the test exists
    in the environment and that every variant is one of its options).
 
-The site must render the `_improve` block: it asks improve's SDK for the
-visitor's option (`getTestValue(slug)`) and shows that list, falling back to
-`control` when it gets `null`. If the site doesn't do that yet, say so; the
-`connect-site` skill and the SDK's docs cover it.
+Publishing writes the block's `fallback` (the option Improve gives a visitor
+outside the test) and its `mode` (`instant` or `after-load`, from the page
+type's fold). The site must render the `_improve` block: a page rendered per
+request picks the visitor's option with Improve's SDK; a prerendered page
+carries every variant tagged, a script in its head shows one, and
+`seedTestCookies` decides it at the edge, with one exposure per test after
+paint. `content init` writes the pattern to `content/examples/_improve.md`.
+If the site doesn't do that yet, say so; without the edge every visitor gets
+the fallback.
 
 For another environment, `improve_syncTests` copies the test there before the
 page is promoted.
@@ -92,5 +97,7 @@ page is promoted.
   and the most clicked elements, by `data-numbers-id`.
 
 If nothing arrives, check in this order: the test is active, the page is
-published, the site renders the `_improve` block, and the site sends events
-(numbers' Setup page).
+published, the site renders the `_improve` block, its edge seeds the test's
+cookie, it records the exposure after paint, and it sends events (numbers'
+Setup page). Improve's results show the page's placements beside the
+exposures: placements with no exposures is a site that doesn't report.

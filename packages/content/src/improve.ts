@@ -13,7 +13,7 @@ export const isImproveBlock = (block: Block): block is ImproveBlock =>
 export const pickImproveVariant = <TBlock extends Block>(
 	block: ImproveBlock<TBlock>,
 	option: string | null | undefined,
-	fallback?: string,
+	fallback?: string | null,
 ): TBlock[] => {
 	const variants = block.variants ?? {}
 	if (option && variants[option]) return variants[option]
