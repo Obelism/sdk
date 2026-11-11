@@ -44,7 +44,7 @@ generateImproveProvider(improveArgs: {
 	organizationId: string
 	spaceId?: string // the space; without it, the organization's first
 	environment: 'develop' | 'staging' | 'production'
-	config?: Configuration
+	config?: ImproveConfiguration // skips the fetch
 	fetchTimeout?: number
 }) => ({
 	ImproveProvider,
@@ -90,4 +90,6 @@ Wrapper around [postAnalytic](https://improve.obelism.studio/docs/sdk/javascript
 
 `ComputedRef<'loading' | 'setup' | 'error'>`.
 
-Call the composables in `setup`, below the provider.
+Call the composables in `setup` of a component inside the provider: in the
+component that renders `<ImproveProvider>` itself (such as `app.vue`) they
+only ever give the fallback.
