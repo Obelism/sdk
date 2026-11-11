@@ -49,9 +49,8 @@ npx turbo run build lint test:ci --filter=@obelism/improve-sdk...   # one packag
 
 Packages depend on each other through the workspace: improve on numbers,
 improve-react and improve-next on improve, content-react and content-vue on
-Content. Never
-pin one to a version that isn't in the repository; changesets updates the
-ranges when it versions.
+Content. Never pin one to a version that isn't in the repository; changesets
+updates the ranges when it versions.
 
 ## numbers (`packages/numbers`)
 
@@ -109,7 +108,7 @@ The SDK communicates with two endpoints (see `packages/improve/src/config/urls.t
 - **Analytics/Events** — conversion tracking events posted to the API, tied to test slugs. Conversion rate = visitors reaching the goal / total visitors.
 - **Environments** — `develop`, `staging`, `production`. Each has its own config from the API.
 
-## Content (`packages/content`, `content-react`)
+## Content (`packages/content`, `content-react`, `content-vue`)
 
 - `packages/content` → `@obelism/content`
   - `.`: `ContentClient` (delivery API `/api/delivery/v1`; after the API's

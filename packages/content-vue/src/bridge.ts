@@ -2,7 +2,6 @@ import {
 	computed,
 	type ComputedRef,
 	defineComponent,
-	getCurrentInstance,
 	type MaybeRefOrGetter,
 	onMounted,
 	type PropType,
@@ -30,14 +29,12 @@ export type ContentBridgeProps = BridgeOptions
 const noop = () => {}
 
 // Started after mount, never during setup, so it is null on the server and
-// while hydrating, and markup matches.
+// while hydrating, and markup matches. Call the composables in `setup`.
 const useBridge = (options: BridgeOptions): ShallowRef<Bridge | null> => {
 	const bridge = shallowRef<Bridge | null>(null)
-	const start = () => {
+	onMounted(() => {
 		bridge.value = getContentBridge(options)
-	}
-	if (getCurrentInstance()) onMounted(start)
-	else if (typeof window !== 'undefined') start()
+	})
 	return bridge
 }
 
@@ -176,12 +173,12 @@ export type ContentPromptState = BridgeState & {
 	// in to edit, for someone who may edit content.
 	available: boolean
 	mode: Bridge['mode']
-	// See ContentBridge['prompt'].
+	// See `prompt` on the bridge (`@obelism/content/bridge`).
 	prompt: (
 		prompt: string,
 		options?: { uid?: string | null },
 	) => Promise<PromptResult>
-	// See ContentBridge['createPage']: editing on the site, with 'create'.
+	// See `createPage` on the bridge: editing on the site, with 'create'.
 	createPage: (path: string, prompt: string) => Promise<CreatePageResult>
 	undo: () => void
 	select: (uid: string | null) => void

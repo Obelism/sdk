@@ -60,8 +60,9 @@ rendering and hydration always see "not editing".
 
 `<ContentBridge />` shows editors a prompt box inside the visual editor (see
 `@obelism/content`). `<ContentBridge :prompt="false" />` leaves it out;
-`useContentPrompt()` gives a computed ref of `{ available, prompting, canUndo,
-selectedUid, prompt, createPage, undo, select }` for your own UI.
+`useContentPrompt()` gives a computed ref of `{ available, mode, prompting,
+canUndo, selectedUid, prompt, createPage, undo, select, save, publish, signOut,
+setSelecting }` for your own UI.
 
 ## Rich text
 

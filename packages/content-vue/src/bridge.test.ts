@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
-import { defineComponent, h, nextTick, ref } from 'vue'
+import { defineComponent, h, nextTick } from 'vue'
+import { renderToString } from 'vue/server-renderer'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { Entry } from '@obelism/content'
@@ -192,6 +193,13 @@ describe('ContentBridge', () => {
 			collectionPath: undefined,
 		})
 	})
+
+	it('leaves the prompt box on when `prompt` is left out', () => {
+		mount(ContentBridge)
+		expect(getContentBridge).toHaveBeenCalledWith(
+			expect.objectContaining({ prompt: undefined }),
+		)
+	})
 })
 
 describe('useContentBridgeEvent', () => {
@@ -245,14 +253,17 @@ describe('useContentPrompt', () => {
 	})
 })
 
-describe('outside a component', () => {
-	it('starts the bridge straight away', () => {
-		const page = ref(entry('entry_1', 'One'))
-		const live = useLiveEntry(page)
-		emitter.emit('update', {
-			entry: entry('entry_1', 'Live'),
-			selectedUid: null,
+describe('on the server', () => {
+	it('renders the entry as given, without starting the bridge', async () => {
+		const Page = defineComponent({
+			setup() {
+				const live = useLiveEntry(entry('entry_1', 'Saved'))
+				const bridge = useContentBridge()
+				return () =>
+					h('h1', `${live.value.fields.title} ${bridge.value.isEditing}`)
+			},
 		})
-		expect(live.value.fields.title).toBe('Live')
+		expect(await renderToString(h(Page))).toBe('<h1>Saved false</h1>')
+		expect(getContentBridge).not.toHaveBeenCalled()
 	})
 })
