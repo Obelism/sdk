@@ -316,3 +316,140 @@ describe('ContentClient', () => {
 		await expect(content.getPage('/')).rejects.toThrow('needs a path')
 	})
 })
+
+// What fetch answers after following the API's 308 to the scoped path.
+const redirectedTo = (url: string, body: unknown) =>
+	Object.defineProperties(new Response(JSON.stringify(body)), {
+		redirected: { value: true },
+		url: { value: url },
+	})
+
+const SCOPED =
+	'https://content.obelism.studio/api/delivery/v1/space_A/production'
+
+describe('the scoped delivery path', () => {
+	it('asks the path the API sent it to from then on', async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(redirectedTo(`${SCOPED}/pages?path=a`, { entry }))
+			.mockImplementation(async () => new Response(JSON.stringify({ entry })))
+		const content = new ContentClient({ token: 'cms_d_x', fetch: fetchMock })
+
+		await content.getPage('a')
+		await content.getPage('b')
+		await content.getEntry('entry_1')
+
+		expect(requested(fetchMock, 0).url.pathname).toBe('/api/delivery/v1/pages')
+		expect(requested(fetchMock, 1).url.pathname).toBe(
+			'/api/delivery/v1/space_A/production/pages',
+		)
+		expect(requested(fetchMock, 2).url.pathname).toBe(
+			'/api/delivery/v1/space_A/production/entries/entry_1',
+		)
+	})
+
+	// The scoped path only takes tokens that read published content.
+	it('keeps a request for drafts unscoped', async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(redirectedTo(`${SCOPED}/pages?path=a`, { entry }))
+			.mockImplementation(async () => new Response(JSON.stringify({ entry })))
+		const content = new ContentClient({ token: 'cms_d_x', fetch: fetchMock })
+
+		await content.getPage('a')
+		await content.getPage('b', { drafts: true })
+
+		expect(requested(fetchMock, 1).url.pathname).toBe('/api/delivery/v1/pages')
+	})
+
+	it('asks unscoped again when the scoped path refuses', async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(redirectedTo(`${SCOPED}/pages?path=a`, { entry }))
+			.mockResolvedValueOnce(
+				new Response(JSON.stringify({ code: 'token_place_mismatch' }), {
+					status: 401,
+				}),
+			)
+			.mockImplementation(async () => new Response(JSON.stringify({ entry })))
+		const content = new ContentClient({ token: 'cms_d_x', fetch: fetchMock })
+
+		await content.getPage('a')
+		await expect(content.getPage('b')).resolves.toEqual(entry)
+
+		expect(requested(fetchMock, 1).url.pathname).toBe(
+			'/api/delivery/v1/space_A/production/pages',
+		)
+		expect(requested(fetchMock, 2).url.pathname).toBe('/api/delivery/v1/pages')
+	})
+
+	it('retries a refused scoped request once, unscoped', async () => {
+		const refused = () =>
+			new Response(JSON.stringify({ code: 'drafts_on_scoped_path' }), {
+				status: 403,
+			})
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(redirectedTo(`${SCOPED}/pages?path=a`, { entry }))
+			.mockImplementation(async () => refused())
+		const content = new ContentClient({ token: 'cms_d_x', fetch: fetchMock })
+
+		await content.getPage('a')
+		await expect(content.getPage('b')).rejects.toBeInstanceOf(ContentApiError)
+
+		expect(fetchMock).toHaveBeenCalledTimes(3)
+		expect(requested(fetchMock, 2).url.pathname).toBe('/api/delivery/v1/pages')
+	})
+
+	it('keeps drafts set on the client unscoped', async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(redirectedTo(`${SCOPED}/pages?path=a`, { entry }))
+			.mockImplementation(async () => new Response(JSON.stringify({ entry })))
+		const content = new ContentClient({
+			token: 'cms_d_x',
+			drafts: true,
+			fetch: fetchMock,
+		})
+
+		await content.getPage('a')
+		await content.getPage('b')
+
+		expect(requested(fetchMock, 1).url.pathname).toBe('/api/delivery/v1/pages')
+	})
+
+	it('learns nothing from a redirect to another host', async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(
+				redirectedTo(
+					'https://elsewhere.test/api/delivery/v1/space_A/production/pages',
+					{ entry },
+				),
+			)
+			.mockImplementation(async () => new Response(JSON.stringify({ entry })))
+		const content = new ContentClient({ token: 'cms_d_x', fetch: fetchMock })
+
+		await content.getPage('a')
+		await content.getPage('b')
+
+		expect(requested(fetchMock, 1).url.pathname).toBe('/api/delivery/v1/pages')
+	})
+
+	it('learns nothing from a redirect elsewhere', async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(
+				redirectedTo('https://content.obelism.studio/somewhere/pages', {
+					entry,
+				}),
+			)
+			.mockImplementation(async () => new Response(JSON.stringify({ entry })))
+		const content = new ContentClient({ token: 'cms_d_x', fetch: fetchMock })
+
+		await content.getPage('a')
+		await content.getPage('b')
+
+		expect(requested(fetchMock, 1).url.pathname).toBe('/api/delivery/v1/pages')
+	})
+})

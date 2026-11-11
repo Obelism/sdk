@@ -111,7 +111,10 @@ The SDK communicates with two endpoints (see `packages/improve/src/config/urls.t
 ## Content (`packages/content`, `content-react`)
 
 - `packages/content` → `@obelism/content`
-  - `.`: `ContentClient` (delivery API `/api/delivery/v1`), `readPreviewParams`
+  - `.`: `ContentClient` (delivery API `/api/delivery/v1`; after the API's
+    308 it asks the token's scoped path, `/{space}/{environment}/…`, for
+    everything but drafts, which is what Content's Delivery API requests
+    meter counts), `readPreviewParams`
     (the visual editor's parameters, `cms_token` among them: the token sites
     read drafts with, never `cms_preview` alone),
     `editable`, rich text and image helpers, types
