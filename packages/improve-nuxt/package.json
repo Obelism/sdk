@@ -1,0 +1,61 @@
+{
+	"name": "@obelism/improve-sdk-nuxt",
+	"description": "Obelism Improve Nuxt SDK: server-side A/B tests in Nitro middleware",
+	"version": "0.0.0",
+	"keywords": [
+		"ab-tests",
+		"feature-flags",
+		"typescript",
+		"improve",
+		"nuxt",
+		"nitro"
+	],
+	"license": "MIT",
+	"author": "Obelism <hello@obelism.studio> (https://www.obelism.studio)",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Obelism/sdk",
+		"directory": "packages/improve-nuxt"
+	},
+	"sideEffects": false,
+	"files": [
+		"dist"
+	],
+	"exports": {
+		"import": {
+			"types": "./dist/index.d.mts",
+			"default": "./dist/index.mjs"
+		},
+		"require": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"scripts": {
+		"build": "bunchee -m",
+		"dev": "bunchee --watch --no-clean",
+		"test": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"test:ci": "vitest run",
+		"lint": "npm-run-all --parallel lint:*",
+		"lint:oxlint": "oxlint",
+		"lint:types": "tsc --noEmit",
+		"clean": "rm -rf ./node_modules && rm -rf ./dist && rm -rf ./.turbo"
+	},
+	"peerDependencies": {
+		"h3": "^1.10.0"
+	},
+	"dependencies": {
+		"@obelism/improve-sdk": "^3.7.0"
+	},
+	"devDependencies": {
+		"@obelism/sdk-typescript-config": "^0.0.0",
+		"@typescript/typescript6": "^6.0.2",
+		"bunchee": "^7.0.2",
+		"h3": "^1.15.11",
+		"npm-run-all2": "^9.0.4",
+		"oxlint": "^1.91.0",
+		"typescript": "^7.0.2",
+		"vitest": "^5.1.0"
+	}
+}

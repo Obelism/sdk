@@ -26,7 +26,8 @@ npx turbo run build lint test:ci --filter=@obelism/improve-sdk...   # one packag
 - `packages/improve` → `@obelism/improve-sdk`, `packages/improve-react` →
   `@obelism/improve-sdk-react`, `packages/improve-vue` →
   `@obelism/improve-sdk-vue`, `packages/improve-next` →
-  `@obelism/improve-sdk-next`
+  `@obelism/improve-sdk-next`, `packages/improve-nuxt` →
+  `@obelism/improve-sdk-nuxt`
 - `packages/content` → `@obelism/content`, `packages/content-react` →
   `@obelism/content-react`, `packages/content-vue` → `@obelism/content-vue`
 - `plugin/` → the Obelism Claude plugin (www's docs/adr/0011 in
@@ -49,9 +50,9 @@ npx turbo run build lint test:ci --filter=@obelism/improve-sdk...   # one packag
   published packages, so a change here reaches an example after a release.
 
 Packages depend on each other through the workspace: improve on numbers,
-improve-react, improve-vue and improve-next on improve, content-react and
-content-vue on Content. Never pin one to a version that isn't in the
-repository; changesets updates the ranges when it versions.
+improve-react, improve-vue, improve-next and improve-nuxt on improve,
+content-react and content-vue on Content. Never pin one to a version that
+isn't in the repository; changesets updates the ranges when it versions.
 
 ## numbers (`packages/numbers`)
 
@@ -74,7 +75,7 @@ The browser client of Obelism numbers (`../obelism/apps/numbers`, whose
   → `script.ts`, `rollup.script.config.mjs`): numbers serves it as its
   `public/script.js` (`npm run script:update` there after a release).
 
-## improve (`packages/improve`, `improve-react`, `improve-vue`, `improve-next`)
+## improve (`packages/improve`, `improve-react`, `improve-vue`, `improve-next`, `improve-nuxt`)
 
 ### SDK Design Pattern
 
@@ -83,6 +84,7 @@ The browser client of Obelism numbers (`../obelism/apps/numbers`, whose
 - React SDK uses a factory function (`generateImproveProvider`) that creates a Context + hooks bundle
 - Vue SDK uses the same factory: a provider component plus composables (computed refs), with an injection key per call
 - Next.js SDK generates middleware that handles bot detection, route matching, cookie management, and URL rewriting
+- Nuxt SDK generates a Nitro server middleware (h3 v1, what Nuxt 3 and 4 run) with the same bot detection, route matching and cookies, but no rewrite: Nuxt hydrates the browser's route, so the variant goes on `event.context.improve` and the page renders it. `matchesRoute` and `extendedBotCheck` are copies of improve-next's; change both
 
 ### Host tokens (`./oidc`)
 
