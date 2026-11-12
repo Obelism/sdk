@@ -14,6 +14,7 @@ product shares). One repository, so a change that crosses SDKs ships together.
 | `packages/improve-next`  | `@obelism/improve-sdk-next`  | improve's Next.js middleware                                                                                                             |
 | `packages/content`       | `@obelism/content`           | The delivery API client, the visual editor bridge, rich text and image helpers, webhooks, the improve block helper and the `content` CLI |
 | `packages/content-react` | `@obelism/content-react`     | Live preview hooks for the visual editor and `<RichText>`                                                                                |
+| `packages/content-vue`   | `@obelism/content-vue`       | The same for Vue 3 and Nuxt: live preview composables and `<RichText>`                                                                   |
 
 ## Claude plugin
 

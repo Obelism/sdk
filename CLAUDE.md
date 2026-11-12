@@ -27,7 +27,7 @@ npx turbo run build lint test:ci --filter=@obelism/improve-sdk...   # one packag
   `@obelism/improve-sdk-react`, `packages/improve-next` →
   `@obelism/improve-sdk-next`
 - `packages/content` → `@obelism/content`, `packages/content-react` →
-  `@obelism/content-react`
+  `@obelism/content-react`, `packages/content-vue` → `@obelism/content-vue`
 - `plugin/` → the Obelism Claude plugin (www's docs/adr/0011 in
   `../obelism`): Content's, improve's, numbers' and media's MCP servers
   (`plugin/.mcp.json`) and skills for the jobs that span them
@@ -48,9 +48,9 @@ npx turbo run build lint test:ci --filter=@obelism/improve-sdk...   # one packag
   published packages, so a change here reaches an example after a release.
 
 Packages depend on each other through the workspace: improve on numbers,
-improve-react and improve-next on improve, content-react on Content. Never
-pin one to a version that isn't in the repository; changesets updates the
-ranges when it versions.
+improve-react and improve-next on improve, content-react and content-vue on
+Content. Never pin one to a version that isn't in the repository; changesets
+updates the ranges when it versions.
 
 ## numbers (`packages/numbers`)
 
@@ -108,7 +108,7 @@ The SDK communicates with two endpoints (see `packages/improve/src/config/urls.t
 - **Analytics/Events** — conversion tracking events posted to the API, tied to test slugs. Conversion rate = visitors reaching the goal / total visitors.
 - **Environments** — `develop`, `staging`, `production`. Each has its own config from the API.
 
-## Content (`packages/content`, `content-react`)
+## Content (`packages/content`, `content-react`, `content-vue`)
 
 - `packages/content` → `@obelism/content`
   - `.`: `ContentClient` (delivery API `/api/delivery/v1`; after the API's
@@ -170,6 +170,10 @@ The SDK communicates with two endpoints (see `packages/improve/src/config/urls.t
   `useLiveEntry`, `useContentBridge`, `useContentBridgeEvent`,
   `useContentPrompt` (the only
   `'use client'` module) and `RichText` (server-safe)
+- `packages/content-vue` → `@obelism/content-vue`: the same for Vue 3 and
+  Nuxt, as composables returning computed refs and render-function
+  components (no SFCs, so bunchee builds it). Keep it in step with
+  content-react: a feature added to one goes to both
 
 ## Build
 
