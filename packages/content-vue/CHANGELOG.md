@@ -1,0 +1,7 @@
+# @obelism/content-vue
+
+## 0.1.0
+
+### Minor Changes
+
+- 10ae446: New package: Obelism Content for Vue 3 and Nuxt. `ContentBridge`, `useLiveEntry`, `useContentBridge`, `useContentBridgeEvent`, `useContentPrompt` and `RichText`, the counterparts of `@obelism/content-react`.
