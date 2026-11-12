@@ -11,6 +11,7 @@ product shares). One repository, so a change that crosses SDKs ships together.
 | `packages/numbers`       | `@obelism/numbers-sdk`       | Page views, events and clicks on tagged elements, as a module or one script tag                                                          |
 | `packages/improve`       | `@obelism/improve-sdk`       | improve's server and client SDK; sends its events through the numbers SDK                                                                |
 | `packages/improve-react` | `@obelism/improve-sdk-react` | improve's React provider and hooks                                                                                                       |
+| `packages/improve-vue`   | `@obelism/improve-sdk-vue`   | improve's Vue and Nuxt provider and composables                                                                                          |
 | `packages/improve-next`  | `@obelism/improve-sdk-next`  | improve's Next.js middleware                                                                                                             |
 | `packages/content`       | `@obelism/content`           | The delivery API client, the visual editor bridge, rich text and image helpers, webhooks, the improve block helper and the `content` CLI |
 | `packages/content-react` | `@obelism/content-react`     | Live preview hooks for the visual editor and `<RichText>`                                                                                |

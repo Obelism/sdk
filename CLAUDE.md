@@ -24,7 +24,8 @@ npx turbo run build lint test:ci --filter=@obelism/improve-sdk...   # one packag
 
 - `packages/numbers` → `@obelism/numbers-sdk`
 - `packages/improve` → `@obelism/improve-sdk`, `packages/improve-react` →
-  `@obelism/improve-sdk-react`, `packages/improve-next` →
+  `@obelism/improve-sdk-react`, `packages/improve-vue` →
+  `@obelism/improve-sdk-vue`, `packages/improve-next` →
   `@obelism/improve-sdk-next`
 - `packages/content` → `@obelism/content`, `packages/content-react` →
   `@obelism/content-react`, `packages/content-vue` → `@obelism/content-vue`
@@ -48,9 +49,9 @@ npx turbo run build lint test:ci --filter=@obelism/improve-sdk...   # one packag
   published packages, so a change here reaches an example after a release.
 
 Packages depend on each other through the workspace: improve on numbers,
-improve-react and improve-next on improve, content-react and content-vue on
-Content. Never pin one to a version that isn't in the repository; changesets
-updates the ranges when it versions.
+improve-react, improve-vue and improve-next on improve, content-react and
+content-vue on Content. Never pin one to a version that isn't in the
+repository; changesets updates the ranges when it versions.
 
 ## numbers (`packages/numbers`)
 
@@ -73,13 +74,14 @@ The browser client of Obelism numbers (`../obelism/apps/numbers`, whose
   → `script.ts`, `rollup.script.config.mjs`): numbers serves it as its
   `public/script.js` (`npm run script:update` there after a release).
 
-## improve (`packages/improve`, `improve-react`, `improve-next`)
+## improve (`packages/improve`, `improve-react`, `improve-vue`, `improve-next`)
 
 ### SDK Design Pattern
 
 - `BaseImproveSDK` is the shared base class (config fetching, environment handling)
 - `ImproveServerSDK` and `ImproveClientSDK` extend it for their respective runtimes
 - React SDK uses a factory function (`generateImproveProvider`) that creates a Context + hooks bundle
+- Vue SDK uses the same factory: a provider component plus composables (computed refs), with an injection key per call
 - Next.js SDK generates middleware that handles bot detection, route matching, cookie management, and URL rewriting
 
 ### Host tokens (`./oidc`)
