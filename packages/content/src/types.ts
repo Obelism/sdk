@@ -136,9 +136,13 @@ export type ImproveBlock<TBlock extends Block = Block> = Block<
 		slug: string
 		// The option a visitor who isn't in the test or flag sees, written when
 		// the entry is published: the test's default, or a flag's first option.
-		// Absent from a draft, and from an entry published before Content set
+		// Absent from a draft, null on an entry published before Content set
 		// it; pickImproveVariant then takes the first variant.
-		fallback?: string
+		fallback?: string | null
+		// Written when the entry is published, from the page type's fold:
+		// `instant` puts every variant in the markup, `after-load` only the
+		// fallback's. Null (instant) on an entry published before.
+		mode?: 'instant' | 'after-load' | null
 		variants: Record<string, TBlock[]>
 	},
 	'_improve'

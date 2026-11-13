@@ -82,14 +82,29 @@ describe('runInitCommand', () => {
 		expect(await readJson('content/content-model.json')).toEqual(model)
 		expect((await readdir(join(cwd, 'content/examples'))).sort()).toEqual([
 			'_improve.json',
+			'_improve.md',
 			'hero.json',
 			'page.json',
 		])
 		expect(await readJson('content/examples/_improve.json')).toMatchObject({
 			kind: 'flag',
 			slug: 'sale',
+			fallback: 'on',
+			mode: 'instant',
 			variants: { on: [{ _type: 'hero' }], off: [{ _type: 'hero' }] },
 		})
+		const guide = await readFile(
+			join(cwd, 'content/examples/_improve.md'),
+			'utf8',
+		)
+		for (const piece of [
+			'data-ob-imp',
+			'meta[name="obelism-improve"]',
+			'seedTestCookies',
+			'data-ob-variants',
+		]) {
+			expect(guide).toContain(piece)
+		}
 		expect(opts.fetch).toHaveBeenCalledWith(
 			'https://cms.test/api/management/v1/improve',
 			{ headers: { Authorization: 'Bearer cms_m_x' } },
@@ -115,9 +130,9 @@ describe('runInitCommand', () => {
 			cms({ error: 'Not found' }, 404),
 		]) {
 			await runInitCommand({ ...options(fetchMock), install: false })
-			expect(await readdir(join(cwd, 'content/examples'))).not.toContain(
-				'_improve.json',
-			)
+			const files = await readdir(join(cwd, 'content/examples'))
+			expect(files).not.toContain('_improve.json')
+			expect(files).not.toContain('_improve.md')
 		}
 	})
 

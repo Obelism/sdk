@@ -23,6 +23,7 @@ export type ImproveSource = {
 	slug: string
 	name: string
 	options: { slug: string; name: string }[]
+	defaultValue?: string
 }
 
 export type ImproveStatus = { enabled: boolean; sources: ImproveSource[] }
@@ -107,6 +108,8 @@ export const buildExamples = (
 			_type: '_improve',
 			kind: source.kind,
 			slug: source.slug,
+			fallback: source.defaultValue ?? source.options[0]?.slug ?? null,
+			mode: 'instant',
 			variants: Object.fromEntries(
 				source.options.map((option) => [
 					option.slug,
