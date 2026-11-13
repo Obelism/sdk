@@ -1,5 +1,27 @@
 # @obelism/content
 
+## 0.30.0
+
+### Minor Changes
+
+- f5933bb: `content init` writes `content/examples/_improve.md` beside `_improve.json` while the organization has Improve on: how a site renders a content A/B test before the first paint (Content's docs/adr/0035). Every variant in the page, tagged with `data-ob-imp` and `data-ob-opt`; a classic script and one style rule per test in the head; `seedTestCookies` at the edge; one exposure per test after paint; and the after-load swap for placements below the page type's fold. The same copy as Content's A/B tests guide, with a React example.
+
+  `ImproveBlock` carries `mode?: 'instant' | 'after-load' | null`, which Content stamps when an entry is published, and `fallback` may be `null`, as delivery answers it for an entry published before Content wrote it. `pickImproveVariant`'s `fallback` argument takes `null` too. The `_improve.json` example carries both fields.
+
+- 019cd92: Types for what Content already sends about releases and shared blocks.
+
+  - `WebhookEvent` takes `release.published` and `release.review_requested` (`ReleasePublishedEvent`, `ReleaseReviewRequestedEvent`): `data.release` is `{ id, name }` (`WebhookRelease`) and `data.entries` the release's entries with their `action`, `publish` or `unpublish` (`WebhookReleaseEntry`); a review request adds `data.note`.
+  - `WebhookEvent` takes `block.published` (`BlockPublishedEvent`), sent instead of `entry.published` when a shared block is published: `data.entry` is the block and `data.entries` the published pages it updated.
+  - `Block` has an optional `_sharedFrom` (`SharedFrom`: `{ id, name, heldAt? }`) on a block that comes from a shared block entry; `heldAt` marks a page's copy held at an earlier publish. Types generated with `content types` get it too.
+
+  ```ts
+  if (event.type === 'release.published') {
+  	for (const { path } of event.data.entries) {
+  		if (path) revalidatePath(`/${path}`)
+  	}
+  }
+  ```
+
 ## 0.29.0
 
 ### Minor Changes
