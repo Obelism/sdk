@@ -371,8 +371,14 @@ path, paths }`, plus `previousPath` and `previousPaths` when moved), `asset.upda
 `locales.changed` (`data.defaultLocale`, `data.locales`),
 `entry.review_requested` (`data.entry`, `data.revision`, `data.note`) and
 `entry.review_closed` (`data.outcome`: `approved` or `sent_back` with
-`data.reason`) for environments whose publishing is reviewed, and
-`webhook.test`.
+`data.reason`) for environments whose publishing is reviewed,
+`block.published` (`data.entry`: the shared block, `data.entries`: the
+published pages it updated), `release.published` and
+`release.review_requested` (`data.release`: `{ id, name }`, `data.entries`
+with each entry's `action`, `publish` or `unpublish`, and `data.note` on a
+review request), `product.updated`, `product.deleted`, `collection.updated`
+and `collection.deleted` (`data.entries` and `data.tags` a store's change
+touches), and `webhook.test`.
 
 ## Click rates
 
@@ -479,6 +485,14 @@ const blocks = layout.flatMap((block) => {
 `pickImproveVariant(block, option, fallback?)` falls back to `fallback`'s
 variant, else the first one, when the option is `null` (the test isn't
 active or the visitor isn't in it) or has no variant.
+
+## Shared blocks
+
+A block shared between pages arrives as the block it is, with its fields,
+plus `_sharedFrom: { id, name }`: the block entry it comes from. Render it
+like any other block. A page left out of the block's last publish keeps the
+copy that was live then, marked with `heldAt` (ISO 8601). Publishing a shared
+block sends `block.published` (see Webhooks) instead of `entry.published`.
 
 ## Shopify
 
