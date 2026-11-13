@@ -280,5 +280,22 @@ export const MANIFEST_SCHEMA = {
 				required: { type: 'array', items: { type: 'string' } },
 			},
 		},
+		// As a model file holds them; a field's `editor` may only be this
+		// plugin. Content checks the rest.
+		contentTypes: {
+			type: 'array',
+			maxItems: 5,
+			items: {
+				type: 'object',
+				required: ['apiId', 'name', 'kind', 'description', 'fields'],
+				properties: {
+					apiId: { type: 'string', pattern: '^[a-z][a-zA-Z0-9_]{0,63}$' },
+					name: { type: 'string', minLength: 1, maxLength: 256 },
+					kind: { enum: ['page', 'data', 'block'] },
+					description: { type: 'string', maxLength: 1024, pattern: '\\S' },
+					fields: { type: 'array', maxItems: 200, items: { type: 'object' } },
+				},
+			},
+		},
 	},
 } as const
