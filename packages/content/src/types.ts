@@ -123,7 +123,17 @@ export type Block<
 > = {
 	_uid: string
 	_type: TType
+	_sharedFrom?: SharedFrom
 } & TFields
+
+// On a block that is a shared block (the CMS's docs/adr/0028): the block
+// entry it comes from. `heldAt` (ISO 8601) is set when the page was left out
+// of the block's last publish and shows the copy that was live then.
+export type SharedFrom = {
+	id: string
+	name: string
+	heldAt?: string
+}
 
 // The built-in A/B test or feature flag block, which any blocks field can
 // hold: one list of blocks per option of an improve test or flag, by slug.

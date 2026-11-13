@@ -1,12 +1,13 @@
 import { createHmac } from 'node:crypto'
 
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 import {
 	createWebhookHandler,
 	verifyWebhook,
 	WebhookVerificationError,
 	type WebhookEvent,
+	type WebhookReleaseEntry,
 } from './webhooks'
 
 const key = Buffer.from('a-very-secret-key-of-24b')
@@ -152,5 +153,72 @@ describe('createWebhookHandler', () => {
 			},
 		})
 		expect((await failing(signed())).status).toBe(500)
+	})
+})
+
+describe('WebhookEvent', () => {
+	const page = {
+		id: 'entry_1',
+		contentType: 'page',
+		name: 'Hello',
+		path: 'blog/hello',
+		paths: { en: 'blog/hello' },
+	}
+
+	it('narrows release and shared block events on type', async () => {
+		const release: WebhookEvent = {
+			type: 'release.published',
+			timestamp: '2026-11-13T09:00:00.000Z',
+			space: 'space_1',
+			environment: 'production',
+			data: {
+				release: { id: 'release_1', name: 'Winter sale' },
+				entries: [
+					{ ...page, action: 'publish' },
+					{ ...page, id: 'entry_2', action: 'unpublish' },
+				],
+			},
+		}
+		const verified = await verifyWebhook(
+			signed({ body: JSON.stringify(release) }),
+			secret,
+		)
+		expect(verified).toEqual(release)
+		if (verified.type === 'release.published') {
+			expectTypeOf(verified.data.entries).toEqualTypeOf<WebhookReleaseEntry[]>()
+			expectTypeOf(verified.data.release).toEqualTypeOf<{
+				id: string
+				name: string
+			}>()
+		}
+
+		const review: WebhookEvent = {
+			...release,
+			type: 'release.review_requested',
+			data: { ...release.data, note: null },
+		}
+		if (review.type === 'release.review_requested') {
+			expectTypeOf(review.data.note).toEqualTypeOf<string | null>()
+		}
+
+		const block: WebhookEvent = {
+			...release,
+			type: 'block.published',
+			data: {
+				entry: {
+					id: 'entry_3',
+					contentType: 'hero',
+					name: 'Shared hero',
+					path: null,
+					paths: {},
+				},
+				entries: [page],
+			},
+		}
+		if (block.type === 'block.published') {
+			expectTypeOf(block.data.entries[0]!.paths).toEqualTypeOf<
+				Record<string, string>
+			>()
+		}
 	})
 })

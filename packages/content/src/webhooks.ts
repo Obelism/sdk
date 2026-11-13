@@ -49,6 +49,15 @@ export type EntryPublishedEvent = WebhookEventOf<
 	{ entry: WebhookEntry }
 >
 
+// A shared block (the CMS's docs/adr/0028) is published, with the published
+// pages that show it now. Pages left out of the publish keep the copy they
+// had and aren't listed. Sent instead of `entry.published`; the block's own
+// `path` is null and `paths` empty.
+export type BlockPublishedEvent = WebhookEventOf<
+	'block.published',
+	{ entry: WebhookEntry; entries: WebhookEntry[] }
+>
+
 // An entry is taken off the delivery API.
 export type EntryUnpublishedEvent = WebhookEventOf<
 	'entry.unpublished',
@@ -115,6 +124,33 @@ export type EntryReviewClosedEvent = WebhookEventOf<
 	}
 >
 
+// A release (the CMS's docs/adr/0038): entries published or unpublished
+// together.
+export type WebhookRelease = { id: string; name: string }
+
+export type WebhookReleaseEntry = WebhookEntry & {
+	action: 'publish' | 'unpublish'
+}
+
+// A release is published: every entry in it went live (or off) at once.
+// Each entry also sends its own `entry.published`, `block.published` or
+// `entry.unpublished`.
+export type ReleasePublishedEvent = WebhookEventOf<
+	'release.published',
+	{ release: WebhookRelease; entries: WebhookReleaseEntry[] }
+>
+
+// Someone asks for review of a release, in an environment whose publishing
+// is reviewed.
+export type ReleaseReviewRequestedEvent = WebhookEventOf<
+	'release.review_requested',
+	{
+		release: WebhookRelease
+		note: string | null
+		entries: WebhookReleaseEntry[]
+	}
+>
+
 // A product or collection of the space's Shopify store: its GID and handle
 // (null once a product is deleted).
 export type WebhookShopifyItem = { id: string; handle: string | null }
@@ -164,6 +200,7 @@ export type WebhookTestEvent = WebhookEventOf<
 
 export type WebhookEvent =
 	| EntryPublishedEvent
+	| BlockPublishedEvent
 	| EntryUnpublishedEvent
 	| EntryDeletedEvent
 	| EntryMovedEvent
@@ -172,6 +209,8 @@ export type WebhookEvent =
 	| LocalesChangedEvent
 	| EntryReviewRequestedEvent
 	| EntryReviewClosedEvent
+	| ReleasePublishedEvent
+	| ReleaseReviewRequestedEvent
 	| ProductUpdatedEvent
 	| ProductDeletedEvent
 	| CollectionUpdatedEvent
