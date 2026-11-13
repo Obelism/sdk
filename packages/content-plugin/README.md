@@ -46,7 +46,8 @@ Register a plugin in Content (**Plugins**) by the URL of its manifest. `MANIFEST
 A plugin that needs a type around its input can bring it: `contentTypes`
 lists up to five, as a model file holds them. Each is added to an
 environment's model when the plugin is turned on there, unless a type with
-that `apiId` exists; a model managed in code gets them from its model file.
+that `apiId` exists. A model managed in code gets none: Content names them
+for you to add to the model file.
 
 ```json
 {
