@@ -43,6 +43,33 @@ Register a plugin in Content (**Plugins**) by the URL of its manifest. `MANIFEST
 }
 ```
 
+A plugin that needs a type around its input can bring it: `contentTypes`
+lists up to five, as a model file holds them. Each is added to an
+environment's model when the plugin is turned on there, unless a type with
+that `apiId` exists; a model managed in code gets them from its model file.
+
+```json
+{
+	"contentTypes": [
+		{
+			"apiId": "swatch",
+			"name": "Swatch",
+			"kind": "data",
+			"description": "A named colour of the brand.",
+			"fields": [
+				{ "apiId": "name", "name": "Name", "type": "text", "required": true },
+				{
+					"apiId": "colour",
+					"name": "Colour",
+					"type": "text",
+					"editor": { "plugin": "brand-colour" }
+				}
+			]
+		}
+	]
+}
+```
+
 ## Starter: a field editor
 
 ```html
