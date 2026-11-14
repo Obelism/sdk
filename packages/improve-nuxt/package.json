@@ -52,7 +52,7 @@
 		"@obelism/sdk-typescript-config": "^0.0.0",
 		"@typescript/typescript6": "^6.0.2",
 		"bunchee": "^7.0.2",
-		"h3": "^1.15.11",
+		"h3": "^2.0.8",
 		"npm-run-all2": "^9.0.4",
 		"oxlint": "^1.91.0",
 		"typescript": "^7.0.2",
