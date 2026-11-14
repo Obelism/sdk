@@ -1,7 +1,10 @@
-// Improve's deterministic buckets (improve's docs/adr/0014). A copy lives in
+// Improve's deterministic buckets (Improve's docs/adr/0014). A copy lives in
 // Obelism/obelism's packages/numbers/src/buckets.ts; bucketVectors.json pins both.
 
 export const BUCKETS = 10_000
+
+// Salts are server-made and never contain a `.`, so `${salt}.${id}` can't be
+// read two ways.
 
 const C1 = 0xcc9e2d51
 const C2 = 0x1b873593
@@ -10,7 +13,6 @@ const rotl = (x: number, r: number) => (x << r) | (x >>> (32 - r))
 
 const scramble = (k: number) => Math.imul(rotl(Math.imul(k, C1), 15), C2)
 
-// MurmurHash3 x86_32, unsigned.
 export const murmur3_32 = (bytes: Uint8Array, seed = 0): number => {
 	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 	const length = bytes.byteLength
