@@ -82,6 +82,44 @@ describe('ContentClient', () => {
 		expect(init.headers).toMatchObject({ 'x-extra': 'b' })
 	})
 
+	it('asks for a release, from the client and per request', async () => {
+		const fetchMock = respond({ entry })
+		const content = new ContentClient({
+			token: 'cms_p_x',
+			release: 'release_a',
+			fetch: fetchMock,
+		})
+
+		await content.getPage('home')
+		await content.getEntries({ release: 'release_b' })
+
+		expect(requested(fetchMock).url.searchParams.get('release')).toBe(
+			'release_a',
+		)
+		expect(requested(fetchMock, 1).url.searchParams.get('release')).toBe(
+			'release_b',
+		)
+	})
+
+	it('previews the release on redirects and the content model too', async () => {
+		const fetchMock = respond({ items: [] })
+		const content = new ContentClient({
+			token: 'cms_p_x',
+			release: 'release_a',
+			fetch: fetchMock,
+		})
+
+		await content.getRedirects()
+		await content.getContentModel()
+
+		expect(requested(fetchMock).url.searchParams.get('release')).toBe(
+			'release_a',
+		)
+		expect(requested(fetchMock, 1).url.searchParams.get('release')).toBe(
+			'release_a',
+		)
+	})
+
 	it('answers null for a page or entry that is not there', async () => {
 		const content = new ContentClient({
 			token: 't',

@@ -43,8 +43,16 @@ await content.getEntries({
 await content.getContentModel() //          the model file
 ```
 
-Each method takes `{ locale, depth, richText, drafts, init }` to override the
-defaults.
+Each method takes `{ locale, depth, richText, drafts, release, init }` to
+override the defaults.
+
+`release` previews a release (`release_…`): every entry as publishing it now
+would leave it, with the release's own unpublished pages and without the ones
+it takes down. It is how a site checks a launch before it goes live, so the
+token must read drafts (a preview token, a `cms_token`, a site or plugin
+token, or a host token with `drafts`): a delivery token that names a release
+is refused, `403 release_needs_preview`. It holds for every read the client
+makes, `getRedirects` and `getContentModel` too.
 
 ### Without a stored token
 
@@ -102,6 +110,12 @@ their own can make a `cms_token` for it, and only a request that names yours
 refuses one for another. Never show drafts because `cms_preview` is there:
 anyone can add it to a URL.
 
+A release's **Preview** button opens the same parameters on the release's
+first page plus `cms_release=release_…`, with a `cms_token` made for that
+release: the site previews that release alone. `readPreviewParams` answers it
+as `release`; pass it to the client to ask for the release with a preview
+token of your own, or to tell which release is being shown.
+
 ```ts
 import {
 	ContentApiError,
@@ -115,6 +129,7 @@ const content = preview?.token
 			token: preview.token,
 			space: process.env.CONTENT_SPACE_ID,
 			environment: process.env.CONTENT_ENVIRONMENT,
+			release: preview.release ?? undefined,
 			init: { cache: 'no-store' },
 		})
 	: deliveryClient
