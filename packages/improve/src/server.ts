@@ -55,8 +55,9 @@ export type ImproveSeededAssignment = {
 	// The option this visitor gets, which is the test's default for a visitor
 	// outside it.
 	value: string
-	// False for a visitor outside the test's or flag's audience, or the test's
-	// allocation: they see the default option and nothing is exposed.
+	// False for a visitor outside the test's or flag's audience, the test's
+	// allocation or group range, or held out: they see the default option and
+	// nothing is exposed for the test.
 	included: boolean
 	// The holdout keeping the visitor out of this test. The browser SDK
 	// exposes it when the page reads the test.

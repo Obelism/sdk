@@ -89,12 +89,23 @@ export const generateImproveNextMiddleware = (
 						request.cookies.get(serverABTestConfig.slug)?.value ?? null,
 					)
 			const testValue = forced ?? decision?.value ?? null
+			const clearStale = (response: NextResponse) => {
+				if (decision?.cookie === 'clear')
+					response.cookies.delete({
+						...args.options?.testValue,
+						name: serverABTestConfig.slug,
+						// A custom maxAge would outlast the delete's expiry.
+						maxAge: 0,
+					})
+				return response
+			}
 
 			const testMatchOption = serverABTestConfig.options.find(
 				(option) => option.value === testValue,
 			)
 
-			if (testValue == null || !testMatchOption) return NextResponse.next()
+			if (testValue == null || !testMatchOption)
+				return clearStale(NextResponse.next())
 
 			// Update the response with cookies response
 			let response: undefined | NextResponse<unknown>
@@ -120,10 +131,8 @@ export const generateImproveNextMiddleware = (
 					maxAge: DEFAULT_COOKIE_TTL,
 					...args.options?.testValue,
 				})
-			else if (decision.cookie === 'clear')
-				response.cookies.delete(serverABTestConfig.slug)
 
-			return response
+			return clearStale(response)
 		} catch (e) {
 			console.error('[Improve SDK]', e)
 			return NextResponse.next()

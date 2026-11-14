@@ -6,6 +6,12 @@
 npm i @obelism/improve-sdk
 ```
 
+## Exclusion groups and holdouts
+
+Tests in an exclusion group or under a holdout need this SDK version or later: an older one gets them with allocation 0, so their visitors see the default. Nothing else changes on the site: the SDK asks for the datafile with `?groups=1` by itself.
+
+For those tests the visitor's id (the `obelism_visitor_id` cookie) decides who is in, the same in the browser and on the server, before any cookie: a visitor is in at most one test of a group, and a cookie only keeps the variant of a visitor who is in. A visitor held out sees each test's default and is exposed once, as the holdout. A test cookie of a visitor who is out is removed. The browser SDK removes it with `path=/` and no domain, so a cookie your middleware set on another path or domain stays until the server removes it (`decideTest`, `seedTestCookies`).
+
 ## Class
 
 The Improve JS SDK exposes two classes;
@@ -140,6 +146,38 @@ getTestValue = (testSlug: string, visitorId: string, userAgent: string) =>
 ```
 
 Based on the slug, visitorId and userAgent this method gives you back what version of the AB test this visitor should get. If no config is loaded yet or no AB test with the given slug is found it returns `null`. When the userAgent of the visitor doesn't match the audience of the Test it will always return the control value. If the visitor does match the audience it will then check the allocation. If that's lower than 100% it will based on randomization check if this visitor should get the AB test. After that it will receive a random version of the test based on the randomization using the odds setup in the split.
+
+### decideTest
+
+```ts
+decideTest = (
+	testSlug: string,
+	visitorId: string,
+	userAgent: string,
+	geo?: { country?: string },
+	cookie?: string | null,
+) => { value: string | null; cookie: 'set' | 'clear' | 'none'; holdout?: string }
+```
+
+For middleware: the test's value for a request, given the test's cookie, and what to do with that cookie: set it to `value`, remove it (a visitor out of a group's range or held out), or leave it. A test outside groups and holdouts keeps a valid cookie's value, as before.
+
+### seedTestCookies
+
+```ts
+seedTestCookies = ({ cookieHeader, userAgent, geo, maxAgeDays, secure }) =>
+	{ visitorId: string; cookies: { name, value, kind, header }[]; assignments: { slug, kind, value, included, holdout? }[] }
+```
+
+What to set before sending a page: the visitor cookie and a cookie per test and flag the visitor is in, each with a ready `Set-Cookie` header. A visitor outside a test gets its default and no cookie; a stale cookie comes back with an empty value and `Max-Age=0`.
+
+### readVercelConfig
+
+```ts
+readVercelConfig = (get: (key: string) => unknown, environment) =>
+	Promise<Configuration | null>
+```
+
+Reads the datafile Improve mirrors to Vercel Global Config, for `config` or `loadConfig`. Pass the store's `get` (from `@vercel/global-config`): it reads `{environment}_f2`, the datafile with groups and holdouts, and falls back to `{environment}` for a store an older Improve wrote. Exported from `@obelism/improve-sdk/server`.
 
 ### Without a stored token
 

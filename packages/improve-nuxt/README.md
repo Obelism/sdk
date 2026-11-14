@@ -41,10 +41,13 @@ For each request on a route with a server test, the middleware:
   through a deploy;
 - reads the visitor and the variant from their cookies, or a query parameter
   named after the test (`/?startpage-visual=variation`, for testing a
-  variant), and decides only when there is nothing to reuse;
+  variant), and decides only when there is nothing to reuse; for a test in
+  an exclusion group or under a holdout the visitor's bucket decides first,
+  and the cookie of a visitor who is out is removed;
 - passes the visitor's country from `x-vercel-ip-country` or `cf-ipcountry`,
   so country audiences resolve;
-- sets the `obelism_visitor_id` cookie and one named after the test;
+- sets the `obelism_visitor_id` cookie and one named after the test (not
+  for a visitor out of a group's range or held out);
 - leaves the variants on `event.context.improve`.
 
 `routeHandler` is the page route: a path (`/`), a parameter

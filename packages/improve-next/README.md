@@ -77,4 +77,5 @@ The generated handler based on your configuration. Receives a `NextRequest` and 
 
 - Search parameters matching a valid test with option configuration. Recommended for development or testing purposes, shouldn't be used for real users since it will impact the distribution.
 - AB test cookie value which matches a valid test for name with option for value, the `improveMiddlewareHandler` will both read and write this cookie
+- For a test in an exclusion group or under a holdout, the visitor's bucket decides first: a visitor who is out gets the default and their test cookie is removed, with the `testValue` cookie options
 - Visitor ID cookie, for long running servers the `ImproveServerSDK` will also be able to store the saved decision for a visitor in memory and use that to serve the same result. For serverless or edge this won't work for this purpose.
