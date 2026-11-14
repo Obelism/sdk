@@ -37,6 +37,11 @@ export type ContentClientOptions = {
 	locale?: string | undefined
 	depth?: number | undefined
 	richText?: RichTextFormat | undefined
+	// The release to preview (`release_…`): the content as publishing it now
+	// would put live. Its unpublished content is drafts, so the token must
+	// read drafts (a preview, site, plugin or `drafts` host token): a
+	// delivery token is refused.
+	release?: string | undefined
 	// Milliseconds before a request is aborted. Default: 10000.
 	timeout?: number | undefined
 	// Passed to every fetch, e.g. `{ next: { revalidate: 60 } }` in Next.js.
@@ -55,6 +60,8 @@ export type RequestOptions = {
 	richText?: RichTextFormat | undefined
 	// Overrides the client's `drafts` for this request.
 	drafts?: boolean | undefined
+	// Overrides the client's `release` for this request.
+	release?: string | undefined
 	// Merged over the client's `init` for this request.
 	init?: RequestInit | undefined
 }
@@ -124,7 +131,10 @@ export class ContentClient {
 	// 308, so the client asks there directly after the first one. Never used
 	// for a request that reads drafts, which the scoped path refuses.
 	#scope: string | null = null
-	#defaults: Pick<RequestOptions, 'locale' | 'depth' | 'richText' | 'drafts'>
+	#defaults: Pick<
+		RequestOptions,
+		'locale' | 'depth' | 'richText' | 'drafts' | 'release'
+	>
 	#timeout: number
 	#init: RequestInit | undefined
 	#fetch: typeof fetch
@@ -138,6 +148,7 @@ export class ContentClient {
 		locale,
 		depth,
 		richText,
+		release,
 		timeout,
 		init,
 		fetch: fetchImpl,
@@ -148,7 +159,7 @@ export class ContentClient {
 			...(space && { 'Obelism-Space': space }),
 			...(environment && { 'Obelism-Environment': environment }),
 		}
-		this.#defaults = { locale, depth, richText, drafts }
+		this.#defaults = { locale, depth, richText, drafts, release }
 		this.#timeout = timeout ?? DEFAULT_TIMEOUT
 		this.#init = init
 		this.#fetch = fetchImpl ?? ((...args) => fetch(...args))
@@ -307,8 +318,11 @@ export class ContentClient {
 			...(defaults && this.#defaults),
 			...withoutUndefined(options),
 		}
+		// Which content the whole read is, unlike the shaping defaults:
+		// redirects and the content model preview the release too.
+		const release = options.release ?? this.#defaults.release
 		const params = new URLSearchParams()
-		const values = { ...query, locale, depth, richtext: richText }
+		const values = { ...query, locale, depth, richtext: richText, release }
 		for (const [key, value] of Object.entries(values)) {
 			if (value !== undefined) params.set(key, String(value))
 		}

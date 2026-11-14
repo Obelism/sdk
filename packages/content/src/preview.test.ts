@@ -9,6 +9,7 @@ describe('readPreviewParams', () => {
 		entryId: 'entry_1',
 		environment: 'develop',
 		token: 'cms_v_abc',
+		release: null,
 	}
 
 	it('reads the editor parameters from any shape of query', () => {
@@ -31,12 +32,24 @@ describe('readPreviewParams', () => {
 		).toEqual(expected)
 	})
 
+	it('reads the release the Preview button opened', () => {
+		expect(readPreviewParams(`?${query}&cms_release=release_abc`)).toEqual({
+			...expected,
+			release: 'release_abc',
+		})
+	})
+
 	it('has no token from a CMS that sends none', () => {
 		expect(
 			readPreviewParams(
 				'?cms_preview=1&cms_entry=entry_1&cms_environment=develop',
 			),
-		).toEqual({ entryId: 'entry_1', environment: 'develop', token: null })
+		).toEqual({
+			entryId: 'entry_1',
+			environment: 'develop',
+			token: null,
+			release: null,
+		})
 	})
 
 	it('is null outside a preview', () => {

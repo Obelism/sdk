@@ -8,6 +8,8 @@ export const PREVIEW_PARAMS = {
 	entry: 'cms_entry',
 	environment: 'cms_environment',
 	token: 'cms_token',
+	// The release its Preview button opened (`release_…`).
+	release: 'cms_release',
 } as const
 
 export type PreviewParams = {
@@ -15,6 +17,8 @@ export type PreviewParams = {
 	environment: string | null
 	// Null from a CMS that doesn't send one yet.
 	token: string | null
+	// The release to pass as the client's `release`, if this preview is one.
+	release: string | null
 }
 
 type SearchParamsInput =
@@ -46,7 +50,12 @@ const toSearchParams = (input: SearchParamsInput) => {
 //
 //   const preview = readPreviewParams(request.url)
 //   const content = preview?.token
-//   	? new ContentClient({ token: preview.token, space, environment })
+//   	? new ContentClient({
+//   			token: preview.token,
+//   			space,
+//   			environment,
+//   			release: preview.release ?? undefined,
+//   		})
 //   	: deliveryClient
 //
 // `space` and `environment` are the site's own: anyone can make a cms_token
@@ -62,5 +71,6 @@ export const readPreviewParams = (
 		entryId: params.get(PREVIEW_PARAMS.entry),
 		environment: params.get(PREVIEW_PARAMS.environment),
 		token: params.get(PREVIEW_PARAMS.token),
+		release: params.get(PREVIEW_PARAMS.release),
 	}
 }
