@@ -86,11 +86,12 @@ export type TrackOptions = {
 }
 
 /**
- * A visitor's assignment to a test's or flag's variant, for SDKs that run
- * them (improve's). numbers attributes the visitor's events to it.
+ * A visitor's assignment to a test's or flag's variant, or to a holdout that
+ * keeps them out of tests, for SDKs that run them (Improve's). Numbers
+ * attributes the visitor's events to it.
  */
 export type Exposure = {
-	subjectKind: 'test' | 'flag'
+	subjectKind: 'test' | 'flag' | 'holdout'
 	subjectId: string
 	variant: string
 }

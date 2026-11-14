@@ -1,4 +1,10 @@
-import type { ImproveAudienceValue, ImproveFlag, ImproveTest } from './types'
+import type {
+	ImproveAudienceValue,
+	ImproveConfiguration,
+	ImproveFlag,
+	ImproveTest,
+} from './types'
+import { BUCKETS, bucketOf, inRanges, pickVariant } from './utils/buckets'
 import { getRandomTestValue } from './utils/getRandomTestValue'
 import { getVisitorMatchesAudience } from './utils/getVisitorMatchesAudience'
 import type { ParsedUserAgent } from './utils/parseUserAgent'
@@ -10,6 +16,8 @@ import type { ParsedUserAgent } from './utils/parseUserAgent'
 // A visitor's categories, which audiences match on, and the values assigned to
 // them, by test or flag slug.
 export type Visitor = {
+	// Numbers' visitor id, which buckets are taken of.
+	id: string
 	params: ParsedUserAgent
 	assigned: Map<string, string>
 	// The subjects a visitor was left out of, which are remembered so a later
@@ -18,7 +26,8 @@ export type Visitor = {
 	heldOut: Set<string>
 }
 
-export const createVisitor = (params: ParsedUserAgent): Visitor => ({
+export const createVisitor = (params: ParsedUserAgent, id = ''): Visitor => ({
+	id,
 	params,
 	assigned: new Map(),
 	heldOut: new Set(),
@@ -32,14 +41,69 @@ export type Subject = {
 	// Share of visitors in it, out of 100.
 	allocation: number
 	options: readonly { slug: string; split: number }[]
+	// A test in an exclusion group or under a holdout (Improve's
+	// docs/adr/0014): who is in it is decided by the visitor's id.
+	buckets?: Buckets
 }
 
-export const testSubject = (slug: string, test: ImproveTest): Subject => ({
-	slug,
-	fallback: test.defaultValue,
-	allocation: test.allocation,
-	options: test.options,
-})
+type Buckets = {
+	salt: string
+	// The group's salt and the test's ranges of it. Without, entry is the
+	// test's own bucket against its allocation.
+	group?: { salt: string; ranges: readonly (readonly [number, number])[] }
+	// The holdouts running over this test now.
+	holdouts: { id: string; salt: string; share: number }[]
+}
+
+const runningHoldouts = (
+	slug: string,
+	config: ImproveConfiguration | null | undefined,
+	now: number,
+): Buckets['holdouts'] =>
+	Object.entries(config?.holdouts ?? {}).flatMap(([id, holdout]) =>
+		holdout.tests.includes(slug) &&
+		Date.parse(holdout.start) <= now &&
+		(holdout.end === null || now < Date.parse(holdout.end))
+			? [{ id, salt: holdout.salt, share: holdout.share }]
+			: [],
+	)
+
+const testBuckets = (
+	slug: string,
+	test: ImproveTest,
+	config: ImproveConfiguration | null | undefined,
+	now: number,
+): Buckets | undefined => {
+	if (!test.salt) return undefined
+	const holdouts = runningHoldouts(slug, config, now)
+	if (!test.group) return { salt: test.salt, holdouts }
+	// A group the datafile doesn't name holds no buckets: nobody is in.
+	const group = config?.groups?.[test.group]
+	return {
+		salt: test.salt,
+		group: {
+			salt: group?.salt ?? '',
+			ranges: group ? (test.ranges ?? []) : [],
+		},
+		holdouts,
+	}
+}
+
+export const testSubject = (
+	slug: string,
+	test: ImproveTest,
+	config?: ImproveConfiguration | null,
+	now: number = Date.now(),
+): Subject => {
+	const buckets = testBuckets(slug, test, config, now)
+	return {
+		slug,
+		fallback: test.defaultValue,
+		allocation: test.allocation,
+		options: test.options,
+		...(buckets && { buckets }),
+	}
+}
 
 export const flagSubject = (slug: string, flag: ImproveFlag): Subject => ({
 	slug,
@@ -60,7 +124,15 @@ export type AssignmentSource =
 	// Nothing to assign: the test or flag has no options.
 	| 'none'
 
-export type Assignment = { value: string | null; source: AssignmentSource }
+export type Assignment = {
+	value: string | null
+	source: AssignmentSource
+	// The holdout keeping the visitor out of this test, which is exposed
+	// instead of it.
+	holdout?: string
+	// The visitor is out of a bucketed test, so a cookie for it is stale.
+	clear?: true
+}
 
 // The value `visitor` gets from `subject`: the one they have, else the one a
 // cookie gives them, else one they're assigned now (remembered on them), else
@@ -73,6 +145,8 @@ export const assign = (
 	known?: string | null,
 ): Assignment => {
 	if (!visitor) return { value: subject.fallback, source: 'default' }
+	if (subject.buckets)
+		return assignByBucket(subject, subject.buckets, audience, visitor, known)
 
 	const assigned = visitor.assigned.get(subject.slug)
 	// A value that outlived its option (the datafile changed under a live
@@ -110,5 +184,58 @@ export const assign = (
 
 	visitor.assigned.set(subject.slug, value)
 	visitor.heldOut.delete(subject.slug)
+	return { value, source: 'new' }
+}
+
+const hasOption = (subject: Subject, value: string | null | undefined) =>
+	Boolean(value) && subject.options.some(({ slug }) => slug === value)
+
+// Holdout and entry come from the visitor's id every time, before any cookie,
+// so a cookie can't put a visitor in two tests of a group; inside the test, a
+// cookie keeps the variant.
+const assignByBucket = (
+	subject: Subject,
+	buckets: Buckets,
+	audience: ImproveAudienceValue | undefined,
+	visitor: Visitor,
+	known: string | null | undefined,
+): Assignment => {
+	const out = (holdout?: string): Assignment => {
+		visitor.assigned.delete(subject.slug)
+		return {
+			value: subject.fallback,
+			source: 'default',
+			...(holdout && { holdout }),
+			...(known && { clear: true as const }),
+		}
+	}
+	// Random entry would break a group's exclusivity.
+	if (!visitor.id) return out()
+
+	const holdout = buckets.holdouts.find(
+		({ salt, share }) => bucketOf(salt, visitor.id) < share,
+	)
+	if (holdout) return out(holdout.id)
+
+	const entered = buckets.group
+		? inRanges(bucketOf(buckets.group.salt, visitor.id), buckets.group.ranges)
+		: bucketOf(buckets.salt, visitor.id) < (subject.allocation / 100) * BUCKETS
+	if (!entered) return out()
+
+	const assigned = visitor.assigned.get(subject.slug)
+	if (hasOption(subject, assigned))
+		return { value: assigned!, source: 'visitor' }
+
+	if (hasOption(subject, known)) {
+		visitor.assigned.set(subject.slug, known!)
+		return { value: known!, source: 'cookie' }
+	}
+
+	if (!getVisitorMatchesAudience(audience, visitor.params))
+		return { value: subject.fallback, source: 'default' }
+
+	const value = pickVariant(buckets.salt, visitor.id, subject.options)
+	if (!value) return { value: null, source: 'none' }
+	visitor.assigned.set(subject.slug, value)
 	return { value, source: 'new' }
 }

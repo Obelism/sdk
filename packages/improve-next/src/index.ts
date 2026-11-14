@@ -74,18 +74,21 @@ export const generateImproveNextMiddleware = (
 					undefined,
 			}
 
-			// Get AB test value from: searchParam, cookies or get generate a new value
-			const testValue =
-				validateValue(
-					request.nextUrl.searchParams.get(serverABTestConfig.slug),
-				) ||
-				validateValue(request.cookies.get(serverABTestConfig.slug)?.value) ||
-				args.improveSdk.getTestValue(
-					serverABTestConfig.slug,
-					visitorId,
-					ua,
-					geo,
-				)
+			// A search param forces a value; otherwise the SDK decides, from the
+			// cookie for most tests.
+			const forced = validateValue(
+				request.nextUrl.searchParams.get(serverABTestConfig.slug),
+			)
+			const decision = forced
+				? null
+				: args.improveSdk.decideTest(
+						serverABTestConfig.slug,
+						visitorId,
+						ua,
+						geo,
+						request.cookies.get(serverABTestConfig.slug)?.value ?? null,
+					)
+			const testValue = forced ?? decision?.value ?? null
 
 			const testMatchOption = serverABTestConfig.options.find(
 				(option) => option.value === testValue,
@@ -112,10 +115,13 @@ export const generateImproveNextMiddleware = (
 				maxAge: DEFAULT_COOKIE_TTL,
 				...args.options?.visitorId,
 			})
-			response.cookies.set(serverABTestConfig.slug, testValue, {
-				maxAge: DEFAULT_COOKIE_TTL,
-				...args.options?.testValue,
-			})
+			if (!decision || decision.cookie === 'set')
+				response.cookies.set(serverABTestConfig.slug, testValue, {
+					maxAge: DEFAULT_COOKIE_TTL,
+					...args.options?.testValue,
+				})
+			else if (decision.cookie === 'clear')
+				response.cookies.delete(serverABTestConfig.slug)
 
 			return response
 		} catch (e) {

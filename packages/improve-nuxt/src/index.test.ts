@@ -104,6 +104,33 @@ describe('generateImproveNuxtMiddleware', () => {
 		}
 	})
 
+	it('removes the cookie of a visitor outside a group’s ranges', async () => {
+		const improveSdk = new ImproveServerSDK({
+			organizationId: 'org_1',
+			environment: 'production',
+			config: {
+				...CONFIG,
+				version: 2,
+				tests: {
+					'startpage-visual': {
+						...CONFIG.tests['startpage-visual']!,
+						group: 'group_1',
+						ranges: [],
+						salt: 'visual',
+					},
+				},
+				groups: { group_1: { salt: 'g1' } },
+			},
+		})
+		const response = await setup(improveSdk)('/', {
+			cookie:
+				'obelism_visitor_id=visi_ABCDEFGHIJKLMNOPQRSTUVWXYZ; startpage-visual=variation',
+		})
+		expect(await response.json()).toEqual({ 'startpage-visual': 'control' })
+		expect(cookies(response)['startpage-visual']).toBe('')
+		expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
+	})
+
 	it('lets a query parameter pick a variant, but only a real one', async () => {
 		const request = setup()
 		const picked = await request('/?startpage-visual=variation', {

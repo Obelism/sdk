@@ -11,6 +11,8 @@ import { BaseImproveSDK } from './base'
 import { type TokenSource, resolveToken } from './tokenSource'
 import { ImproveConfiguration, ImproveSetupArgs } from './types'
 
+export { getVercelConfigKeys, readVercelConfig } from './vercelConfig'
+
 const DEFAULT_MAX_VISITORS = 10_000
 // One visitor id with endless user agents would otherwise grow without bound.
 const MAX_USER_AGENTS_PER_VISITOR = 10
@@ -39,6 +41,8 @@ export type ImproveSeedArgs = {
 
 export type ImproveSeededCookie = {
 	name: string
+	// Empty, with `Max-Age=0`, for a cookie to remove: one that would put the
+	// visitor in a test their bucket keeps them out of.
 	value: string
 	kind: 'visitor' | 'test' | 'flag'
 	// Ready for a `Set-Cookie` header.
@@ -54,6 +58,16 @@ export type ImproveSeededAssignment = {
 	// False for a visitor outside the test's or flag's audience, or the test's
 	// allocation: they see the default option and nothing is exposed.
 	included: boolean
+	// The holdout keeping the visitor out of this test. The browser SDK
+	// exposes it when the page reads the test.
+	holdout?: string | undefined
+}
+
+export type ImproveTestDecision = {
+	value: string | null
+	cookie: 'set' | 'clear' | 'none'
+	// The holdout keeping the visitor out of the test.
+	holdout?: string | undefined
 }
 
 export type ImproveSeed = {
@@ -123,7 +137,7 @@ export class ImproveServerSDK extends BaseImproveSDK {
 		if (visitor.size >= MAX_USER_AGENTS_PER_VISITOR) {
 			visitor.delete(visitor.keys().next().value!)
 		}
-		const fresh = createVisitor(parsed)
+		const fresh = createVisitor(parsed, visitorId)
 		visitor.set(userAgent, fresh)
 		return fresh
 	}
@@ -168,7 +182,7 @@ export class ImproveServerSDK extends BaseImproveSDK {
 		if (geo?.country) visitor.params.country = geo.country
 
 		return assign(
-			testSubject(slug, test),
+			testSubject(slug, test, config),
 			config.audience[test.audience],
 			visitor,
 			known,
@@ -192,6 +206,42 @@ export class ImproveServerSDK extends BaseImproveSDK {
 		// country. The browser can't determine this, so it's passed in here.
 		geo?: { country?: string | undefined },
 	) => this.#assignment('test', testSlug, visitorId, userAgent, geo).value
+
+	// A test's value for a request's visitor, and what its cookie should do:
+	// hold the value, be removed, or be left alone (a visitor out of a test in
+	// an exclusion group or under a holdout gets no cookie). For middleware.
+	decideTest = (
+		testSlug: string,
+		visitorId: string,
+		userAgent: string,
+		geo?: { country?: string | undefined },
+		cookie?: string | null,
+	): ImproveTestDecision => {
+		const test = this.getTestConfig(testSlug)
+		if (!test?.salt) {
+			const value =
+				cookie && test?.options.some(({ slug }) => slug === cookie)
+					? cookie
+					: this.getTestValue(testSlug, visitorId, userAgent, geo)
+			return { value, cookie: value ? 'set' : 'none' }
+		}
+
+		const { value, source, holdout, clear } = this.#assignment(
+			'test',
+			testSlug,
+			visitorId,
+			userAgent,
+			geo,
+			cookie,
+		)
+		const included =
+			source === 'visitor' || source === 'cookie' || source === 'new'
+		return {
+			value,
+			cookie: included ? 'set' : clear ? 'clear' : 'none',
+			...(holdout && { holdout }),
+		}
+	}
 
 	// What a server should set before it sends a page: the visitor, and a cookie
 	// per test and flag the visitor is in. A visitor outside a test's audience
@@ -231,7 +281,9 @@ export class ImproveServerSDK extends BaseImproveSDK {
 				kind,
 				name,
 				value,
-				header: `${name}=${value}; ${attributes}`,
+				header: value
+					? `${name}=${value}; ${attributes}`
+					: `${name}=; ${attributes.replace(/Max-Age=\d+/, 'Max-Age=0')}`,
 			})
 		}
 
@@ -254,7 +306,7 @@ export class ImproveServerSDK extends BaseImproveSDK {
 		const assignments: ImproveSeededAssignment[] = []
 		for (const { slug, kind } of subjects) {
 			const known = read.get(slug) ?? null
-			const { value, source } = this.#assignment(
+			const { value, source, holdout, clear } = this.#assignment(
 				kind,
 				slug,
 				visitorId,
@@ -262,11 +314,18 @@ export class ImproveServerSDK extends BaseImproveSDK {
 				args.geo,
 				known,
 			)
+			if (clear) set(kind, slug, '')
 			if (!value) continue
 
 			const included =
 				source === 'visitor' || source === 'cookie' || source === 'new'
-			assignments.push({ slug, kind, value, included })
+			assignments.push({
+				slug,
+				kind,
+				value,
+				included,
+				...(holdout && { holdout }),
+			})
 			if (included && value !== known) set(kind, slug, value)
 		}
 

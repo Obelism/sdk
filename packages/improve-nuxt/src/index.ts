@@ -1,6 +1,7 @@
 import type { ImproveServerSDK } from '@obelism/improve-sdk/server'
 import {
 	defineEventHandler,
+	deleteCookie,
 	getCookie,
 	getQuery,
 	getRequestHeader,
@@ -127,14 +128,24 @@ export const generateImproveNuxtMiddleware = (
 						? value
 						: null
 
-				const value =
-					valid(query[slug]) ??
-					valid(getCookie(event, slug)) ??
-					args.improveSdk.getTestValue(slug, visitorId, ua, geo)
+				const forced = valid(query[slug])
+				const decision = forced
+					? null
+					: args.improveSdk.decideTest(
+							slug,
+							visitorId,
+							ua,
+							geo,
+							getCookie(event, slug) ?? null,
+						)
+				const value = forced ?? decision?.value ?? null
+				if (decision?.cookie === 'clear')
+					deleteCookie(event, slug, cookie(args.options?.testValue))
 				if (value == null) continue
 
 				decided[slug] = value
-				setCookie(event, slug, value, cookie(args.options?.testValue))
+				if (!decision || decision.cookie === 'set')
+					setCookie(event, slug, value, cookie(args.options?.testValue))
 			}
 			if (Object.keys(decided).length === 0) return
 

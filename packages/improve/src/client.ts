@@ -16,7 +16,7 @@ import {
 } from './assignment'
 import { parseUserAgent } from './utils/parseUserAgent'
 import { BaseImproveSDK } from './base'
-import { getCookie, setCookie } from './utils/clientCookie'
+import { clearCookie, getCookie, setCookie } from './utils/clientCookie'
 import { ANALYTICS_PATH } from './config/urls'
 import { pushDataLayer, resetDataLayerEcommerce } from './utils/pushDataLayer'
 import {
@@ -34,7 +34,8 @@ export type CreateEvent = EventBeacon
 
 /**
  * A visitor's assignment to a test/flag variant, emitted the first time the SDK
- * resolves a non-holdout value for them. The per-variant exposure count is the
+ * resolves a non-holdout value for them, or to a holdout that keeps them out of
+ * a test (variant `holdout`). The per-variant exposure count is the
  * denominator for results.
  */
 export type CreateExposure = ExposureBeacon
@@ -94,7 +95,7 @@ export class ImproveClientSDK extends BaseImproveSDK {
 
 		if (!parsedUserAgent) return null
 
-		this.#visitor = createVisitor(parsedUserAgent)
+		this.#visitor = createVisitor(parsedUserAgent, this.#visitorId)
 
 		// The audiences' categories, so numbers reports the same ones.
 		const { pointer, device, browser, os } = parsedUserAgent
@@ -130,7 +131,7 @@ export class ImproveClientSDK extends BaseImproveSDK {
 		if (!this.#visitor) this.setupVisitor()
 		return this.#settle(
 			assign(
-				testSubject(testSlug, test),
+				testSubject(testSlug, test, config),
 				config.audience[test.audience],
 				this.#visitor ?? null,
 				getCookie(testSlug),
@@ -146,11 +147,13 @@ export class ImproveClientSDK extends BaseImproveSDK {
 	// earlier call here is already recorded; one from a cookie was assigned
 	// server-side, and gets its exposure here.
 	#settle = (
-		{ value, source }: Assignment,
+		{ value, source, holdout, clear }: Assignment,
 		slug: string,
 		kind: 'test' | 'flag',
 		id: string,
 	) => {
+		if (clear) clearCookie(slug)
+		if (holdout) this.#postExposure('holdout', holdout, 'holdout')
 		if (!value) return value
 		if (source === 'cookie') this.#postExposure(kind, id, value)
 		else if (source === 'new') {
@@ -168,7 +171,7 @@ export class ImproveClientSDK extends BaseImproveSDK {
 	// this instance (the numbers SDK sends each subject once). Idempotent
 	// server-side (unique per visitor+subject).
 	#postExposure = (
-		subjectKind: 'test' | 'flag',
+		subjectKind: CreateExposure['subjectKind'],
 		subjectId: string,
 		variant: string,
 	) => {

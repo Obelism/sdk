@@ -195,6 +195,32 @@ export type ImproveTest = {
 	allocation: number
 	options: ImproveTestOption[]
 	events: ImproveEvents
+	/** The exclusion group it is in, from `groups`. Datafile format 2. */
+	group?: string | undefined
+	/**
+	 * The group's buckets this test holds, half-open `[start, end)` out of
+	 * 10,000. Datafile format 2.
+	 */
+	ranges?: [start: number, end: number][] | undefined
+	/**
+	 * Set for a test in a group or under a holdout: its visitors are bucketed
+	 * by their id rather than at random. Datafile format 2.
+	 */
+	salt?: string | undefined
+}
+
+export type ImproveGroup = { salt: string }
+
+/**
+ * Keeps the visitors whose bucket of `salt` is below `share` (out of 10,000)
+ * out of the `tests`, from `start` until `end` (ISO dates; null: until ended).
+ */
+export type ImproveHoldout = {
+	salt: string
+	share: number
+	tests: string[]
+	start: string
+	end: string | null
 }
 
 export type ImproveTests = {
@@ -213,6 +239,10 @@ export type ImproveConfiguration = {
 	flags: ImproveFlags
 	tests: ImproveTests
 	audience: ImproveAudience
+	/** Exclusion groups by id. Datafile format 2. */
+	groups?: { [groupId in string]: ImproveGroup } | undefined
+	/** Holdouts by id. Datafile format 2. */
+	holdouts?: { [holdoutId in string]: ImproveHoldout } | undefined
 }
 
 // The base class both SDKs extend, so its type has a public name.
