@@ -1,7 +1,7 @@
 {
 	"name": "@obelism/content-vue",
 	"description": "Obelism Content Vue SDK: live preview in the visual editor and rich text, for Vue and Nuxt",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"keywords": [
 		"cms",
 		"headless-cms",
@@ -47,7 +47,7 @@
 		"vue": ">=3.3.0"
 	},
 	"dependencies": {
-		"@obelism/content": "^0.30.0"
+		"@obelism/content": "^0.31.0"
 	},
 	"devDependencies": {
 		"@obelism/sdk-typescript-config": "^0.0.0",

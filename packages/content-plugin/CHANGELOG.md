@@ -1,5 +1,11 @@
 # @obelism/content-plugin
 
+## 0.2.0
+
+### Minor Changes
+
+- 2a00f8e: `MANIFEST_SCHEMA` takes `contentTypes`: up to five content types a plugin brings into a Space environment's model when it is turned on there.
+
 ## 0.1.0
 
 ### Minor Changes
