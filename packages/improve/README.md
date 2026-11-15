@@ -241,7 +241,7 @@ postAnalytic = (
 	event: string,
 	scope: string,
 	payload?: ImproveAnalyticPayload,
-) => Promise<Response> | null
+) => (Promise<Response>) | null
 ```
 
 Posts an analytic event to Obelism numbers or the url configured with [setAnalyticsUrls](/docs/sdk/javascript#setanalyticsurls), through the [numbers SDK](https://www.npmjs.com/package/@obelism/numbers-sdk): each event also carries the page's path and UTM tags. Exposures to tests and flags go the same way. Use the numbers SDK directly for page views and click tracking without tests.
