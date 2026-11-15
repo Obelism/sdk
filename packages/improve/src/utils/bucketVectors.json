@@ -1,0 +1,653 @@
+{
+	"buckets": [
+		{
+			"salt": "",
+			"visitorId": "",
+			"hash": 2941713443,
+			"bucket": 3443,
+			"variantBucket": 2674
+		},
+		{
+			"salt": "",
+			"visitorId": "visitor",
+			"hash": 785266294,
+			"bucket": 6294,
+			"variantBucket": 1669
+		},
+		{
+			"salt": "",
+			"visitorId": "0b8f6a3e-6c1d-4b7a-9f2e-3d5c8a1b2e4f",
+			"hash": 773640534,
+			"bucket": 534,
+			"variantBucket": 7752
+		},
+		{
+			"salt": "",
+			"visitorId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"hash": 2840556001,
+			"bucket": 6001,
+			"variantBucket": 49
+		},
+		{
+			"salt": "",
+			"visitorId": "550e8400-e29b-41d4-a716-446655440000",
+			"hash": 1250318222,
+			"bucket": 8222,
+			"variantBucket": 8698
+		},
+		{
+			"salt": "",
+			"visitorId": "1700000000000-abc123",
+			"hash": 373314804,
+			"bucket": 4804,
+			"variantBucket": 2819
+		},
+		{
+			"salt": "",
+			"visitorId": "héllo",
+			"hash": 697613353,
+			"bucket": 3353,
+			"variantBucket": 4789
+		},
+		{
+			"salt": "",
+			"visitorId": "😀👍",
+			"hash": 3425539916,
+			"bucket": 9916,
+			"variantBucket": 4234
+		},
+		{
+			"salt": "",
+			"visitorId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			"hash": 4103465247,
+			"bucket": 5247,
+			"variantBucket": 5264
+		},
+		{
+			"salt": "checkout",
+			"visitorId": "",
+			"hash": 2668859422,
+			"bucket": 9422,
+			"variantBucket": 1527
+		},
+		{
+			"salt": "checkout",
+			"visitorId": "visitor",
+			"hash": 3406270111,
+			"bucket": 111,
+			"variantBucket": 693
+		},
+		{
+			"salt": "checkout",
+			"visitorId": "0b8f6a3e-6c1d-4b7a-9f2e-3d5c8a1b2e4f",
+			"hash": 332811235,
+			"bucket": 1235,
+			"variantBucket": 619
+		},
+		{
+			"salt": "checkout",
+			"visitorId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"hash": 4095547302,
+			"bucket": 7302,
+			"variantBucket": 3575
+		},
+		{
+			"salt": "checkout",
+			"visitorId": "550e8400-e29b-41d4-a716-446655440000",
+			"hash": 383658744,
+			"bucket": 8744,
+			"variantBucket": 8857
+		},
+		{
+			"salt": "checkout",
+			"visitorId": "1700000000000-abc123",
+			"hash": 2740257828,
+			"bucket": 7828,
+			"variantBucket": 2157
+		},
+		{
+			"salt": "checkout",
+			"visitorId": "héllo",
+			"hash": 3479761029,
+			"bucket": 1029,
+			"variantBucket": 7603
+		},
+		{
+			"salt": "checkout",
+			"visitorId": "😀👍",
+			"hash": 2011825581,
+			"bucket": 5581,
+			"variantBucket": 6690
+		},
+		{
+			"salt": "checkout",
+			"visitorId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			"hash": 2156415065,
+			"bucket": 5065,
+			"variantBucket": 6193
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "",
+			"hash": 1950942179,
+			"bucket": 2179,
+			"variantBucket": 1003
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "visitor",
+			"hash": 3721238121,
+			"bucket": 8121,
+			"variantBucket": 2483
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "0b8f6a3e-6c1d-4b7a-9f2e-3d5c8a1b2e4f",
+			"hash": 972101799,
+			"bucket": 1799,
+			"variantBucket": 7959
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"hash": 1604972788,
+			"bucket": 2788,
+			"variantBucket": 3324
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "550e8400-e29b-41d4-a716-446655440000",
+			"hash": 4075012951,
+			"bucket": 2951,
+			"variantBucket": 838
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "1700000000000-abc123",
+			"hash": 3214458474,
+			"bucket": 8474,
+			"variantBucket": 3753
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "héllo",
+			"hash": 1508367386,
+			"bucket": 7386,
+			"variantBucket": 8572
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "😀👍",
+			"hash": 2611045193,
+			"bucket": 5193,
+			"variantBucket": 7760
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			"hash": 1340206720,
+			"bucket": 6720,
+			"variantBucket": 1174
+		},
+		{
+			"salt": "groupA",
+			"visitorId": "",
+			"hash": 1531563971,
+			"bucket": 3971,
+			"variantBucket": 6334
+		},
+		{
+			"salt": "groupA",
+			"visitorId": "visitor",
+			"hash": 3614234818,
+			"bucket": 4818,
+			"variantBucket": 1237
+		},
+		{
+			"salt": "groupA",
+			"visitorId": "0b8f6a3e-6c1d-4b7a-9f2e-3d5c8a1b2e4f",
+			"hash": 867603795,
+			"bucket": 3795,
+			"variantBucket": 5409
+		},
+		{
+			"salt": "groupA",
+			"visitorId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"hash": 1779475384,
+			"bucket": 5384,
+			"variantBucket": 103
+		},
+		{
+			"salt": "groupA",
+			"visitorId": "1700000000000-abc123",
+			"hash": 116895322,
+			"bucket": 5322,
+			"variantBucket": 6600
+		},
+		{
+			"salt": "groupA",
+			"visitorId": "héllo",
+			"hash": 3380093735,
+			"bucket": 3735,
+			"variantBucket": 8138
+		},
+		{
+			"salt": "groupA",
+			"visitorId": "😀👍",
+			"hash": 608517513,
+			"bucket": 7513,
+			"variantBucket": 442
+		},
+		{
+			"salt": "groupA",
+			"visitorId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			"hash": 3495226046,
+			"bucket": 6046,
+			"variantBucket": 2265
+		},
+		{
+			"salt": "Prüfung",
+			"visitorId": "",
+			"hash": 1890694871,
+			"bucket": 4871,
+			"variantBucket": 1248
+		},
+		{
+			"salt": "Prüfung",
+			"visitorId": "0b8f6a3e-6c1d-4b7a-9f2e-3d5c8a1b2e4f",
+			"hash": 1596203915,
+			"bucket": 3915,
+			"variantBucket": 8023
+		},
+		{
+			"salt": "Prüfung",
+			"visitorId": "1700000000000-abc123",
+			"hash": 2543737635,
+			"bucket": 7635,
+			"variantBucket": 9711
+		},
+		{
+			"salt": "Prüfung",
+			"visitorId": "héllo",
+			"hash": 4232498533,
+			"bucket": 8533,
+			"variantBucket": 618
+		},
+		{
+			"salt": "Prüfung",
+			"visitorId": "😀👍",
+			"hash": 701830606,
+			"bucket": 606,
+			"variantBucket": 8619
+		},
+		{
+			"salt": "Prüfung",
+			"visitorId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			"hash": 317936957,
+			"bucket": 6957,
+			"variantBucket": 8763
+		},
+		{
+			"salt": "テスト",
+			"visitorId": "",
+			"hash": 2237143053,
+			"bucket": 3053,
+			"variantBucket": 7238
+		},
+		{
+			"salt": "テスト",
+			"visitorId": "0b8f6a3e-6c1d-4b7a-9f2e-3d5c8a1b2e4f",
+			"hash": 3177733636,
+			"bucket": 3636,
+			"variantBucket": 7894
+		},
+		{
+			"salt": "テスト",
+			"visitorId": "1700000000000-abc123",
+			"hash": 2156933313,
+			"bucket": 3313,
+			"variantBucket": 8145
+		},
+		{
+			"salt": "テスト",
+			"visitorId": "héllo",
+			"hash": 4284066512,
+			"bucket": 6512,
+			"variantBucket": 1177
+		},
+		{
+			"salt": "テスト",
+			"visitorId": "😀👍",
+			"hash": 57091075,
+			"bucket": 1075,
+			"variantBucket": 2565
+		},
+		{
+			"salt": "テスト",
+			"visitorId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			"hash": 3296028946,
+			"bucket": 8946,
+			"variantBucket": 2276
+		},
+		{
+			"salt": "a.b",
+			"visitorId": "",
+			"hash": 1208894242,
+			"bucket": 4242,
+			"variantBucket": 8618
+		},
+		{
+			"salt": "a.b",
+			"visitorId": "0b8f6a3e-6c1d-4b7a-9f2e-3d5c8a1b2e4f",
+			"hash": 1453044093,
+			"bucket": 4093,
+			"variantBucket": 1329
+		},
+		{
+			"salt": "a.b",
+			"visitorId": "1700000000000-abc123",
+			"hash": 525743776,
+			"bucket": 3776,
+			"variantBucket": 6519
+		},
+		{
+			"salt": "a.b",
+			"visitorId": "héllo",
+			"hash": 474424396,
+			"bucket": 4396,
+			"variantBucket": 3827
+		},
+		{
+			"salt": "a.b",
+			"visitorId": "😀👍",
+			"hash": 666848850,
+			"bucket": 8850,
+			"variantBucket": 4571
+		},
+		{
+			"salt": "a.b",
+			"visitorId": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			"hash": 3915881863,
+			"bucket": 1863,
+			"variantBucket": 5313
+		}
+	],
+	"variants": [
+		{
+			"salt": "checkout",
+			"visitorId": "0b8f6a3e-6c1d-4b7a-9f2e-3d5c8a1b2e4f",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 50
+				},
+				{
+					"slug": "option_1",
+					"split": 50
+				}
+			],
+			"expected": "option_0"
+		},
+		{
+			"salt": "checkout",
+			"visitorId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 50
+				},
+				{
+					"slug": "option_1",
+					"split": 50
+				}
+			],
+			"expected": "option_0"
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "550e8400-e29b-41d4-a716-446655440000",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 33.33
+				},
+				{
+					"slug": "option_1",
+					"split": 33.33
+				},
+				{
+					"slug": "option_2",
+					"split": 33.33
+				}
+			],
+			"expected": "option_0"
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "0b8f6a3e-6c1d-4b7a-9f2e-3d5c8a1b2e4f",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 33.33
+				},
+				{
+					"slug": "option_1",
+					"split": 33.33
+				},
+				{
+					"slug": "option_2",
+					"split": 33.33
+				}
+			],
+			"expected": "option_2"
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "visitor",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 33.33
+				},
+				{
+					"slug": "option_1",
+					"split": 33.33
+				},
+				{
+					"slug": "option_2",
+					"split": 33.33
+				}
+			],
+			"expected": "option_0"
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "héllo",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 33.33
+				},
+				{
+					"slug": "option_1",
+					"split": 33.33
+				},
+				{
+					"slug": "option_2",
+					"split": 33.33
+				}
+			],
+			"expected": "option_2"
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "1700000000000-abc123",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 33.33
+				},
+				{
+					"slug": "option_1",
+					"split": 33.33
+				},
+				{
+					"slug": "option_2",
+					"split": 33.33
+				}
+			],
+			"expected": "option_1"
+		},
+		{
+			"salt": "test_1",
+			"visitorId": "",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 33.33
+				},
+				{
+					"slug": "option_1",
+					"split": 33.33
+				},
+				{
+					"slug": "option_2",
+					"split": 33.33
+				}
+			],
+			"expected": "option_0"
+		},
+		{
+			"salt": "headline",
+			"visitorId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 16.67
+				},
+				{
+					"slug": "option_1",
+					"split": 16.67
+				},
+				{
+					"slug": "option_2",
+					"split": 16.67
+				},
+				{
+					"slug": "option_3",
+					"split": 16.67
+				},
+				{
+					"slug": "option_4",
+					"split": 16.67
+				},
+				{
+					"slug": "option_5",
+					"split": 16.67
+				}
+			],
+			"expected": "option_3"
+		},
+		{
+			"salt": "headline",
+			"visitorId": "😀👍",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 14.29
+				},
+				{
+					"slug": "option_1",
+					"split": 14.29
+				},
+				{
+					"slug": "option_2",
+					"split": 14.29
+				},
+				{
+					"slug": "option_3",
+					"split": 14.29
+				},
+				{
+					"slug": "option_4",
+					"split": 14.29
+				},
+				{
+					"slug": "option_5",
+					"split": 14.29
+				},
+				{
+					"slug": "option_6",
+					"split": 14.29
+				}
+			],
+			"expected": "option_4"
+		},
+		{
+			"salt": "weighted",
+			"visitorId": "visitor",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 10
+				},
+				{
+					"slug": "option_1",
+					"split": 30
+				},
+				{
+					"slug": "option_2",
+					"split": 60
+				}
+			],
+			"expected": "option_2"
+		},
+		{
+			"salt": "zero",
+			"visitorId": "visitor",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 0
+				},
+				{
+					"slug": "option_1",
+					"split": 100
+				}
+			],
+			"expected": "option_1"
+		},
+		{
+			"salt": "single",
+			"visitorId": "visitor",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 100
+				}
+			],
+			"expected": "option_0"
+		},
+		{
+			"salt": "empty",
+			"visitorId": "visitor",
+			"options": [],
+			"expected": null
+		},
+		{
+			"salt": "zerosum",
+			"visitorId": "visitor",
+			"options": [
+				{
+					"slug": "option_0",
+					"split": 0
+				},
+				{
+					"slug": "option_1",
+					"split": 0
+				}
+			],
+			"expected": null
+		}
+	]
+}
