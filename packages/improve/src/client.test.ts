@@ -182,3 +182,66 @@ describe('ImproveClientSDK through the numbers SDK', () => {
 		expect(fetchMock).not.toHaveBeenCalled()
 	})
 })
+
+describe('ImproveClientSDK with groups and holdouts', () => {
+	const hero = config.tests.hero!
+	const grouped = (
+		extra: Partial<ImproveConfiguration>,
+		ranges: [number, number][],
+	): ImproveConfiguration => ({
+		...config,
+		version: 2,
+		tests: { hero: { ...hero, group: 'group_1', ranges, salt: 'hero' } },
+		groups: { group_1: { salt: 'g1' } },
+		...extra,
+	})
+
+	test('exposes a held-out visitor once, as the holdout, and never the test', async () => {
+		const sdk = createSdk({
+			config: grouped(
+				{
+					holdouts: {
+						hold_1: {
+							salt: 'h1',
+							share: 10_000,
+							tests: ['hero'],
+							start: '2026-01-01T00:00:00Z',
+							end: null,
+						},
+					},
+				},
+				[[0, 10_000]],
+			),
+		})
+		expect(sdk.getTestValue('hero')).toBe('control')
+		expect(sdk.getTestValue('hero')).toBe('control')
+		await settle()
+		expect(sent().map(({ body }) => body)).toMatchObject([
+			{
+				type: 'exposure',
+				subjectKind: 'holdout',
+				subjectId: 'hold_1',
+				variant: 'holdout',
+			},
+		])
+		expect(sent()).toHaveLength(1)
+	})
+
+	test('clears the cookie of a visitor outside the group’s ranges', async () => {
+		document.cookie = 'hero=b;path=/'
+		const sdk = createSdk({ config: grouped({}, []) })
+		expect(sdk.getTestValue('hero')).toBe('control')
+		expect(document.cookie).not.toContain('hero=')
+		await settle()
+		expect(sent()).toEqual([])
+	})
+
+	test('exposes the test to a visitor inside its ranges', async () => {
+		const sdk = createSdk({ config: grouped({}, [[0, 10_000]]) })
+		expect(sdk.getTestValue('hero')).toBe('b')
+		await settle()
+		expect(sent().map(({ body }) => body)).toMatchObject([
+			{ type: 'exposure', subjectKind: 'test', subjectId: 'test_1' },
+		])
+	})
+})

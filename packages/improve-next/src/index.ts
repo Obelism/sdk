@@ -74,24 +74,38 @@ export const generateImproveNextMiddleware = (
 					undefined,
 			}
 
-			// Get AB test value from: searchParam, cookies or get generate a new value
-			const testValue =
-				validateValue(
-					request.nextUrl.searchParams.get(serverABTestConfig.slug),
-				) ||
-				validateValue(request.cookies.get(serverABTestConfig.slug)?.value) ||
-				args.improveSdk.getTestValue(
-					serverABTestConfig.slug,
-					visitorId,
-					ua,
-					geo,
-				)
+			// A search param forces a value; otherwise the SDK decides, from the
+			// cookie for most tests.
+			const forced = validateValue(
+				request.nextUrl.searchParams.get(serverABTestConfig.slug),
+			)
+			const decision = forced
+				? null
+				: args.improveSdk.decideTest(
+						serverABTestConfig.slug,
+						visitorId,
+						ua,
+						geo,
+						request.cookies.get(serverABTestConfig.slug)?.value ?? null,
+					)
+			const testValue = forced ?? decision?.value ?? null
+			const clearStale = (response: NextResponse) => {
+				if (decision?.cookie === 'clear')
+					response.cookies.delete({
+						...args.options?.testValue,
+						name: serverABTestConfig.slug,
+						// A custom maxAge would outlast the delete's expiry.
+						maxAge: 0,
+					})
+				return response
+			}
 
 			const testMatchOption = serverABTestConfig.options.find(
 				(option) => option.value === testValue,
 			)
 
-			if (testValue == null || !testMatchOption) return NextResponse.next()
+			if (testValue == null || !testMatchOption)
+				return clearStale(NextResponse.next())
 
 			// Update the response with cookies response
 			let response: undefined | NextResponse<unknown>
@@ -112,12 +126,13 @@ export const generateImproveNextMiddleware = (
 				maxAge: DEFAULT_COOKIE_TTL,
 				...args.options?.visitorId,
 			})
-			response.cookies.set(serverABTestConfig.slug, testValue, {
-				maxAge: DEFAULT_COOKIE_TTL,
-				...args.options?.testValue,
-			})
+			if (!decision || decision.cookie === 'set')
+				response.cookies.set(serverABTestConfig.slug, testValue, {
+					maxAge: DEFAULT_COOKIE_TTL,
+					...args.options?.testValue,
+				})
 
-			return response
+			return clearStale(response)
 		} catch (e) {
 			console.error('[Improve SDK]', e)
 			return NextResponse.next()

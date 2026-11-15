@@ -11,7 +11,7 @@ import {
 	COOKIE_NAME_VISITOR,
 	LEGACY_VISITOR_COOKIE,
 } from './config/constants'
-import { CONFIG_PATH, BASE_URL } from './config/urls'
+import { CONFIG_PATH, CONFIG_QUERY, BASE_URL } from './config/urls'
 import {
 	ImproveConfiguration,
 	ImproveEnvironmentOption,
@@ -73,14 +73,15 @@ export class BaseImproveSDK {
 			this.config = config
 		} else {
 			this.#configFetch = {
-				url: [
-					`${this._baseUrl}${CONFIG_PATH}`,
-					// The space's datafile; the organization's id means its first
-					// space.
-					this.spaceId || this.organizationId,
-					this.environment,
-					this.state || 'active',
-				].join('/'),
+				url:
+					[
+						`${this._baseUrl}${CONFIG_PATH}`,
+						// The space's datafile; the organization's id means its first
+						// space.
+						this.spaceId || this.organizationId,
+						this.environment,
+						this.state || 'active',
+					].join('/') + CONFIG_QUERY,
 				timeout: fetchTimeout || 3000,
 				retries: configRetries ?? CONFIG_RETRY_COUNT,
 				revalidate: configRevalidate,

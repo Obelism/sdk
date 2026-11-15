@@ -43,7 +43,8 @@ afterEach(() => {
 	vi.unstubAllGlobals()
 })
 
-// A space's datafile; the organization's id means its first space.
+// A space's datafile; the organization's id means its first space. Format 2,
+// with exclusion groups and holdouts.
 test('fetches the space’s datafile, or the organization’s first space’s', async () => {
 	const fetchMock = vi.fn().mockResolvedValue(makeResponse(200, CONFIG))
 	vi.stubGlobal('fetch', fetchMock)
@@ -52,8 +53,8 @@ test('fetches the space’s datafile, or the organization’s first space’s', 
 	await setup()._fetchConfig()
 
 	expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-		'https://improve.obelism.studio/config/space_1/develop/active',
-		'https://improve.obelism.studio/config/org_1/develop/active',
+		'https://improve.obelism.studio/config/space_1/develop/active?groups=1',
+		'https://improve.obelism.studio/config/org_1/develop/active?groups=1',
 	])
 })
 

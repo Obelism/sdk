@@ -27,5 +27,7 @@ export const normalizeConfig = (body: unknown): ImproveConfiguration => {
 		tests: raw.tests ?? {},
 		flags: raw.flags ?? {},
 		audience: raw.audience ?? {},
+		...(raw.groups && { groups: raw.groups }),
+		...(raw.holdouts && { holdouts: raw.holdouts }),
 	}
 }

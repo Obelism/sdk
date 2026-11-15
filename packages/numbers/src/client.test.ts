@@ -398,6 +398,23 @@ describe('expose', () => {
 		])
 		expect(sentBodies()[0]).not.toHaveProperty('path')
 	})
+
+	it('sends a holdout once, apart from a test with the same id', async () => {
+		const numbers = numbersFor()
+		const holdout = {
+			subjectKind: 'holdout',
+			subjectId: 'hold_1',
+			variant: 'holdout',
+		} as const
+		numbers.expose(holdout)
+		expect(numbers.expose(holdout)).toBeNull()
+		expect(numbers.expose({ ...holdout, subjectKind: 'test' })).not.toBeNull()
+		await settle()
+		expect(sentBodies()).toMatchObject([
+			{ type: 'exposure', subjectKind: 'holdout', subjectId: 'hold_1' },
+			{ type: 'exposure', subjectKind: 'test', subjectId: 'hold_1' },
+		])
+	})
 })
 
 describe('autoTrack', () => {

@@ -1,6 +1,11 @@
 import { expect, test, vi } from 'vitest'
 
-import { ImproveServerSDK } from './server'
+import {
+	getVercelConfigKeys,
+	ImproveServerSDK,
+	readVercelConfig,
+} from './server'
+import { pickVariant } from './utils/buckets'
 import { parseUserAgent } from './utils/parseUserAgent'
 import { ImproveConfiguration } from './types'
 
@@ -415,4 +420,163 @@ test('seedTestCookies does not echo a visitor id it would not mint', () => {
 		name: 'obelism_visitor_id',
 		kind: 'visitor',
 	})
+})
+
+const groupedConfig = (
+	ranges: [number, number][],
+	holdoutShare = 0,
+): ImproveConfiguration => ({
+	...TEST_CONFIG,
+	version: 2,
+	tests: {
+		'startpage-visual': {
+			...TEST_CONFIG.tests['startpage-visual']!,
+			group: 'group_1',
+			ranges,
+			salt: 'visual',
+		},
+	},
+	groups: { group_1: { salt: 'g1' } },
+	holdouts: {
+		hold_1: {
+			salt: 'h1',
+			share: holdoutShare,
+			tests: ['startpage-visual'],
+			start: '2026-01-01T00:00:00Z',
+			end: null,
+		},
+	},
+})
+
+test('seedTestCookies removes the cookie of a visitor outside a group’s ranges', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: groupedConfig([]),
+	})
+	const visitorId = sdk.generateVisitorId()
+	const seed = sdk.seedTestCookies({
+		userAgent: UA,
+		cookieHeader: `obelism_visitor_id=${visitorId}; startpage-visual=variation`,
+	})
+
+	expect(seed.cookies).toEqual([
+		{
+			kind: 'test',
+			name: 'startpage-visual',
+			value: '',
+			header: 'startpage-visual=; Path=/; Max-Age=0; SameSite=Lax; Secure',
+		},
+	])
+	expect(seed.assignments).toEqual([
+		{
+			slug: 'startpage-visual',
+			kind: 'test',
+			value: 'control',
+			included: false,
+		},
+	])
+})
+
+test('seedTestCookies sets no cookie for a held-out visitor, and names the holdout', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: groupedConfig([[0, 10_000]], 10_000),
+	})
+	const seed = sdk.seedTestCookies({ userAgent: UA })
+
+	expect(seedNames(seed)).toEqual(['obelism_visitor_id'])
+	expect(seed.assignments).toEqual([
+		{
+			slug: 'startpage-visual',
+			kind: 'test',
+			value: 'control',
+			included: false,
+			holdout: 'hold_1',
+		},
+	])
+})
+
+test('seedTestCookies seeds the visitor’s bucketed variant inside the ranges', () => {
+	const sdk = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: groupedConfig([[0, 10_000]]),
+	})
+	const visitorId = sdk.generateVisitorId()
+	const seed = sdk.seedTestCookies({
+		userAgent: UA,
+		cookieHeader: `obelism_visitor_id=${visitorId}`,
+	})
+	const value = pickVariant(
+		'visual',
+		visitorId,
+		TEST_CONFIG.tests['startpage-visual']!.options,
+	)
+
+	expect(seed.cookies).toMatchObject([{ name: 'startpage-visual', value }])
+	expect(seed.assignments).toEqual([
+		{ slug: 'startpage-visual', kind: 'test', value, included: true },
+	])
+})
+
+test('decideTest keeps the cookie of an unbucketed test, and checks a bucketed one first', () => {
+	const plain = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: TEST_CONFIG,
+	})
+	expect(
+		plain.decideTest('startpage-visual', 'visi_1', UA, undefined, 'variation'),
+	).toEqual({ value: 'variation', cookie: 'set' })
+
+	const out = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: groupedConfig([]),
+	})
+	expect(
+		out.decideTest('startpage-visual', 'visi_1', UA, undefined, 'variation'),
+	).toEqual({ value: 'control', cookie: 'clear' })
+	expect(out.decideTest('startpage-visual', 'visi_1', UA)).toEqual({
+		value: 'control',
+		cookie: 'none',
+	})
+
+	const held = new ImproveServerSDK({
+		organizationId: '',
+		environment: 'develop',
+		config: groupedConfig([[0, 10_000]], 10_000),
+	})
+	expect(held.decideTest('startpage-visual', 'visi_1', UA)).toEqual({
+		value: 'control',
+		cookie: 'none',
+		holdout: 'hold_1',
+	})
+})
+
+test('readVercelConfig reads the format-2 key, else the format-1 one', async () => {
+	const format2 = { ...TEST_CONFIG, version: 2, groups: {}, holdouts: {} }
+	const store = new Map<string, unknown>([
+		['production', TEST_CONFIG],
+		['production_f2', format2],
+		['staging', TEST_CONFIG],
+	])
+	const get = vi.fn(async (key: string) => store.get(key))
+
+	expect(getVercelConfigKeys('production')).toEqual([
+		'production_f2',
+		'production',
+	])
+	expect(await readVercelConfig(get, 'production')).toEqual(format2)
+	expect(await readVercelConfig(get, 'staging')).toEqual(TEST_CONFIG)
+	expect(await readVercelConfig(get, 'develop')).toBeNull()
+	expect(get.mock.calls.map(([key]) => key)).toEqual([
+		'production_f2',
+		'staging_f2',
+		'staging',
+		'develop_f2',
+		'develop',
+	])
 })

@@ -16,7 +16,7 @@ import {
 } from './assignment'
 import { parseUserAgent } from './utils/parseUserAgent'
 import { BaseImproveSDK } from './base'
-import { getCookie, setCookie } from './utils/clientCookie'
+import { clearCookie, getCookie, setCookie } from './utils/clientCookie'
 import { ANALYTICS_PATH } from './config/urls'
 import { pushDataLayer, resetDataLayerEcommerce } from './utils/pushDataLayer'
 import {
@@ -34,7 +34,8 @@ export type CreateEvent = EventBeacon
 
 /**
  * A visitor's assignment to a test/flag variant, emitted the first time the SDK
- * resolves a non-holdout value for them. The per-variant exposure count is the
+ * resolves a non-holdout value for them, or to a holdout that keeps them out of
+ * a test (variant `holdout`). The per-variant exposure count is the
  * denominator for results.
  */
 export type CreateExposure = ExposureBeacon
@@ -51,7 +52,7 @@ export class ImproveClientSDK extends BaseImproveSDK {
 
 	#analytics: TrackedEvents = {}
 
-	// Events and exposures go to Obelism numbers through its SDK, which keeps
+	// Events and exposures go to Obelism Numbers through its SDK, which keeps
 	// the visitor cookie, the device categories, the page context, the size
 	// and field limits, and backs off after a 429.
 	#numbers: NumbersClient
@@ -70,7 +71,7 @@ export class ImproveClientSDK extends BaseImproveSDK {
 			organizationId: this.organizationId,
 			spaceId: this.spaceId,
 			environment: this.environment,
-			// numbers takes the events; a custom `baseUrl` (e.g. a local Improve)
+			// Numbers takes the events; a custom `baseUrl` (e.g. a local Improve)
 			// keeps getting them at its own /api/log.
 			endpoint: args.baseUrl
 				? `${args.baseUrl}${ANALYTICS_PATH}`
@@ -81,9 +82,9 @@ export class ImproveClientSDK extends BaseImproveSDK {
 	}
 
 	setupVisitor = (userAgent: string = window.navigator.userAgent) => {
-		// The numbers SDK reads (or makes) the visitor in the shared
+		// The Numbers SDK reads (or makes) the visitor in the shared
 		// `obelism_visitor_id` cookie, so the visitor is the same one in
-		// numbers' own script.
+		// Numbers' own script.
 		const visitor = this.#numbers.visitor()
 
 		if (!visitor) return null
@@ -94,9 +95,9 @@ export class ImproveClientSDK extends BaseImproveSDK {
 
 		if (!parsedUserAgent) return null
 
-		this.#visitor = createVisitor(parsedUserAgent)
+		this.#visitor = createVisitor(parsedUserAgent, this.#visitorId)
 
-		// The audiences' categories, so numbers reports the same ones.
+		// The audiences' categories, so Numbers reports the same ones.
 		const { pointer, device, browser, os } = parsedUserAgent
 		this.#numbers.setDevice({ pointer, device, browser, os })
 
@@ -130,7 +131,7 @@ export class ImproveClientSDK extends BaseImproveSDK {
 		if (!this.#visitor) this.setupVisitor()
 		return this.#settle(
 			assign(
-				testSubject(testSlug, test),
+				testSubject(testSlug, test, config),
 				config.audience[test.audience],
 				this.#visitor ?? null,
 				getCookie(testSlug),
@@ -146,11 +147,13 @@ export class ImproveClientSDK extends BaseImproveSDK {
 	// earlier call here is already recorded; one from a cookie was assigned
 	// server-side, and gets its exposure here.
 	#settle = (
-		{ value, source }: Assignment,
+		{ value, source, holdout, clear }: Assignment,
 		slug: string,
 		kind: 'test' | 'flag',
 		id: string,
 	) => {
+		if (clear) clearCookie(slug)
+		if (holdout) this.#postExposure('holdout', holdout, 'holdout')
 		if (!value) return value
 		if (source === 'cookie') this.#postExposure(kind, id, value)
 		else if (source === 'new') {
@@ -165,10 +168,10 @@ export class ImproveClientSDK extends BaseImproveSDK {
 	}
 
 	// Emits an exposure beacon the first time a visitor is assigned to a subject
-	// this instance (the numbers SDK sends each subject once). Idempotent
+	// this instance (the Numbers SDK sends each subject once). Idempotent
 	// server-side (unique per visitor+subject).
 	#postExposure = (
-		subjectKind: 'test' | 'flag',
+		subjectKind: CreateExposure['subjectKind'],
 		subjectId: string,
 		variant: string,
 	) => {
@@ -191,8 +194,8 @@ export class ImproveClientSDK extends BaseImproveSDK {
 		// it, or the mirrored dataLayer entry would collide with GTM internals.
 		if (event.startsWith('gtm.')) return null
 
-		// The numbers SDK nudges toward snake_case names itself; an empty scope
-		// is improve's own convention to warn about (numbers falls back to the
+		// The Numbers SDK nudges toward snake_case names itself; an empty scope
+		// is Improve's own convention to warn about (Numbers falls back to the
 		// page's path).
 		if (!scope && !this.#warnedMissingScope) {
 			this.#warnedMissingScope = true
