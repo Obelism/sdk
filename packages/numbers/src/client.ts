@@ -70,7 +70,7 @@ export type NumbersClient = {
 	 * Moves the visitor id to other storage, e.g. to `cookie` once the visitor
 	 * consents and back to `session` when they withdraw. The id is kept,
 	 * unless a cookie already holds a returning visitor's; leaving `cookie`
-	 * deletes the visitor cookies.
+	 * deletes the visitor cookies and starts a new id.
 	 */
 	setStorage: (storage: VisitorStorage) => void
 	/**
@@ -438,11 +438,11 @@ export const createNumbers = ({
 			url = next
 		},
 		setStorage: (next) => {
-			// Loaded from the old storage first, so a tab's session id carries over.
-			const current = getVisitor()
+			if (next !== storage && isBrowser())
+				visitor = moveVisitor(visitor, storage, next)
 			storage = next
-			if (current) visitor = moveVisitor(current, next)
 		},
+
 		track,
 		pageView,
 		formSubmit,

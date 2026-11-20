@@ -21,6 +21,8 @@ export type Visitor = {
  */
 export type VisitorStorage = 'cookie' | 'session' | 'none'
 
+type StoredIn = Exclude<VisitorStorage, 'none'>
+
 const CHARACTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 export const readCookie = (name: string) => {
@@ -58,7 +60,7 @@ export const createVisitorId = () => {
 	return `${VISITOR_ID_PREFIX}${VISITOR_ID_SEPARATOR}${id}`
 }
 
-const readStoredVisitor = (storage: 'cookie' | 'session') => {
+const readStoredVisitor = (storage: StoredIn) => {
 	if (storage === 'session') {
 		try {
 			return sessionStorage.getItem(VISITOR_SESSION_KEY) ?? ''
@@ -69,7 +71,7 @@ const readStoredVisitor = (storage: 'cookie' | 'session') => {
 	return readCookie(VISITOR_COOKIE) || readCookie(LEGACY_VISITOR_COOKIE)
 }
 
-const writeStoredVisitor = (storage: 'cookie' | 'session', id: string) => {
+const writeStoredVisitor = (storage: StoredIn, id: string) => {
 	if (storage === 'session') {
 		try {
 			sessionStorage.setItem(VISITOR_SESSION_KEY, id)
@@ -88,19 +90,25 @@ const writeStoredVisitor = (storage: 'cookie' | 'session', id: string) => {
 		writeCookie(LEGACY_VISITOR_COOKIE, id)
 }
 
+const newVisitor = (): Visitor => ({ id: createVisitorId(), recurring: false })
+
+// The visitor in its storage, or a new one, without writing it.
+const peekVisitor = (storage: VisitorStorage): Visitor => {
+	const existing = storage === 'none' ? '' : readStoredVisitor(storage)
+	return isVisitorId(existing)
+		? { id: existing, recurring: true }
+		: newVisitor()
+}
+
 // The visitor in its storage, or a new one; either way it is written again, so
 // the cookie lasts 30 days from the last visit and the session id lasts the tab.
 export const loadVisitor = (storage: VisitorStorage = 'cookie'): Visitor => {
-	if (storage === 'none') return { id: createVisitorId(), recurring: false }
-
-	const existing = readStoredVisitor(storage)
-	const recurring = isVisitorId(existing)
-	const id = recurring ? existing : createVisitorId()
-	writeStoredVisitor(storage, id)
-	return { id, recurring }
+	const visitor = peekVisitor(storage)
+	if (storage !== 'none') writeStoredVisitor(storage, visitor.id)
+	return visitor
 }
 
-const clearStoredVisitor = (storage: 'cookie' | 'session') => {
+const clearStoredVisitor = (storage: StoredIn) => {
 	if (storage === 'session') {
 		try {
 			sessionStorage.removeItem(VISITOR_SESSION_KEY)
@@ -113,18 +121,20 @@ const clearStoredVisitor = (storage: 'cookie' | 'session') => {
 		if (readCookie(name)) writeCookie(name, '', new Date(0))
 }
 
-// The visitor once ids live in `storage`: kept, so the visit isn't split,
-// unless a cookie already names a returning visitor.
-export const moveVisitor = (current: Visitor, storage: VisitorStorage) => {
-	if (storage !== 'cookie') clearStoredVisitor('cookie')
-	if (storage === 'none') {
-		clearStoredVisitor('session')
-		return current
-	}
-
-	const existing = readStoredVisitor(storage)
-	if (storage === 'cookie' && isVisitorId(existing) && existing !== current.id)
-		current = { id: existing, recurring: true }
-	writeStoredVisitor(storage, current.id)
-	return current
+// Leaving the cookie is consent withdrawn: a new id, so what follows can't be
+// tied to what the cookie collected. A returning visitor's cookie wins over
+// the id the visit started with.
+export const moveVisitor = (
+	current: Visitor | null,
+	from: VisitorStorage,
+	to: VisitorStorage,
+): Visitor => {
+	if (from === 'cookie') clearStoredVisitor('cookie')
+	if (to === 'none') clearStoredVisitor('session')
+	const kept = from === 'cookie' ? newVisitor() : (current ?? peekVisitor(from))
+	if (to === 'none') return kept
+	const cookie = to === 'cookie' ? peekVisitor('cookie') : null
+	const next = cookie?.recurring ? cookie : kept
+	writeStoredVisitor(to, next.id)
+	return next
 }

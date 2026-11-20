@@ -180,8 +180,13 @@ numbers.setStorage('session') // consent withdrawn: deletes the cookies
 Moving to the cookie keeps the visitor's id, so the visit isn't split, unless
 the cookie already holds a returning visitor's id: then that one is used.
 Leaving the cookie (for `session` or `none`) deletes `obelism_visitor_id` and
-`visitorId`. Pass the consent you already know to `createNumbers`, so the
-first events use the right storage.
+`visitorId` and starts a new id, so later events can't be tied to what the
+cookie collected. Pass the consent you already know to `createNumbers`, so
+the first events use the right storage.
+
+The client deletes the cookies it sets: for the current host, on `/`. The
+improve SDK's middleware sets the same cookie on every request, with the
+`domain` you give it; gate it on the same consent, or it comes back.
 
 ### Limits
 

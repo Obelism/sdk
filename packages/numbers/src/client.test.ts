@@ -139,31 +139,52 @@ describe('setStorage', () => {
 		expect(document.cookie).toContain(`visitorId=${RETURNING}`)
 	})
 
-	it('deletes the cookies when leaving them, and keeps the id for the tab', () => {
+	it('deletes the cookies when leaving them, and starts a new id', () => {
 		const numbers = numbersFor()
 		const before = numbers.visitor()!
 		numbers.setStorage('session')
 		expect(document.cookie).not.toContain('obelism_visitor_id')
 		expect(document.cookie).not.toContain('visitorId')
-		expect(numbers.visitor()).toEqual(before)
-		expect(sessionStorage.getItem('obelism_visitor_id')).toBe(before.id)
-		expect(numbersFor({ storage: 'session' }).visitor()!.id).toBe(before.id)
+		const after = numbers.visitor()!
+		expect(after).toEqual({ id: expect.any(String), recurring: false })
+		expect(after.id).not.toBe(before.id)
+		expect(sessionStorage.getItem('obelism_visitor_id')).toBe(after.id)
 	})
 
-	it('deletes every stored id for none, and keeps the id for the page', () => {
+	it('deletes every stored id for none', () => {
+		sessionStorage.setItem('obelism_visitor_id', RETURNING)
+		document.cookie = `obelism_visitor_id=${RETURNING};path=/`
+		const numbers = numbersFor()
+		numbers.setStorage('none')
+		expect(document.cookie).not.toContain('obelism_visitor_id')
+		expect(sessionStorage.getItem('obelism_visitor_id')).toBe(null)
+		expect(numbers.visitor()!.id).not.toBe(RETURNING)
+	})
+
+	it('keeps the id from session to none, for the page', () => {
 		const numbers = numbersFor({ storage: 'session' })
 		const before = numbers.visitor()!
-		document.cookie = `visitorId=${RETURNING};path=/`
 		numbers.setStorage('none')
-		expect(document.cookie).not.toContain('visitorId')
 		expect(sessionStorage.getItem('obelism_visitor_id')).toBe(null)
 		expect(numbers.visitor()).toEqual(before)
 	})
 
-	it('deletes a cookie also when the storage was session already', () => {
+	it('never writes a cookie when leaving it before anything was sent', () => {
+		const set = vi.spyOn(document, 'cookie', 'set')
+		numbersFor().setStorage('session')
+		expect(
+			set.mock.calls.filter(
+				([value]) => !value.includes('expires=Thu, 01 Jan 1970'),
+			),
+		).toEqual([])
+	})
+
+	it('leaves cookies it doesn’t own alone outside cookie storage', () => {
 		document.cookie = `obelism_visitor_id=${RETURNING};path=/`
-		numbersFor({ storage: 'session' }).setStorage('session')
-		expect(document.cookie).not.toContain('obelism_visitor_id')
+		const numbers = numbersFor({ storage: 'session' })
+		numbers.setStorage('none')
+		numbers.setStorage('session')
+		expect(document.cookie).toContain(`obelism_visitor_id=${RETURNING}`)
 	})
 })
 
