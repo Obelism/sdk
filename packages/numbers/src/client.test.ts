@@ -107,6 +107,66 @@ describe('visitor', () => {
 	})
 })
 
+describe('setStorage', () => {
+	const RETURNING = 'visi_ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+	it('moves a session visitor into the cookie with the same id', async () => {
+		const numbers = numbersFor({ storage: 'session' })
+		const before = numbers.visitor()!
+		numbers.setStorage('cookie')
+		expect(numbers.visitor()).toEqual(before)
+		expect(document.cookie).toContain(`obelism_visitor_id=${before.id}`)
+		expect(document.cookie).toContain(`visitorId=${before.id}`)
+		numbers.track('sign_up', 'footer')
+		await settle()
+		expect(sentBodies()[0]).toMatchObject({ visitorId: before.id })
+	})
+
+	it('carries the tab’s session id over before anything was sent', () => {
+		sessionStorage.setItem('obelism_visitor_id', RETURNING)
+		const numbers = numbersFor({ storage: 'session' })
+		numbers.setStorage('cookie')
+		expect(numbers.visitor()).toEqual({ id: RETURNING, recurring: true })
+		expect(document.cookie).toContain(`obelism_visitor_id=${RETURNING}`)
+	})
+
+	it('keeps a returning visitor’s cookie over the session id', () => {
+		document.cookie = `obelism_visitor_id=${RETURNING};path=/`
+		const numbers = numbersFor({ storage: 'session' })
+		expect(numbers.visitor()!.id).not.toBe(RETURNING)
+		numbers.setStorage('cookie')
+		expect(numbers.visitor()).toEqual({ id: RETURNING, recurring: true })
+		expect(document.cookie).toContain(`visitorId=${RETURNING}`)
+	})
+
+	it('deletes the cookies when leaving them, and keeps the id for the tab', () => {
+		const numbers = numbersFor()
+		const before = numbers.visitor()!
+		numbers.setStorage('session')
+		expect(document.cookie).not.toContain('obelism_visitor_id')
+		expect(document.cookie).not.toContain('visitorId')
+		expect(numbers.visitor()).toEqual(before)
+		expect(sessionStorage.getItem('obelism_visitor_id')).toBe(before.id)
+		expect(numbersFor({ storage: 'session' }).visitor()!.id).toBe(before.id)
+	})
+
+	it('deletes every stored id for none, and keeps the id for the page', () => {
+		const numbers = numbersFor({ storage: 'session' })
+		const before = numbers.visitor()!
+		document.cookie = `visitorId=${RETURNING};path=/`
+		numbers.setStorage('none')
+		expect(document.cookie).not.toContain('visitorId')
+		expect(sessionStorage.getItem('obelism_visitor_id')).toBe(null)
+		expect(numbers.visitor()).toEqual(before)
+	})
+
+	it('deletes a cookie also when the storage was session already', () => {
+		document.cookie = `obelism_visitor_id=${RETURNING};path=/`
+		numbersFor({ storage: 'session' }).setStorage('session')
+		expect(document.cookie).not.toContain('obelism_visitor_id')
+	})
+})
+
 describe('track', () => {
 	it('sends an event with the visitor, device and page', async () => {
 		vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(IPHONE)

@@ -30,8 +30,11 @@ export const readCookie = (name: string) => {
 	return row ? (row.split('=')[1] ?? '') : ''
 }
 
-export const writeCookie = (name: string, value: string) => {
-	const expires = new Date(Date.now() + VISITOR_COOKIE_DAYS * 86_400_000)
+export const writeCookie = (
+	name: string,
+	value: string,
+	expires = new Date(Date.now() + VISITOR_COOKIE_DAYS * 86_400_000),
+) => {
 	document.cookie =
 		`${name}=${value};path=/;expires=${expires.toUTCString()};SameSite=Lax` +
 		(location.protocol === 'https:' ? ';Secure' : '')
@@ -95,4 +98,33 @@ export const loadVisitor = (storage: VisitorStorage = 'cookie'): Visitor => {
 	const id = recurring ? existing : createVisitorId()
 	writeStoredVisitor(storage, id)
 	return { id, recurring }
+}
+
+const clearStoredVisitor = (storage: 'cookie' | 'session') => {
+	if (storage === 'session') {
+		try {
+			sessionStorage.removeItem(VISITOR_SESSION_KEY)
+		} catch {
+			// Disabled storage holds nothing to clear.
+		}
+		return
+	}
+	for (const name of [VISITOR_COOKIE, LEGACY_VISITOR_COOKIE])
+		if (readCookie(name)) writeCookie(name, '', new Date(0))
+}
+
+// The visitor once ids live in `storage`: kept, so the visit isn't split,
+// unless a cookie already names a returning visitor.
+export const moveVisitor = (current: Visitor, storage: VisitorStorage) => {
+	if (storage !== 'cookie') clearStoredVisitor('cookie')
+	if (storage === 'none') {
+		clearStoredVisitor('session')
+		return current
+	}
+
+	const existing = readStoredVisitor(storage)
+	if (storage === 'cookie' && isVisitorId(existing) && existing !== current.id)
+		current = { id: existing, recurring: true }
+	writeStoredVisitor(storage, current.id)
+	return current
 }

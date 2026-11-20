@@ -22,7 +22,12 @@ import type {
 	NumbersOptions,
 	TrackOptions,
 } from './types'
-import { loadVisitor, type Visitor } from './visitor'
+import {
+	loadVisitor,
+	moveVisitor,
+	type Visitor,
+	type VisitorStorage,
+} from './visitor'
 
 export type AutoTrackOptions = {
 	/** A page view now and on every client-side navigation. Default on. */
@@ -61,6 +66,13 @@ export type NumbersClient = {
 	/** Replaces the device categories, e.g. from a fuller user-agent parser. */
 	setDevice: (device: Device) => void
 	setEndpoint: (endpoint: string) => void
+	/**
+	 * Moves the visitor id to other storage, e.g. to `cookie` once the visitor
+	 * consents and back to `session` when they withdraw. The id is kept,
+	 * unless a cookie already holds a returning visitor's; leaving `cookie`
+	 * deletes the visitor cookies.
+	 */
+	setStorage: (storage: VisitorStorage) => void
 	/**
 	 * Sends an event. `scope` is the stable second half of its identity, e.g.
 	 * `'homepage_hero_signup'` (default: the page's path). `null` when nothing
@@ -103,11 +115,12 @@ export const createNumbers = ({
 	endpoint = DEFAULT_ENDPOINT,
 	device: givenDevice,
 	disableWarnings = false,
-	storage = 'cookie',
+	storage: initialStorage = 'cookie',
 	routes,
 }: NumbersOptions): NumbersClient => {
 	const toRoute = routeMatcher(routes)
 	let visitor: Visitor | null = null
+	let storage = initialStorage
 	let device = givenDevice
 	let url = endpoint
 	// Epoch ms until which sending is paused after a 429.
@@ -423,6 +436,12 @@ export const createNumbers = ({
 		},
 		setEndpoint: (next) => {
 			url = next
+		},
+		setStorage: (next) => {
+			// Loaded from the old storage first, so a tab's session id carries over.
+			const current = getVisitor()
+			storage = next
+			if (current) visitor = moveVisitor(current, next)
 		},
 		track,
 		pageView,
