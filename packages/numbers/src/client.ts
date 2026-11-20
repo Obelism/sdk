@@ -375,8 +375,7 @@ export const createNumbers = ({
 
 		const trackLink = (target: Element) => {
 			const link = classifyLink(target, { outbound, downloads })
-			if (link)
-				track(link.event, link.scope, link.params && { params: link.params })
+			if (link) track(link.event, link.scope, { params: link.params })
 		}
 
 		if (clicks || outbound || downloads) {

@@ -1,3 +1,5 @@
+import { hasLocation, toWebUrl } from './url'
+
 // Documents, archives and media, not images a browser shows inline (a link
 // with `download` still counts, whatever it points at).
 const DOWNLOAD_EXTENSIONS = new Set([
@@ -30,23 +32,19 @@ export type LinkEvent = {
 	params?: Record<string, string>
 }
 
+/** Both on by default, unlike `autoTrack`'s. */
 export type ClassifyLinkOptions = {
-	/** Count links to another site. Default on. */
 	outbound?: boolean | undefined
-	/** Count links to a file. Default on. */
 	downloads?: boolean | undefined
 }
 
-const hasLocation = () => typeof location !== 'undefined'
-
-// Only http(s): a data: URL's path is its whole payload, and mailto:/tel:
-// aren't destinations.
-export const toWebUrl = (url: string | URL) => {
-	try {
-		const parsed = new URL(url, hasLocation() ? location.href : undefined)
-		return /^https?:$/.test(parsed.protocol) ? parsed : null
-	} catch {
-		return null
+const fileOf = (url: URL) => {
+	const name = url.pathname.split('/').pop() || url.pathname
+	const dot = name.lastIndexOf('.')
+	return {
+		name,
+		dot,
+		extension: dot < 0 ? '' : name.slice(dot + 1).toLowerCase(),
 	}
 }
 
@@ -63,11 +61,9 @@ export const isOutbound = (url: string | URL) => {
 export const isDownload = (url: string | URL, anchor?: HTMLAnchorElement) => {
 	const parsed = toWebUrl(url)
 	if (!parsed) return false
-	if (anchor?.hasAttribute('download')) return true
-	const fileName = parsed.pathname.split('/').pop() ?? ''
 	return (
-		fileName.includes('.') &&
-		DOWNLOAD_EXTENSIONS.has(fileName.split('.').pop()!.toLowerCase())
+		!!anchor?.hasAttribute('download') ||
+		DOWNLOAD_EXTENSIONS.has(fileOf(parsed).extension)
 	)
 }
 
@@ -101,14 +97,12 @@ export const classifyLink = (
 			scope: `${url.origin}${url.pathname}`,
 			params: { link_domain: url.hostname },
 		}
-	const fileName = url.pathname.split('/').pop() || url.pathname
-	const dot = fileName.lastIndexOf('.')
-	const extension = dot < 0 ? '' : fileName.slice(dot + 1).toLowerCase()
+	const { name, dot, extension } = fileOf(url)
 	return {
 		event,
-		scope: fileName,
+		scope: name,
 		params: {
-			file_name: extension ? fileName.slice(0, dot) : fileName,
+			file_name: extension ? name.slice(0, dot) : name,
 			...(extension && { file_extension: extension }),
 		},
 	}

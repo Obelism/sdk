@@ -68,6 +68,14 @@ describe('classifyLink', () => {
 		})
 	})
 
+	it('treats an empty data-numbers-id as no tag', () => {
+		document.body.innerHTML =
+			'<div data-numbers-id=""><a href="/files/a.pdf">pdf</a></div>'
+		expect(classifyLink(document.querySelector('a')!)).toMatchObject({
+			scope: 'a.pdf',
+		})
+	})
+
 	it('leaves out what is switched off, and other clicks', () => {
 		const file = link('<a href="https://elsewhere.example/a.pdf">pdf</a>')
 		expect(classifyLink(file, { downloads: false })).toMatchObject({
