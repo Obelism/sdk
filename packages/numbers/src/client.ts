@@ -8,7 +8,7 @@ import {
 } from './constants'
 import { detectDevice, getScreenSize } from './device'
 import { classifyLink } from './links'
-import { getExternalReferrer, getPageContext } from './page'
+import { getExternalReferrer, getPageContext, pageOf } from './page'
 import { parseRetryAfterMs } from './retry'
 import { routeMatcher } from './routes'
 import type {
@@ -20,6 +20,7 @@ import type {
 	Exposure,
 	ExposureBeacon,
 	NumbersOptions,
+	PageViewOptions,
 	TrackOptions,
 } from './types'
 import {
@@ -83,8 +84,8 @@ export type NumbersClient = {
 		scope?: string,
 		options?: TrackOptions,
 	) => Sent | null
-	/** Sends a page view of the current page. */
-	pageView: () => Sent | null
+	/** Sends a page view of the current page, or of `page`. */
+	pageView: (options?: PageViewOptions) => Sent | null
 	/** Sends a `form_submit` for a form, scoped to its id or action. */
 	formSubmit: (form: HTMLFormElement, scope?: string) => Sent | null
 	/** Sends a test's or flag's assignment, once per subject per client. */
@@ -266,31 +267,30 @@ export const createNumbers = ({
 
 	const paused = () => Date.now() < pausedUntil
 
+	// Without a scope, the event is scoped to its page's route.
 	const sendEvent = (
 		event: string,
-		scope: string,
+		scope: string | undefined,
 		options: TrackOptions,
 		referrer?: string,
 	) => {
 		const current = getVisitor()
 		if (!current || paused()) return null
 
-		const { value, currency, params, dedupeKey } = options
+		const { value, currency, params, dedupeKey, page } = options
 		if (dedupeKey !== undefined) {
 			const key = `${event}:${dedupeKey}`
 			if (sentKeys.has(key)) return null
 			rememberKey(sentKeys, key)
 		}
 
-		const page = getPageContext()
+		const route = toRoute(pageOf(page?.url).pathname)
 		const body: EventBeacon = {
 			...common('event', current),
-			...page,
-			...(page.path && {
-				path: toRoute(location.pathname).slice(0, MAX_URL_LENGTH),
-			}),
+			...getPageContext(page?.url),
+			path: route.slice(0, MAX_URL_LENGTH),
 			event: event.slice(0, MAX_FIELD_LENGTH),
-			scope: scope.slice(0, MAX_FIELD_LENGTH),
+			scope: (scope || route).slice(0, MAX_FIELD_LENGTH),
 		}
 		if (referrer) body.referrer = referrer
 		if (typeof value === 'number' && Number.isFinite(value)) body.value = value
@@ -309,15 +309,15 @@ export const createNumbers = ({
 				`name:${event}`,
 				`"${event}" isn't snake_case. Prefer GA4-style names like "add_to_cart" or "sign_up"; \`disableWarnings: true\` silences this.`,
 			)
-		return sendEvent(event, scope || toRoute(location.pathname), options)
+		return sendEvent(event, scope, options)
 	}
 
-	const pageView = () => {
+	const pageView: NumbersClient['pageView'] = (options = {}) => {
 		if (!isBrowser()) return null
 		// Where the visit came from belongs to its first page view only.
 		const referrer = firstPageView ? getExternalReferrer() : undefined
 		firstPageView = false
-		return sendEvent('page_view', toRoute(location.pathname), {}, referrer)
+		return sendEvent('page_view', undefined, options, referrer)
 	}
 
 	const formScope = (form: HTMLFormElement) => {
