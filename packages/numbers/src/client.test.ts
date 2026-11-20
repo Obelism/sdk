@@ -523,6 +523,22 @@ describe('page', () => {
 		expect(second).not.toHaveProperty('referrer')
 	})
 
+	it('leaves out UTM tags numbers would refuse', async () => {
+		const numbers = numbersFor()
+		const emoji = `a${'😀'.repeat(200)}`
+		numbers.track('view_item', 'x', {
+			page: {
+				url: `/p?utm_source=%00&utm_medium=${encodeURIComponent(emoji)}&utm_campaign=${encodeURIComponent('a😀')}`,
+			},
+		})
+		await settle()
+		const [body] = sentBodies()
+		expect(body).not.toHaveProperty('utmSource')
+		// 256 code units end in the middle of the 128th emoji.
+		expect(body!.utmMedium).toBe(`a${'😀'.repeat(127)}`)
+		expect(body).toMatchObject({ utmCampaign: 'a😀' })
+	})
+
 	it('falls back to the current page for a URL numbers would refuse', async () => {
 		history.replaceState(null, '', '/now')
 		const numbers = numbersFor()
@@ -542,11 +558,8 @@ describe('page', () => {
 		numbers.track('view_item', 'x', {})
 		numbers.track('view_item', 'x', { page: { url: location.href } })
 		await settle()
-		const [without, withPage] = fetchMock.mock.calls
-			.map(([, init]) => JSON.parse(String(init!.body)))
-			.flat()
-		expect(withPage).toEqual(without)
-		expect(Object.keys(without)).not.toContain('page')
+		const [withoutPage, withPage] = sentBodies()
+		expect(withPage).toEqual(withoutPage)
 	})
 })
 

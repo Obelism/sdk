@@ -2,8 +2,11 @@ import { MAX_FIELD_LENGTH, MAX_URL_LENGTH } from './constants'
 import { toWebUrl } from './url'
 import type { PageContext } from './types'
 
-const utm = (params: URLSearchParams, name: string) =>
-	params.get(name)?.slice(0, MAX_FIELD_LENGTH) || undefined
+const UTM_TAGS = {
+	utmSource: 'utm_source',
+	utmMedium: 'utm_medium',
+	utmCampaign: 'utm_campaign',
+} as const
 
 // Events come in bursts on one page, so the context is worked out once per
 // path and query string and shared until the URL changes. Callers copy it
@@ -24,12 +27,16 @@ export const getPageContext = (url?: string | URL): PageContext => {
 	const context: PageContext = { path: pathname.slice(0, MAX_URL_LENGTH) }
 	if (search) {
 		const params = new URLSearchParams(search)
-		const utmSource = utm(params, 'utm_source')
-		const utmMedium = utm(params, 'utm_medium')
-		const utmCampaign = utm(params, 'utm_campaign')
-		if (utmSource) context.utmSource = utmSource
-		if (utmMedium) context.utmMedium = utmMedium
-		if (utmCampaign) context.utmCampaign = utmCampaign
+		for (const [field, name] of Object.entries(UTM_TAGS)) {
+			// numbers refuses a NUL or a lone surrogate, and the whole batch with
+			// it. Decoding never makes the latter; the cut can, from an emoji.
+			const value = params
+				.get(name)
+				?.slice(0, MAX_FIELD_LENGTH)
+				.replace(/[\uD800-\uDBFF]$/, '')
+			if (value && !value.includes('\0'))
+				context[field as keyof typeof UTM_TAGS] = value
+		}
 	}
 	contextKey = key
 	pageContext = context
