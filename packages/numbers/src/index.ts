@@ -13,6 +13,13 @@ export {
 	VISITOR_ID_SEPARATOR,
 } from './constants'
 export { detectDevice } from './device'
+export {
+	classifyLink,
+	isDownload,
+	isOutbound,
+	type ClassifyLinkOptions,
+	type LinkEvent,
+} from './links'
 export { parseRetryAfterMs } from './retry'
 export { createVisitorId, isVisitorId } from './visitor'
 export type * from './types'

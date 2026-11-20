@@ -67,6 +67,9 @@ The browser client of Obelism numbers (`../obelism/apps/numbers`, whose
 - The visitor (`visitor.ts`) is improve's `visitorId` cookie and id format;
   keep it in step with `packages/improve/src/config/constants.ts` and
   `base.ts`, or visitors split in two.
+- Link rules (`links.ts`): `classifyLink`, `isOutbound`, `isDownload`, the
+  `outbound_click` / `file_download` decisions `autoTrack` makes, exported for
+  sites that send events from their own pipeline
 - Device categories (`device.ts`) are improve's audience values, worked out
   without a parser; improve passes its ua-parser-js result instead.
 - Limits (`constants.ts`) follow numbers' `ingest.ts`: 256-character fields,

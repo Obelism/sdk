@@ -80,17 +80,17 @@ export type EventName = RecommendedEventName | (string & {})
 
 export type TrackOptions = {
 	/** A numeric value, e.g. an order total (GA4 `value`). */
-	value?: number
+	value?: number | undefined
 	/** ISO 4217 currency for `value`, e.g. `'EUR'`. */
-	currency?: string
+	currency?: string | undefined
 	/** Extra parameters, stored as JSON (e.g. a GA4 `ecommerce` object). */
-	params?: Record<string, unknown>
+	params?: Record<string, unknown> | undefined
 	/**
 	 * Sends the event once per client for this event and key, e.g. an item id
 	 * for a `view_item` fired every render. Not sent; without it every call
 	 * sends.
 	 */
-	dedupeKey?: string
+	dedupeKey?: string | undefined
 }
 
 /**
