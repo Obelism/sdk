@@ -168,6 +168,26 @@ one on every client (so every full load in a page that isn't an SPA): neither
 sets a cookie. The script takes the same as
 `data-storage`.
 
+To count every visitor and add the cookie only once they consent, start
+without it and switch when the consent changes:
+
+```ts
+const numbers = createNumbers({ organizationId: 'org_…', storage: 'session' })
+numbers.setStorage('cookie') // consent given
+numbers.setStorage('session') // consent withdrawn: deletes the cookies
+```
+
+Moving to the cookie keeps the visitor's id, so the visit isn't split, unless
+the cookie already holds a returning visitor's id: then that one is used.
+Leaving the cookie (for `session` or `none`) deletes `obelism_visitor_id` and
+`visitorId` and starts a new id, so later events can't be tied to what the
+cookie collected. Pass the consent you already know to `createNumbers`, so
+the first events use the right storage.
+
+The client deletes the cookies it sets: for the current host, on `/`. The
+improve SDK's middleware sets the same cookie on every request, with the
+`domain` you give it; gate it on the same consent, or it comes back.
+
 ### Limits
 
 Strings are capped to what numbers accepts (256 characters, currency 8),
