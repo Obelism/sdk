@@ -202,6 +202,30 @@ describe('startScript', () => {
 		expect(sessionStorage.getItem('obelism_visitor_id')).toMatch(/^visi_/)
 	})
 
+	it('takes data-routes, separated by spaces or commas', async () => {
+		history.replaceState(null, '', '/invite/abc')
+		// Earlier tests' clients still follow history: only this one's counts.
+		fetchMock.mockClear()
+		startScript(
+			window,
+			scriptTag({
+				src: 'https://numbers.obelism.studio/script.js',
+				'data-organization': 'org_routes',
+				'data-routes': '/tests/[testId], /invite/[token]',
+			}),
+		)
+		await settle()
+		const sent = fetchMock.mock.calls
+			.map(([, init]) => JSON.parse(String(init!.body)))
+			.find((body) => body.organizationId === 'org_routes')
+		expect(sent).toMatchObject({
+			event: 'page_view',
+			scope: '/invite/[token]',
+			path: '/invite/[token]',
+		})
+		history.replaceState(null, '', '/')
+	})
+
 	it('does nothing without an organization, or when it already runs', () => {
 		expect(startScript(window, null)).toBeNull()
 		expect(startScript(window, scriptTag({ src: '/script.js' }))).toBeNull()

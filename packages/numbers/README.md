@@ -38,7 +38,9 @@ domain; without it events go to numbers' origin, even when a CDN serves the
 file. `data-debug` turns on the development warnings (snake_case names, an 8 KB
 body, a `data-organization` or `data-space` it can't use, an unknown
 `data-environment` or `data-storage`), and
-`data-storage="session"` (or `"none"`) counts without a cookie. npm CDNs
+`data-storage="session"` (or `"none"`) counts without a cookie, and
+`data-routes` takes the site's routes with ids in them (see
+[Routes](#routes)), separated by spaces or commas. npm CDNs
 serve the same file from `@obelism/numbers-sdk/dist/script.global.js`.
 
 ## Module
@@ -102,6 +104,25 @@ browser.
 `params` are stored as JSON. `track` returns `null` when it sent nothing,
 otherwise a promise of the response (`undefined` when the request failed; it
 never rejects).
+
+### Routes
+
+A page whose path holds an id (`/orders/ord_123`, `/invite/a8F…`) is a page
+of its own in a report, one per record. `routes` lists those routes as
+patterns, and a path that matches one is sent as the pattern, as the page
+view's scope and every event's path:
+
+```ts
+createNumbers({
+	organizationId: 'org_…',
+	routes: ['/orders/[orderId]', '/orders/new', '/invite/[token]'],
+})
+```
+
+`[name]` matches one segment of the path. A static segment wins over a
+parameter, so list a static route a pattern would also match
+(`/orders/new`) to keep it apart. Paths that match no pattern are sent as
+they are.
 
 ### Tagged elements
 

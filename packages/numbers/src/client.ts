@@ -8,6 +8,7 @@ import {
 import { detectDevice, getScreenSize } from './device'
 import { getExternalReferrer, getPageContext } from './page'
 import { parseRetryAfterMs } from './retry'
+import { routePath } from './routes'
 import type {
 	BeaconCommon,
 	Device,
@@ -130,7 +131,9 @@ export const createNumbers = ({
 	device: givenDevice,
 	disableWarnings = false,
 	storage = 'cookie',
+	routes,
 }: NumbersOptions): NumbersClient => {
+	const toRoute = routePath(routes)
 	let visitor: Visitor | null = null
 	let device = givenDevice
 	let url = endpoint
@@ -293,9 +296,11 @@ export const createNumbers = ({
 			rememberKey(sentKeys, key)
 		}
 
+		const page = getPageContext()
 		const body: EventBeacon = {
 			...common('event', current),
-			...getPageContext(),
+			...page,
+			...(page.path && { path: toRoute(page.path) }),
 			event: event.slice(0, MAX_FIELD_LENGTH),
 			scope: scope.slice(0, MAX_FIELD_LENGTH),
 		}
@@ -316,7 +321,7 @@ export const createNumbers = ({
 				`name:${event}`,
 				`"${event}" isn't snake_case. Prefer GA4-style names like "add_to_cart" or "sign_up"; \`disableWarnings: true\` silences this.`,
 			)
-		return sendEvent(event, scope || location.pathname, options)
+		return sendEvent(event, scope || toRoute(location.pathname), options)
 	}
 
 	const pageView = () => {
@@ -324,7 +329,7 @@ export const createNumbers = ({
 		// Where the visit came from belongs to its first page view only.
 		const referrer = firstPageView ? getExternalReferrer() : undefined
 		firstPageView = false
-		return sendEvent('page_view', location.pathname, {}, referrer)
+		return sendEvent('page_view', toRoute(location.pathname), {}, referrer)
 	}
 
 	const formScope = (form: HTMLFormElement) => {

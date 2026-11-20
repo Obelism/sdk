@@ -39,6 +39,14 @@ export type NumbersOptions = {
 	 * for a site that counts visits without asking for consent.
 	 */
 	storage?: VisitorStorage
+	/**
+	 * The site's routes with ids in them, like `/tests/[testId]`: a path that
+	 * matches one is sent as the pattern, so a report counts the route rather
+	 * than every record as its own page. `[name]` matches one segment. List a
+	 * static route next to a pattern it would match (`/tests/new`) to keep it
+	 * apart; a static segment wins over a parameter.
+	 */
+	routes?: readonly string[] | undefined
 }
 
 /**

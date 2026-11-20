@@ -16,8 +16,9 @@ import type { VisitorStorage } from './visitor'
 // It sends page views and clicks on tagged elements, and puts the client on
 // `window.numbers` (`numbers.track('sign_up', 'footer_form')`). Events go to
 // numbers' origin, or `data-endpoint`; `data-debug` turns on the client's and
-// the script's development warnings, and `data-storage="session|none"` counts
-// without a cookie.
+// the script's development warnings, `data-storage="session|none"` counts
+// without a cookie, and `data-routes="/tests/[testId] /tests/new"` reports
+// paths with ids as their route (the client's `routes`).
 
 export type ScriptWindow = Window & { numbers?: NumbersClient }
 
@@ -99,6 +100,7 @@ export const startScript = (
 		endpoint: script.dataset.endpoint || resolveEndpoint(script.src),
 		disableWarnings: !debug,
 		storage: storageOf(givenStorage),
+		routes: script.dataset.routes?.split(/[\s,]+/).filter(Boolean),
 	})
 	target.numbers = numbers
 	numbers.autoTrack()

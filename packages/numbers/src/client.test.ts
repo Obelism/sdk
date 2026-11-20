@@ -373,6 +373,25 @@ describe('pageView', () => {
 		await settle()
 		expect(sentBodies()[0]).not.toHaveProperty('referrer')
 	})
+
+	it('sends a path with an id as its route', async () => {
+		history.replaceState(null, '', '/tests/test_1?tab=results')
+		const numbers = numbersFor({ routes: ['/tests/[testId]', '/tests/new'] })
+		numbers.pageView()
+		numbers.track('share')
+		numbers.track('share', 'header')
+		history.replaceState(null, '', '/tests/new')
+		numbers.pageView()
+		await settle()
+		expect(
+			sentBodies().map(({ event, scope, path }) => [event, scope, path]),
+		).toEqual([
+			['page_view', '/tests/[testId]', '/tests/[testId]'],
+			['share', '/tests/[testId]', '/tests/[testId]'],
+			['share', 'header', '/tests/[testId]'],
+			['page_view', '/tests/new', '/tests/new'],
+		])
+	})
 })
 
 describe('expose', () => {
