@@ -109,8 +109,9 @@ never rejects).
 
 A page whose path holds an id (`/orders/ord_123`, `/invite/a8F…`) is a page
 of its own in a report, one per record. `routes` lists those routes as
-patterns, and a path that matches one is sent as the pattern, as the page
-view's scope and every event's path:
+patterns, and a path that matches one is sent as the pattern: as every
+event's path, the page view's scope, and the scope `track()` and
+`formSubmit()` default to:
 
 ```ts
 createNumbers({
@@ -121,8 +122,9 @@ createNumbers({
 
 `[name]` matches one segment of the path. A static segment wins over a
 parameter, so list a static route a pattern would also match
-(`/orders/new`) to keep it apart. Paths that match no pattern are sent as
-they are.
+(`/orders/new`) to keep it apart. A trailing slash doesn't count. Paths are
+compared as the browser has them, percent-encoded. Paths that match no
+pattern are sent as they are.
 
 ### Tagged elements
 

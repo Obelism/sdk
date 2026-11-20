@@ -380,6 +380,7 @@ describe('pageView', () => {
 		numbers.pageView()
 		numbers.track('share')
 		numbers.track('share', 'header')
+		numbers.formSubmit(document.createElement('form'))
 		history.replaceState(null, '', '/tests/new')
 		numbers.pageView()
 		await settle()
@@ -389,6 +390,7 @@ describe('pageView', () => {
 			['page_view', '/tests/[testId]', '/tests/[testId]'],
 			['share', '/tests/[testId]', '/tests/[testId]'],
 			['share', 'header', '/tests/[testId]'],
+			['form_submit', '/tests/[testId]', '/tests/[testId]'],
 			['page_view', '/tests/new', '/tests/new'],
 		])
 	})

@@ -100,7 +100,7 @@ export const startScript = (
 		endpoint: script.dataset.endpoint || resolveEndpoint(script.src),
 		disableWarnings: !debug,
 		storage: storageOf(givenStorage),
-		routes: script.dataset.routes?.split(/[\s,]+/).filter(Boolean),
+		routes: script.dataset.routes?.split(/[\s,]+/),
 	})
 	target.numbers = numbers
 	numbers.autoTrack()

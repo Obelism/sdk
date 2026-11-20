@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { routePath } from './routes'
+import { routeMatcher } from './routes'
 
-describe('routePath', () => {
-	const toRoute = routePath([
+describe('routeMatcher', () => {
+	const toRoute = routeMatcher([
 		'/organization/[organizationId]',
 		'/organization/[organizationId]/spaces/[spaceId]',
 		'/organization/create',
@@ -35,7 +35,17 @@ describe('routePath', () => {
 	})
 
 	it('passes paths through without patterns', () => {
-		expect(routePath(undefined)('/a/b')).toBe('/a/b')
-		expect(routePath(['', 'tests/[id]'])('/tests/1')).toBe('/tests/1')
+		expect(routeMatcher(undefined)('/a/b')).toBe('/a/b')
+		expect(routeMatcher(['', 'tests/[id]'])('/tests/1')).toBe('/tests/1')
+	})
+
+	it('ignores a trailing slash on the path or the pattern', () => {
+		expect(toRoute('/organization/org_1/')).toBe(
+			'/organization/[organizationId]',
+		)
+		expect(routeMatcher(['/tests/[testId]/'])('/tests/1')).toBe(
+			'/tests/[testId]/',
+		)
+		expect(routeMatcher(['/'])('/')).toBe('/')
 	})
 })

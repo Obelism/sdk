@@ -3,8 +3,9 @@ type Route = { pattern: string; segments: string[] }
 const isParam = (segment: string) =>
 	segment.length > 2 && segment.startsWith('[') && segment.endsWith(']')
 
-// Left to right, a static segment beats a parameter, so `/organization/create`
-// wins over `/organization/[organizationId]` when both are listed.
+const segmentsOf = (path: string) =>
+	(path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path).split('/')
+
 const moreSpecific = (a: Route, b: Route) => {
 	for (let i = 0; i < a.segments.length; i++) {
 		const aParam = isParam(a.segments[i]!)
@@ -16,22 +17,22 @@ const moreSpecific = (a: Route, b: Route) => {
 /**
  * Turns route patterns (`/tests/[testId]`) into a function that reports a
  * path as the pattern it matches, so ids in a URL don't make every record its
- * own page. A `[name]` segment matches one non-empty segment; a path matching
- * no pattern stays as it is.
+ * own page. A `[name]` segment matches one non-empty segment, a static
+ * segment wins over a parameter, and a trailing slash doesn't count. A path
+ * matching no pattern stays as it is.
  */
-export const routePath = (
+export const routeMatcher = (
 	patterns: readonly string[] | undefined,
 ): ((path: string) => string) => {
 	const routes: Route[] = []
 	for (const pattern of patterns ?? []) {
-		const trimmed = pattern.trim()
-		if (trimmed.startsWith('/'))
-			routes.push({ pattern: trimmed, segments: trimmed.split('/') })
+		if (pattern.startsWith('/'))
+			routes.push({ pattern, segments: segmentsOf(pattern) })
 	}
 	if (!routes.length) return (path) => path
 
 	return (path) => {
-		const segments = path.split('/')
+		const segments = segmentsOf(path)
 		let best: Route | undefined
 		for (const route of routes) {
 			if (route.segments.length !== segments.length) continue

@@ -3,12 +3,13 @@ import {
 	MAX_BODY_BYTES,
 	MAX_CURRENCY_LENGTH,
 	MAX_FIELD_LENGTH,
+	MAX_URL_LENGTH,
 	RATE_LIMIT_COOLDOWN_MS,
 } from './constants'
 import { detectDevice, getScreenSize } from './device'
 import { getExternalReferrer, getPageContext } from './page'
 import { parseRetryAfterMs } from './retry'
-import { routePath } from './routes'
+import { routeMatcher } from './routes'
 import type {
 	BeaconCommon,
 	Device,
@@ -133,7 +134,7 @@ export const createNumbers = ({
 	storage = 'cookie',
 	routes,
 }: NumbersOptions): NumbersClient => {
-	const toRoute = routePath(routes)
+	const toRoute = routeMatcher(routes)
 	let visitor: Visitor | null = null
 	let device = givenDevice
 	let url = endpoint
@@ -300,7 +301,9 @@ export const createNumbers = ({
 		const body: EventBeacon = {
 			...common('event', current),
 			...page,
-			...(page.path && { path: toRoute(page.path) }),
+			...(page.path && {
+				path: toRoute(location.pathname).slice(0, MAX_URL_LENGTH),
+			}),
 			event: event.slice(0, MAX_FIELD_LENGTH),
 			scope: scope.slice(0, MAX_FIELD_LENGTH),
 		}
@@ -338,7 +341,7 @@ export const createNumbers = ({
 		try {
 			const action = new URL(form.action, location.href)
 			return action.origin === location.origin
-				? action.pathname
+				? toRoute(action.pathname)
 				: `${action.origin}${action.pathname}`
 		} catch {
 			return 'form'
