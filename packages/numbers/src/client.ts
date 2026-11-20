@@ -3,11 +3,13 @@ import {
 	MAX_BODY_BYTES,
 	MAX_CURRENCY_LENGTH,
 	MAX_FIELD_LENGTH,
+	MAX_URL_LENGTH,
 	RATE_LIMIT_COOLDOWN_MS,
 } from './constants'
 import { detectDevice, getScreenSize } from './device'
 import { getExternalReferrer, getPageContext } from './page'
 import { parseRetryAfterMs } from './retry'
+import { routeMatcher } from './routes'
 import type {
 	BeaconCommon,
 	Device,
@@ -130,7 +132,9 @@ export const createNumbers = ({
 	device: givenDevice,
 	disableWarnings = false,
 	storage = 'cookie',
+	routes,
 }: NumbersOptions): NumbersClient => {
+	const toRoute = routeMatcher(routes)
 	let visitor: Visitor | null = null
 	let device = givenDevice
 	let url = endpoint
@@ -293,9 +297,13 @@ export const createNumbers = ({
 			rememberKey(sentKeys, key)
 		}
 
+		const page = getPageContext()
 		const body: EventBeacon = {
 			...common('event', current),
-			...getPageContext(),
+			...page,
+			...(page.path && {
+				path: toRoute(location.pathname).slice(0, MAX_URL_LENGTH),
+			}),
 			event: event.slice(0, MAX_FIELD_LENGTH),
 			scope: scope.slice(0, MAX_FIELD_LENGTH),
 		}
@@ -316,7 +324,7 @@ export const createNumbers = ({
 				`name:${event}`,
 				`"${event}" isn't snake_case. Prefer GA4-style names like "add_to_cart" or "sign_up"; \`disableWarnings: true\` silences this.`,
 			)
-		return sendEvent(event, scope || location.pathname, options)
+		return sendEvent(event, scope || toRoute(location.pathname), options)
 	}
 
 	const pageView = () => {
@@ -324,7 +332,7 @@ export const createNumbers = ({
 		// Where the visit came from belongs to its first page view only.
 		const referrer = firstPageView ? getExternalReferrer() : undefined
 		firstPageView = false
-		return sendEvent('page_view', location.pathname, {}, referrer)
+		return sendEvent('page_view', toRoute(location.pathname), {}, referrer)
 	}
 
 	const formScope = (form: HTMLFormElement) => {
@@ -333,7 +341,7 @@ export const createNumbers = ({
 		try {
 			const action = new URL(form.action, location.href)
 			return action.origin === location.origin
-				? action.pathname
+				? toRoute(action.pathname)
 				: `${action.origin}${action.pathname}`
 		} catch {
 			return 'form'
