@@ -78,6 +78,15 @@ export type RecommendedEventName =
 /** An event's name: snake_case, any string, the GA4 ones suggested. */
 export type EventName = RecommendedEventName | (string & {})
 
+/** The page an event happened on, when it is sent after the visitor left it. */
+export type PageOptions = {
+	/**
+	 * The page's URL, absolute or relative to this one. Its path and UTM tags
+	 * go with the event instead of the current page's.
+	 */
+	url: string | URL
+}
+
 export type TrackOptions = {
 	/** A numeric value, e.g. an order total (GA4 `value`). */
 	value?: number | undefined
@@ -91,6 +100,13 @@ export type TrackOptions = {
 	 * sends.
 	 */
 	dedupeKey?: string | undefined
+	/** The page the event happened on. Default: the current page. */
+	page?: PageOptions | undefined
+}
+
+export type PageViewOptions = {
+	/** The page viewed. Default: the current page. */
+	page?: PageOptions | undefined
 }
 
 /**

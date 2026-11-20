@@ -116,6 +116,20 @@ path. Every event carries the page's path and UTM tags, the first page view
 also the referrer when it is another site. Query strings never leave the
 browser.
 
+An event sent after the visitor moved on (from a queue, or a pipeline that
+waits for the page to load) can name the page it happened on, so it isn't
+counted on the next one:
+
+```ts
+numbers.track('view_item', 'sku_1', { page: { url: productUrl } })
+numbers.pageView({ page: { url } })
+```
+
+Its path and UTM tags then come from `url` (absolute, or relative to the
+current page); a URL that isn't http(s) falls back to the current page. The
+referrer doesn't: it stays the other site the visit came from, on the first
+page view.
+
 `value` and `currency` are summed into revenue per variant in improve.
 `params` are stored as JSON. `track` returns `null` when it sent nothing,
 otherwise a promise of the response (`undefined` when the request failed; it

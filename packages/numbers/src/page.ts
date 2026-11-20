@@ -1,4 +1,5 @@
 import { MAX_FIELD_LENGTH, MAX_URL_LENGTH } from './constants'
+import { toWebUrl } from './url'
 import type { PageContext } from './types'
 
 const utm = (params: URLSearchParams, name: string) =>
@@ -10,10 +11,14 @@ const utm = (params: URLSearchParams, name: string) =>
 let contextKey: string | undefined
 let pageContext: PageContext | undefined
 
-// The page now: its path (without the query string, which numbers drops too)
-// and the UTM tags.
-export const getPageContext = (): PageContext => {
-	const { pathname, search } = location
+// The page now, or at `url` when it parses as http(s): its path (without the
+// query string, which numbers drops too) and the UTM tags. A path numbers
+// refuses would lose the whole batch, so anything else is the page now.
+export const pageOf = (url?: string | URL) =>
+	(url && toWebUrl(url)) || location
+
+export const getPageContext = (url?: string | URL): PageContext => {
+	const { pathname, search } = pageOf(url)
 	const key = `${pathname}${search}`
 	if (key === contextKey) return pageContext!
 	const context: PageContext = { path: pathname.slice(0, MAX_URL_LENGTH) }

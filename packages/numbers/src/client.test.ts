@@ -477,6 +477,79 @@ describe('pageView', () => {
 	})
 })
 
+describe('page', () => {
+	it('sends the path and UTM tags of the given page, not the current one', async () => {
+		history.replaceState(null, '', '/collections/y?utm_source=now')
+		const numbers = numbersFor()
+		numbers.track('view_item', 'product_x', {
+			page: {
+				url: 'https://shop.example/products/x?utm_source=mail&utm_medium=email#top',
+			},
+		})
+		numbers.track('view_item', undefined, {
+			page: { url: new URL('/products/z', location.href) },
+		})
+		await settle()
+		const [first, second] = sentBodies()
+		expect(first).toMatchObject({
+			path: '/products/x',
+			scope: 'product_x',
+			utmSource: 'mail',
+			utmMedium: 'email',
+		})
+		expect(first).not.toHaveProperty('utmCampaign')
+		expect(second).toMatchObject({ path: '/products/z', scope: '/products/z' })
+		expect(second).not.toHaveProperty('utmSource')
+	})
+
+	it('sends a page view of the given page, the referrer still only first', async () => {
+		vi.spyOn(document, 'referrer', 'get').mockReturnValue(
+			'https://news.example/story',
+		)
+		history.replaceState(null, '', '/two')
+		const numbers = numbersFor()
+		numbers.pageView({ page: { url: '/one?utm_campaign=fall' } })
+		numbers.pageView({ page: { url: '/two' } })
+		await settle()
+		const [first, second] = sentBodies()
+		expect(first).toMatchObject({
+			event: 'page_view',
+			path: '/one',
+			scope: '/one',
+			utmCampaign: 'fall',
+			referrer: 'https://news.example/story',
+		})
+		expect(second).toMatchObject({ path: '/two', scope: '/two' })
+		expect(second).not.toHaveProperty('referrer')
+	})
+
+	it('falls back to the current page for a URL numbers would refuse', async () => {
+		history.replaceState(null, '', '/now')
+		const numbers = numbersFor()
+		for (const url of ['http://[bad', 'javascript:alert(1)', ''])
+			numbers.track('view_item', 'x', { page: { url } })
+		await settle()
+		expect(sentBodies().map((body) => body.path)).toEqual([
+			'/now',
+			'/now',
+			'/now',
+		])
+	})
+
+	it('sends the same body as before without the option', async () => {
+		history.replaceState(null, '', '/now?utm_source=a')
+		const numbers = numbersFor({ storage: 'none' })
+		numbers.track('view_item', 'x', {})
+		numbers.track('view_item', 'x', { page: { url: location.href } })
+		await settle()
+		const [without, withPage] = fetchMock.mock.calls
+			.map(([, init]) => JSON.parse(String(init!.body)))
+			.flat()
+		expect(withPage).toEqual(without)
+		expect(Object.keys(without)).not.toContain('page')
+	})
+})
+
 describe('expose', () => {
 	it('sends an exposure once per subject', async () => {
 		const numbers = numbersFor()
