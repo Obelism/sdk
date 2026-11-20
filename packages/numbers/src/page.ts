@@ -17,8 +17,7 @@ let pageContext: PageContext | undefined
 // The page now, or at `url` when it parses as http(s): its path (without the
 // query string, which numbers drops too) and the UTM tags. A path numbers
 // refuses would lose the whole batch, so anything else is the page now.
-export const pageOf = (url?: string | URL) =>
-	(url && toWebUrl(url)) || location
+export const pageOf = (url?: string | URL) => (url && toWebUrl(url)) || location
 
 export const getPageContext = (url?: string | URL): PageContext => {
 	const { pathname, search } = pageOf(url)
