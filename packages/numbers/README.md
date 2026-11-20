@@ -87,6 +87,22 @@ site, `downloads: true` sends `file_download` for links to a file, and
 `autoTrack` again replaces the previous listeners, so it doesn't double
 count.
 
+A site that sends its events from its own pipeline, without `autoTrack`, can
+use the same link rules:
+
+```ts
+import { classifyLink, isDownload, isOutbound } from '@obelism/numbers-sdk'
+
+document.addEventListener('click', (event) => {
+	const link = classifyLink(event.target as Element) // or { outbound, downloads }
+	// { event: 'file_download' | 'outbound_click', scope, params? } or null
+	if (link) numbers.track(link.event, link.scope, { params: link.params })
+})
+
+isOutbound('https://elsewhere.example') // http(s) on another origin
+isDownload(anchor.href, anchor) // a file by extension, or a `download` link
+```
+
 The client is safe to create during server rendering: outside the browser
 every call does nothing and returns `null`.
 

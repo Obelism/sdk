@@ -7,6 +7,7 @@ import {
 	RATE_LIMIT_COOLDOWN_MS,
 } from './constants'
 import { detectDevice, getScreenSize } from './device'
+import { classifyLink } from './links'
 import { getExternalReferrer, getPageContext } from './page'
 import { parseRetryAfterMs } from './retry'
 import { routeMatcher } from './routes'
@@ -47,35 +48,6 @@ export type AutoTrackOptions = {
 	 */
 	forms?: boolean
 }
-
-// Documents, archives and media, not images a browser shows inline (a link
-// with `download` still counts, whatever it points at).
-const DOWNLOAD_EXTENSIONS = new Set([
-	'7z',
-	'avi',
-	'csv',
-	'doc',
-	'docx',
-	'gz',
-	'mov',
-	'mp3',
-	'mp4',
-	'pdf',
-	'ppt',
-	'pptx',
-	'rar',
-	'tar',
-	'txt',
-	'wav',
-	'xls',
-	'xlsx',
-	'xml',
-	'zip',
-])
-
-const isDownload = (url: URL, link: HTMLAnchorElement) =>
-	link.hasAttribute('download') ||
-	DOWNLOAD_EXTENSIONS.has(url.pathname.split('.').pop()?.toLowerCase() ?? '')
 
 /** What a send resolves to: the response, or nothing when it failed. */
 export type Sent = Promise<Response | undefined>
@@ -401,48 +373,10 @@ export const createNumbers = ({
 			onNavigate()
 		}
 
-		// A click on a link to another site or a file, scoped to its tag, its
-		// destination or its name.
 		const trackLink = (target: Element) => {
-			const link = target.closest?.('a[href]') as HTMLAnchorElement | null
-			if (!link) return
-			let url: URL
-			try {
-				url = new URL(link.href, location.href)
-			} catch {
-				return
-			}
-			// Only http(s): a data: URL's path is its whole payload, and
-			// mailto:/tel: aren't destinations.
-			if (!/^https?:$/.test(url.protocol)) return
-			const id = link
-				.closest('[data-numbers-id]')
-				?.getAttribute('data-numbers-id')
-			const fileName = url.pathname.split('/').pop() || url.pathname
-			const extension = fileName.includes('.')
-				? fileName.split('.').pop()!.toLowerCase()
-				: ''
-			if (downloads && isDownload(url, link))
-				track(
-					'file_download',
-					id ?? fileName,
-					id
-						? undefined
-						: {
-								params: {
-									file_name: extension
-										? fileName.slice(0, -(extension.length + 1))
-										: fileName,
-									...(extension && { file_extension: extension }),
-								},
-							},
-				)
-			else if (outbound && url.origin !== location.origin)
-				track(
-					'outbound_click',
-					id ?? `${url.origin}${url.pathname}`,
-					id ? undefined : { params: { link_domain: url.hostname } },
-				)
+			const link = classifyLink(target, { outbound, downloads })
+			if (link)
+				track(link.event, link.scope, link.params && { params: link.params })
 		}
 
 		if (clicks || outbound || downloads) {
