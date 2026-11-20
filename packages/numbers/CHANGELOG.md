@@ -1,5 +1,17 @@
 # @obelism/numbers-sdk
 
+## 0.7.0
+
+### Minor Changes
+
+- 0fd8e1d: Export `classifyLink`, `isOutbound` and `isDownload`: the rules `autoTrack` uses for `outbound_click` and `file_download`, with the same scope and params, for sites that send events from their own pipeline. A link inside an empty `data-numbers-id=""` is now scoped like an untagged one (its file or destination) instead of to the page's path.
+
+  `TrackOptions` fields accept `undefined`, for callers on `exactOptionalPropertyTypes`.
+
+- 5bac22b: `track(…, { page: { url } })` and `pageView({ page: { url } })` send the path and UTM tags of the page an event happened on, for events sent after the visitor moved on. Without it, nothing changes. UTM tags numbers would refuse (a NUL, or an emoji split by the 256-character cut) are left out or trimmed instead of losing the batch.
+- db77087: `routes` (and the script's `data-routes`) report a path with an id in it as its route: `/tests/[testId]` instead of one page per test.
+- ded2a7a: `numbers.setStorage('cookie' | 'session' | 'none')` changes where the visitor id lives at runtime, e.g. to add the cookie once a visitor consents. Moving to the cookie keeps the id unless the cookie already holds a returning visitor's; leaving it deletes `obelism_visitor_id` and `visitorId` and starts a new id.
+
 ## 0.6.0
 
 ### Minor Changes

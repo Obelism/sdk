@@ -1,5 +1,15 @@
 # @obelism/improve-sdk
 
+## 3.8.1
+
+### Patch Changes
+
+- Updated dependencies [0fd8e1d]
+- Updated dependencies [5bac22b]
+- Updated dependencies [db77087]
+- Updated dependencies [ded2a7a]
+  - @obelism/numbers-sdk@0.7.0
+
 ## 3.8.0
 
 ### Minor Changes
