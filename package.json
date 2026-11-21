@@ -22,7 +22,7 @@
 	"devDependencies": {
 		"@changesets/cli": "^3.0.3",
 		"@vercel/git-hooks": "^1.0.0",
-		"lint-staged": "^17.6.0",
+		"lint-staged": "^17.6.1",
 		"prettier": "^3.10.1",
 		"turbo": "^2.11.11",
 		"typescript": "^7.0.2"
