@@ -107,7 +107,7 @@
 		"npm-run-all2": "^9.0.4",
 		"oxlint": "^1.93.0",
 		"rollup": "^4.68.3",
-		"rollup-plugin-swc3": "^0.12.1",
+		"rollup-plugin-swc3": "^0.12.2",
 		"typescript": "^7.0.2",
 		"vitest": "^5.1.0"
 	},
