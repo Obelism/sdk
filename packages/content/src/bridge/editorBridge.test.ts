@@ -162,6 +162,25 @@ describe('createBridge', () => {
 		bridge.destroy()
 	})
 
+	it('hands a listener that starts late the latest update of each entry', () => {
+		const { win, receive } = frame()
+		const bridge = createBridge(win, CMS)
+		const other = { id: 'entry_2', fields: { title: 'Other' } }
+		const newer = { id: 'entry_1', fields: { title: 'Newer' } }
+
+		receive(fromEditor('update', { entry }))
+		receive(fromEditor('update', { entry: other }))
+		receive(fromEditor('update', { entry: newer, selectedUid: 'b_1' }))
+
+		const listener = vi.fn()
+		bridge.on('update', listener)
+		expect(listener.mock.calls).toEqual([
+			[{ entry: newer, selectedUid: 'b_1' }],
+			[{ entry: other, selectedUid: null }],
+		])
+		bridge.destroy()
+	})
+
 	it('tells the editor which block was clicked, instead of following links', () => {
 		const { win, parent } = frame()
 		const bridge = createBridge(win, CMS)

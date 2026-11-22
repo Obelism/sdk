@@ -153,8 +153,9 @@ bridge.on('update', ({ entry }) => render(entry)) // unsaved edits, as typed
 ```
 
 Mark blocks so editors can click them: `<section {...editable(block)}>`
-(adds `data-cms-uid`). Without an `update` listener the page reloads after
-each save. React sites use `@obelism/content-react`.
+(adds `data-cms-uid`). A listener added after an update, like a component
+streamed in after hydration, is called right away with each entry's latest
+one. Without an `update` listener the page reloads after each save. React sites use `@obelism/content-react`.
 
 Without a bundler, the same bridge (prompt box included) is one script tag:
 

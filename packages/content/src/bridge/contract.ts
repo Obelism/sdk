@@ -250,22 +250,38 @@ export const createEmitter = () => {
 		published: new Set(),
 		change: new Set(),
 	}
+	// A listener that starts after the editor's update, like a block streamed
+	// in after hydration, still gets the entry's latest live version.
+	const latestUpdates = new Map<string, BridgeEvents['update']>()
+	const call = <E extends BridgeEvent>(
+		listener: BridgeListener<E>,
+		payload: BridgeEvents[E],
+	) => {
+		try {
+			listener(payload)
+		} catch (error) {
+			console.error('[@obelism/content bridge]', error)
+		}
+	}
 	return {
 		listeners,
 		on<E extends BridgeEvent>(event: E, listener: BridgeListener<E>) {
 			listeners[event].add(listener)
+			if (event === 'update') {
+				for (const payload of latestUpdates.values()) {
+					call(listener, payload as BridgeEvents[E])
+				}
+			}
 			return () => {
 				listeners[event].delete(listener)
 			}
 		},
 		emit<E extends BridgeEvent>(event: E, payload: BridgeEvents[E]) {
-			for (const listener of listeners[event]) {
-				try {
-					listener(payload)
-				} catch (error) {
-					console.error('[@obelism/content bridge]', error)
-				}
+			if (event === 'update') {
+				const update = payload as BridgeEvents['update']
+				latestUpdates.set(update.entry.id, update)
 			}
+			for (const listener of listeners[event]) call(listener, payload)
 		},
 	}
 }
