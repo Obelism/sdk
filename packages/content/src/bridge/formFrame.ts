@@ -16,7 +16,7 @@ import type { ShownVariant } from './variants'
 //   `height` the form's own height in px, which the iframe takes (up to 60vh),
 //   `escape` that Escape was pressed in it (focus there never reaches the
 //   page's keydown), `variant` the option of an improve test or flag whose tab
-//   was opened, for the page to show (CMS versions from 2026-11-22)
+//   shown, for the page to show (a CMS from before never sends it)
 // - bridge → form: { source: 'obelism-content-bridge', type: 'content',
 //   entryId, content, locale, selectedUid }
 
@@ -44,8 +44,7 @@ export type FormFrameHandlers = {
 	) => void
 	onError: (message: string) => void
 	onEscape?: (() => void) | undefined
-	onVariant?:
-		((variant: ShownVariant, entryId: string | undefined) => void) | undefined
+	onVariant?: ((variant: ShownVariant, entryId: string) => void) | undefined
 }
 
 export type FormFrame = {
@@ -114,6 +113,9 @@ export const mountFormFrame = (
 			entryId?: unknown
 			message?: unknown
 			loading?: unknown
+			kind?: unknown
+			slug?: unknown
+			option?: unknown
 		} | null
 		if (!data || data.source !== FORM_SOURCE) return
 		if (data.type === 'ready') {
@@ -138,16 +140,14 @@ export const mountFormFrame = (
 				iframe.style.height = `min(${px}px, 60vh)`
 			}
 		} else if (data.type === 'variant') {
-			const { kind, slug, option } = data as Record<string, unknown>
+			const { kind, slug, option, entryId } = data
 			if (
+				typeof entryId === 'string' &&
 				typeof kind === 'string' &&
 				typeof slug === 'string' &&
 				typeof option === 'string'
 			) {
-				handlers.onVariant?.(
-					{ kind, slug, option },
-					typeof data.entryId === 'string' ? data.entryId : undefined,
-				)
+				handlers.onVariant?.({ kind, slug, option }, entryId)
 			}
 		} else if (data.type === 'escape') {
 			handlers.onEscape?.()

@@ -683,6 +683,48 @@ describe('createSiteBridge', () => {
 			expect(calls.some(({ path }) => path.endsWith('/save'))).toBe(false)
 		})
 
+		it('keeps the page on the latest render when an earlier answer comes late', async () => {
+			const intro = {
+				_type: '_improve',
+				_uid: 'b1',
+				kind: 'test',
+				slug: 'home-intro',
+				variants: { control: [], quiet: [{ _type: 'quiet' }] },
+			}
+			let release = () => {}
+			const held = new Promise<void>((resolve) => (release = resolve))
+			const { win, listeners } = formSite({
+				'entries/entry_page': () => ({
+					content: { body: [intro] },
+					draftRevision: 3,
+				}),
+				'entries/entry_page/preview': async ({ content }) => {
+					if (Object.keys(content.body[0].variants).length === 1) await held
+					return { entry: { id: 'entry_page', fields: content } }
+				},
+			})
+			const bridge = createSiteBridge(win, '/cms')
+			await vi.waitFor(() =>
+				expect(bridge.getState().features).toContain('prompt'),
+			)
+			const updates: unknown[] = []
+			bridge.on('update', ({ entry }) => updates.push(entry))
+			const form = await open(win, listeners, bridge)
+			form.receive({ type: 'ready' })
+			form.receive({
+				type: 'variant',
+				entryId: 'entry_page',
+				kind: 'test',
+				slug: 'home-intro',
+				option: 'quiet',
+			})
+			form.handle.close()
+			await vi.waitFor(() => expect(updates).toHaveLength(1))
+			release()
+			await new Promise((resolve) => setTimeout(resolve, 10))
+			expect(updates).toEqual([{ id: 'entry_page', fields: { body: [intro] } }])
+		})
+
 		it('follows the selection to the entry around it', async () => {
 			const { win, calls, listeners } = formSite({
 				'entries/entry_page/save': () => ({ draftRevision: 4 }),

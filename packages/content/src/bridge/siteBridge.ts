@@ -161,6 +161,8 @@ export const createSiteBridge = (
 	// Per entry, the improve options whose tabs the open form shows: the page
 	// shows them too, never saved.
 	const shownVariants = new Map<string, Map<string, ShownVariant>>()
+	// A slower answer to an earlier render must not replace a later one.
+	const latestRender = new Map<string, number>()
 
 	const refreshUnsaved = () =>
 		setState({
@@ -297,14 +299,17 @@ export const createSiteBridge = (
 	// API. A page without `update` listeners shows it once saved (it reloads).
 	const render = async (entryId: string) => {
 		if (listeners.update.size === 0) return
+		const attempt = (latestRender.get(entryId) ?? 0) + 1
+		latestRender.set(entryId, attempt)
 		const content = showVariants(
 			working.get(entryId)?.content,
-			shownVariants.get(entryId) ?? new Map(),
+			shownVariants.get(entryId),
 		)
 		const { entry } = await api<{ entry: Entry }>(siteApi.preview(entryId), {
 			content,
 			locale: locale(),
 		})
+		if (latestRender.get(entryId) !== attempt) return
 		emit('update', { entry, selectedUid: getState().selectedUid })
 		win.requestAnimationFrame(() => highlight(getState().selectedUid))
 	}
@@ -582,9 +587,8 @@ export const createSiteBridge = (
 				renderSoon(entryId)
 			}
 
-			const showVariant = (variant: ShownVariant, from?: string) => {
-				const entryId = from ?? shown?.entryId
-				if (closed || entryId === undefined || !working.has(entryId)) return
+			const showVariant = (variant: ShownVariant, entryId: string) => {
+				if (closed || !working.has(entryId)) return
 				const shownHere = shownVariants.get(entryId) ?? new Map()
 				shownHere.set(variantKey(variant), variant)
 				shownVariants.set(entryId, shownHere)

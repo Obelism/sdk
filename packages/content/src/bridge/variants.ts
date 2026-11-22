@@ -12,9 +12,9 @@ export const variantKey = ({ kind, slug }: { kind: string; slug: string }) =>
 // only render the shown one.
 export const showVariants = (
 	content: unknown,
-	shown: ReadonlyMap<string, ShownVariant>,
+	shown: ReadonlyMap<string, ShownVariant> | undefined,
 ): unknown => {
-	if (shown.size === 0) return content
+	if (!shown?.size) return content
 	const map = (value: unknown): unknown => {
 		if (Array.isArray(value)) return value.map(map)
 		if (!isObject(value)) return value
@@ -32,12 +32,11 @@ export const showVariants = (
 		const variant = shown.get(
 			variantKey({ kind: mapped.kind, slug: mapped.slug }),
 		)
-		return variant
-			? {
-					...mapped,
-					variants: { [variant.option]: mapped.variants[variant.option] ?? [] },
-				}
-			: mapped
+		if (!variant) return mapped
+		const blocks = Object.hasOwn(mapped.variants, variant.option)
+			? mapped.variants[variant.option]
+			: []
+		return { ...mapped, variants: { [variant.option]: blocks } }
 	}
 	return map(content)
 }

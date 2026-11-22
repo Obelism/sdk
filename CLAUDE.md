@@ -146,7 +146,9 @@ The SDK communicates with two endpoints (see `packages/improve/src/config/urls.t
     when the editing cookie is set; the prompt box's Form mode is the CMS's
     entry form in an iframe (`bridge.openForm`, `bridge/formFrame.ts`, a
     one-time URL from `/cms/api/form`; its postMessage protocol must stay in
-    step with the CMS's `/site/form` page)
+    step with the CMS's `/site/form` page). The variant tab opened in the
+    form shows on the page while it is open (`bridge/variants.ts`), never
+    saved
   - `./prompt`: `createPromptHandler` / `verifyPromptRequest`, for a
     customer's own model behind the space's prompt endpoint
   - `./webhooks`: `verifyWebhook` / `createWebhookHandler` and the
