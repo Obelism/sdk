@@ -1,5 +1,11 @@
 # @obelism/content
 
+## 0.32.0
+
+### Minor Changes
+
+- 7144cdb: Editing on the site: opening a variant's tab of an Improve test or flag in the entry form shows that variant on the page while the form is open. Nothing about it is saved.
+
 ## 0.31.0
 
 ### Minor Changes
