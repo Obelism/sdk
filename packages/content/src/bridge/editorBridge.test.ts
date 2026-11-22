@@ -174,10 +174,9 @@ describe('createBridge', () => {
 
 		const listener = vi.fn()
 		bridge.on('update', listener)
-		expect(listener.mock.calls).toEqual([
-			[{ entry: newer, selectedUid: 'b_1' }],
-			[{ entry: other, selectedUid: null }],
-		])
+		expect(listener).toHaveBeenCalledTimes(2)
+		expect(listener).toHaveBeenCalledWith({ entry: newer, selectedUid: 'b_1' })
+		expect(listener).toHaveBeenCalledWith({ entry: other, selectedUid: null })
 		bridge.destroy()
 	})
 

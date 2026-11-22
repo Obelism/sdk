@@ -250,8 +250,8 @@ export const createEmitter = () => {
 		published: new Set(),
 		change: new Set(),
 	}
-	// A listener that starts after the editor's update, like a block streamed
-	// in after hydration, still gets the entry's latest live version.
+	// A listener added after an update (e.g. streamed in after hydration) still
+	// gets each entry's latest live version.
 	const latestUpdates = new Map<string, BridgeEvents['update']>()
 	const call = <E extends BridgeEvent>(
 		listener: BridgeListener<E>,
