@@ -12,7 +12,9 @@ const NOW = Date.parse('2026-11-14T12:00:00Z')
 
 const ids = Array.from({ length: 2000 }, (_, i) => `visi_${i}`)
 
-const visitor = (id: string) => createVisitor(parseUserAgent(UA)!, id)
+const parsedUA = parseUserAgent(UA)!
+
+const visitor = (id: string) => createVisitor(parsedUA, id)
 
 const makeTest = (extra: Partial<ImproveTest>): ImproveTest => ({
 	id: 'test_x',
