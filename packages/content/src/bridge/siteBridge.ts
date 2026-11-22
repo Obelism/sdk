@@ -27,6 +27,7 @@ import {
 	shopKindOf,
 } from './shop'
 import { mountStatsOverlay, TAG_ATTRIBUTE } from './statsOverlay'
+import { type ShownVariant, showVariants, variantKey } from './variants'
 
 // The bridge on a site signed in to edit (`/cms/login`, from
 // @obelism/content/site), outside the visual editor. It plays the editor's
@@ -157,6 +158,11 @@ export const createSiteBridge = (
 	let closeForm: (() => void) | null = null
 	let lastFormEdit = -Infinity
 	const renderTimers = new Map<string, ReturnType<typeof setTimeout>>()
+	// Per entry, the improve options whose tabs the open form shows: the page
+	// shows them too, never saved.
+	const shownVariants = new Map<string, Map<string, ShownVariant>>()
+	// A slower answer to an earlier render must not replace a later one.
+	const latestRender = new Map<string, number>()
 
 	const refreshUnsaved = () =>
 		setState({
@@ -293,11 +299,17 @@ export const createSiteBridge = (
 	// API. A page without `update` listeners shows it once saved (it reloads).
 	const render = async (entryId: string) => {
 		if (listeners.update.size === 0) return
-		const content = working.get(entryId)?.content
+		const attempt = (latestRender.get(entryId) ?? 0) + 1
+		latestRender.set(entryId, attempt)
+		const content = showVariants(
+			working.get(entryId)?.content,
+			shownVariants.get(entryId),
+		)
 		const { entry } = await api<{ entry: Entry }>(siteApi.preview(entryId), {
 			content,
 			locale: locale(),
 		})
+		if (latestRender.get(entryId) !== attempt) return
 		emit('update', { entry, selectedUid: getState().selectedUid })
 		win.requestAnimationFrame(() => highlight(getState().selectedUid))
 	}
@@ -515,6 +527,10 @@ export const createSiteBridge = (
 				unsubscribe()
 				frame?.destroy()
 				if (closeForm === close) closeForm = null
+				for (const entryId of [...shownVariants.keys()]) {
+					shownVariants.delete(entryId)
+					void render(entryId).catch(logError)
+				}
 			}
 			closeForm = close
 
@@ -571,6 +587,14 @@ export const createSiteBridge = (
 				renderSoon(entryId)
 			}
 
+			const showVariant = (variant: ShownVariant, entryId: string) => {
+				if (closed || !working.has(entryId)) return
+				const shownHere = shownVariants.get(entryId) ?? new Map()
+				shownHere.set(variantKey(variant), variant)
+				shownVariants.set(entryId, shownHere)
+				void render(entryId).catch(logError)
+			}
+
 			const start = async () => {
 				if (!has('form')) throw new Error('You may not edit content here')
 				await load(target(undefined).entryId)
@@ -581,6 +605,7 @@ export const createSiteBridge = (
 				frame = mountFormFrame(win, container, address, title, {
 					onReady: () => onReady?.(),
 					onChange: change,
+					onVariant: showVariant,
 					onError: (message) => onError?.(message),
 					onEscape: () => onEscape?.(),
 				})
