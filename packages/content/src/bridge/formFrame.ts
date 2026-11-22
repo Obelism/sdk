@@ -1,4 +1,5 @@
 import { BRIDGE_SOURCE } from './contract'
+import type { ShownVariant } from './variants'
 
 // The CMS's entry form in an iframe, for editing on the site (the prompt
 // box's Form mode). The CMS renders the form at a one-time URL (`/site/form#
@@ -8,13 +9,14 @@ import { BRIDGE_SOURCE } from './contract'
 // Messages are only exchanged with the URL's origin, and only with the
 // iframe's window:
 // - form → bridge: { source: 'obelism-content-form', type: 'ready' |
-//   'loaded' | 'change' | 'error' | 'height' | 'escape', loading?, content?,
-//   message?, height? } — `ready` with `loading: true` when the form still loads the
+//   'loaded' | 'change' | 'variant' | 'error' | 'height' | 'escape', loading?,
+//   content?, message?, height?, kind?, slug?, option? } — `ready` with `loading: true` when the form still loads the
 //   entry after it and says `loaded` once it shows (a CMS from before says
 //   only `ready`), `change` carries the whole entry content after an edit,
 //   `height` the form's own height in px, which the iframe takes (up to 60vh),
 //   `escape` that Escape was pressed in it (focus there never reaches the
-//   page's keydown)
+//   page's keydown), `variant` the option of an improve test or flag whose tab
+//   was opened, for the page to show (CMS versions from 2026-11-22)
 // - bridge → form: { source: 'obelism-content-bridge', type: 'content',
 //   entryId, content, locale, selectedUid }
 
@@ -42,6 +44,8 @@ export type FormFrameHandlers = {
 	) => void
 	onError: (message: string) => void
 	onEscape?: (() => void) | undefined
+	onVariant?:
+		((variant: ShownVariant, entryId: string | undefined) => void) | undefined
 }
 
 export type FormFrame = {
@@ -132,6 +136,18 @@ export const mountFormFrame = (
 				// A short page's form is short; a long one scrolls inside.
 				const px = Math.round(Math.min(Math.max(height, 80), 4000))
 				iframe.style.height = `min(${px}px, 60vh)`
+			}
+		} else if (data.type === 'variant') {
+			const { kind, slug, option } = data as Record<string, unknown>
+			if (
+				typeof kind === 'string' &&
+				typeof slug === 'string' &&
+				typeof option === 'string'
+			) {
+				handlers.onVariant?.(
+					{ kind, slug, option },
+					typeof data.entryId === 'string' ? data.entryId : undefined,
+				)
 			}
 		} else if (data.type === 'escape') {
 			handlers.onEscape?.()
