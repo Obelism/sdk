@@ -384,7 +384,6 @@ describe('mountSiteEditor', () => {
 
 		button('Ask').click()
 		expect($('.fields').hidden).toBe(true)
-		// Kept: coming back to the fields doesn't load the form again.
 		expect(forms[0]!.frame.isConnected).toBe(true)
 
 		type('Shorter')
@@ -424,8 +423,6 @@ describe('mountSiteEditor', () => {
 		expect(ask.getAttribute('aria-pressed')).toBe('true')
 		expect($('.ask').hidden).toBe(false)
 		expect($('.fields').hidden).toBe(true)
-		// The form stays mounted behind the ask view, so the switch back is
-		// instant and edits made before it are still there.
 		expect(forms[0]!.frame.isConnected).toBe(true)
 
 		ask.click()
@@ -433,6 +430,23 @@ describe('mountSiteEditor', () => {
 		expect($('.fields').hidden).toBe(false)
 		expect(forms).toHaveLength(1)
 		expect(forms[0]!.frame.isConnected).toBe(true)
+	})
+
+	it('loads a form that failed again when the fields come back', () => {
+		const { bridge, setState, forms } = fakeBridge()
+		unmount = mountSiteEditor(document, bridge)
+		setState({ features: ['prompt', 'form'] })
+		forms[0]!.options.onError?.('Could not load the form')
+		expect($('.form-note').textContent).toBe('Could not load the form')
+
+		const ask = $<HTMLButtonElement>('.mode')
+		ask.click()
+		expect(forms[0]!.frame.isConnected).toBe(false)
+
+		ask.click()
+		expect(forms).toHaveLength(2)
+		expect(forms[1]!.frame.isConnected).toBe(true)
+		expect($('.form-note').textContent).toBe('Opening the form…')
 	})
 
 	it('steps back on Escape in the form too', () => {

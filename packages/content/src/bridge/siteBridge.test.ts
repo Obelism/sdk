@@ -535,8 +535,6 @@ describe('createSiteBridge', () => {
 			const formCall = calls.find(({ path }) => path === 'form')!
 			expect(formCall.body).toEqual({})
 			expect(formCall.headers['x-obelism-content']).toBe('1')
-			// The entry rides along in the fragment, so the form loads its fields
-			// while the bar hands the content over.
 			expect(form.iframe.src).toBe(
 				`${CMS}/site/form#code=${codes}&entry=entry_page`,
 			)
