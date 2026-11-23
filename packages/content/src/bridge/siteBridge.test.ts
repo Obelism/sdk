@@ -535,7 +535,9 @@ describe('createSiteBridge', () => {
 			const formCall = calls.find(({ path }) => path === 'form')!
 			expect(formCall.body).toEqual({})
 			expect(formCall.headers['x-obelism-content']).toBe('1')
-			expect(form.iframe.src).toBe(`${CMS}/site/form#code=${codes}`)
+			expect(form.iframe.src).toBe(
+				`${CMS}/site/form#code=${codes}&entry=entry_page`,
+			)
 			expect(form.sent()).toEqual([])
 
 			form.receive({ type: 'ready' })

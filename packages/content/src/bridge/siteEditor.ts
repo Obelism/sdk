@@ -1176,9 +1176,12 @@ export const mountSiteEditor = (
 		const selecting = shown && outlines && !creating
 		if (state.selecting !== selecting) bridge.setSelecting(selecting)
 
+		// Kept while hidden so coming back doesn't load it again; a failed one
+		// is dropped instead, so coming back retries.
 		const showForm = shown && view === 'fields'
+		const dropForm = !hasForm || (!showForm && formSlot.error !== null)
 		if (showForm && !formSlot.mounted) formSlot.mount()
-		else if (!showForm && formSlot.mounted) formSlot.unmount()
+		else if (dropForm && formSlot.mounted) formSlot.unmount()
 
 		if (picking && !shown) picking = false
 		pageButtonText.textContent = pageTitle()

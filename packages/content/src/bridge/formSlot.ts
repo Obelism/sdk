@@ -1,7 +1,7 @@
 import type { ContentBridge, FormHandle } from './contract'
 
-// The CMS's form (`bridge.openForm`) in a container, while shown: a fresh
-// one, and one-time address, every time it mounts.
+// The CMS's form (`bridge.openForm`) in a container: a fresh one, and
+// one-time address, every time it mounts.
 export const createFormSlot = (
 	bridge: ContentBridge,
 	container: HTMLElement,
