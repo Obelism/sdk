@@ -790,6 +790,7 @@ export const mountSiteEditor = (
 	const parents = new Map<string, string | null>()
 	let pageNames: 'idle' | 'loading' | 'done' = 'idle'
 	let destroyed = false
+	let formTried = false
 
 	const formSlot = createFormSlot(bridge, formBox, labels.formTitle, {
 		onReady: () => {
@@ -802,7 +803,7 @@ export const mountSiteEditor = (
 	})
 
 	// The form's iframe, once the slot has one; the fields view's focus
-	// target (the slot mounts it only while shown, so it may not be there).
+	// target (it may not be there yet).
 	const focusForm = () => formBox.querySelector('iframe')?.focus()
 
 	const pending = () => answers.filter(({ status }) => status === 'pending')
@@ -1176,12 +1177,17 @@ export const mountSiteEditor = (
 		const selecting = shown && outlines && !creating
 		if (state.selecting !== selecting) bridge.setSelecting(selecting)
 
-		// Kept while hidden so coming back doesn't load it again; a failed one
-		// is dropped instead, so coming back retries.
+		// Loaded once as the page loads, open or not, so opening the panel finds
+		// the fields there; kept while hidden so coming back doesn't load it
+		// again. A failed one is dropped instead, and retried only once shown.
 		const showForm = shown && view === 'fields'
+		const preloadForm = available && hasForm && !formTried
 		const dropForm = !hasForm || (!showForm && formSlot.error !== null)
-		if (showForm && !formSlot.mounted) formSlot.mount()
-		else if (dropForm && formSlot.mounted) formSlot.unmount()
+		if (!hasForm) formTried = false
+		if ((showForm || preloadForm) && !formSlot.mounted) {
+			formTried = true
+			formSlot.mount()
+		} else if (dropForm && formSlot.mounted) formSlot.unmount()
 
 		if (picking && !shown) picking = false
 		pageButtonText.textContent = pageTitle()
@@ -1323,7 +1329,7 @@ export const mountSiteEditor = (
 		formNote.textContent = formSlot.error ?? labels.formLoading
 
 		syncAnswers()
-		if (shown) {
+		if (available) {
 			readPageNames()
 			if (picker.pages === null && picker.error === null) void picker.fetch()
 		}
