@@ -248,6 +248,8 @@ describe('mountSiteEditor', () => {
 		expect($('.panel').hasAttribute('data-closed')).toBe(true)
 		expect(forms).toHaveLength(1)
 		expect(forms[0]!.frame.isConnected).toBe(true)
+		expect(bridge.view).toHaveBeenCalledWith({ uid: null })
+		expect(bridge.pages).toHaveBeenCalledTimes(1)
 
 		forms[0]!.options.onReady?.()
 		expect(shadow().activeElement).not.toBe(forms[0]!.frame)
@@ -269,6 +271,19 @@ describe('mountSiteEditor', () => {
 		expect(forms).toHaveLength(1)
 
 		$<HTMLButtonElement>('.launch').click()
+		expect(forms).toHaveLength(2)
+		expect(forms[1]!.frame.isConnected).toBe(true)
+	})
+
+	it('loads the form behind the minimised panel again once it comes back', () => {
+		localStorage.setItem('obelism-content-editor', 'minimised')
+		const { bridge, setState, forms } = fakeBridge()
+		unmount = mountSiteEditor(document, bridge)
+		setState({ features: ['prompt', 'form'] })
+		setState({ features: ['prompt'] })
+		expect(forms[0]!.frame.isConnected).toBe(false)
+
+		setState({ features: ['prompt', 'form'] })
 		expect(forms).toHaveLength(2)
 		expect(forms[1]!.frame.isConnected).toBe(true)
 	})

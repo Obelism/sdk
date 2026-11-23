@@ -790,7 +790,7 @@ export const mountSiteEditor = (
 	const parents = new Map<string, string | null>()
 	let pageNames: 'idle' | 'loading' | 'done' = 'idle'
 	let destroyed = false
-	let formPreloaded = false
+	let formTried = false
 
 	const formSlot = createFormSlot(bridge, formBox, labels.formTitle, {
 		onReady: () => {
@@ -1177,14 +1177,15 @@ export const mountSiteEditor = (
 		const selecting = shown && outlines && !creating
 		if (state.selecting !== selecting) bridge.setSelecting(selecting)
 
-		// Loaded once behind the minimised panel, so opening it finds the
-		// fields there; kept while hidden so coming back doesn't load it again.
-		// A failed one is dropped instead, and retried only once shown.
+		// Loaded once as the page loads, open or not, so opening the panel finds
+		// the fields there; kept while hidden so coming back doesn't load it
+		// again. A failed one is dropped instead, and retried only once shown.
 		const showForm = shown && view === 'fields'
-		const preloadForm = available && hasForm && !formPreloaded
+		const preloadForm = available && hasForm && !formTried
 		const dropForm = !hasForm || (!showForm && formSlot.error !== null)
+		if (!hasForm) formTried = false
 		if ((showForm || preloadForm) && !formSlot.mounted) {
-			formPreloaded = true
+			formTried = true
 			formSlot.mount()
 		} else if (dropForm && formSlot.mounted) formSlot.unmount()
 
@@ -1328,7 +1329,7 @@ export const mountSiteEditor = (
 		formNote.textContent = formSlot.error ?? labels.formLoading
 
 		syncAnswers()
-		if (shown) {
+		if (available) {
 			readPageNames()
 			if (picker.pages === null && picker.error === null) void picker.fetch()
 		}
