@@ -63,6 +63,21 @@ const webUrl = (url: string) => {
 	return url
 }
 
+// The form page told which entry it is for, so it loads that entry's fields
+// while the bar hands over the content, not after. In the fragment beside the
+// code: a fragment never reaches a server, and the address is single use.
+const withEntry = (address: string, entryId: string) => {
+	try {
+		const url = new URL(address)
+		const params = new URLSearchParams(url.hash.slice(1))
+		params.set('entry', entryId)
+		url.hash = params.toString()
+		return url.toString()
+	} catch {
+		return address
+	}
+}
+
 // The base path of the site's handler while signed in to edit, else null.
 export const readSiteEditing = (doc: Document): string | null => {
 	const basePath = parseCookies(doc.cookie).get(SITE_EDITING_COOKIE)
@@ -597,18 +612,28 @@ export const createSiteBridge = (
 
 			const start = async () => {
 				if (!has('form')) throw new Error('You may not edit content here')
-				await load(target(undefined).entryId)
-				// A fresh one every time: the address works once, for a minute.
-				const { url } = await api<{ url?: unknown }>(siteApi.form(), {})
+				const { entryId } = target(undefined)
+				// Two calls with nothing between them: the entry the bar edits,
+				// and a fresh address for the form (works once, for a minute).
+				const [, { url }] = await Promise.all([
+					load(entryId),
+					api<{ url?: unknown }>(siteApi.form(), {}),
+				])
 				if (closed) return
 				const address = typeof url === 'string' ? url : ''
-				frame = mountFormFrame(win, container, address, title, {
-					onReady: () => onReady?.(),
-					onChange: change,
-					onVariant: showVariant,
-					onError: (message) => onError?.(message),
-					onEscape: () => onEscape?.(),
-				})
+				frame = mountFormFrame(
+					win,
+					container,
+					withEntry(address, entryId),
+					title,
+					{
+						onReady: () => onReady?.(),
+						onChange: change,
+						onVariant: showVariant,
+						onError: (message) => onError?.(message),
+						onEscape: () => onEscape?.(),
+					},
+				)
 				unsubscribe = on('change', show)
 				show()
 			}
