@@ -1176,9 +1176,12 @@ export const mountSiteEditor = (
 		const selecting = shown && outlines && !creating
 		if (state.selecting !== selecting) bridge.setSelecting(selecting)
 
+		// Mounted once and then kept: switching to Ask, or minimising the
+		// panel, used to throw the whole form away (its own request too), so
+		// coming back loaded it all again.
 		const showForm = shown && view === 'fields'
 		if (showForm && !formSlot.mounted) formSlot.mount()
-		else if (!showForm && formSlot.mounted) formSlot.unmount()
+		else if (!hasForm && formSlot.mounted) formSlot.unmount()
 
 		if (picking && !shown) picking = false
 		pageButtonText.textContent = pageTitle()

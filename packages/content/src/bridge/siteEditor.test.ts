@@ -384,7 +384,8 @@ describe('mountSiteEditor', () => {
 
 		button('Ask').click()
 		expect($('.fields').hidden).toBe(true)
-		expect(forms[0]!.frame.isConnected).toBe(false)
+		// Kept: coming back to the fields doesn't load the form again.
+		expect(forms[0]!.frame.isConnected).toBe(true)
 
 		type('Shorter')
 		await vi.waitFor(() => expect(bridge.prompt).toHaveBeenCalled())
@@ -407,11 +408,8 @@ describe('mountSiteEditor', () => {
 		expect($('.gate').hidden).toBe(true)
 		expect(button('Ask').getAttribute('aria-pressed')).toBe('false')
 		expect($('.ask').hidden).toBe(true)
-		expect(forms).toHaveLength(2)
-		expect(forms[1]!.frame.isConnected).toBe(true)
-		expect($('.form-note').textContent).toBe('Opening the form…')
-		forms[1]!.options.onReady?.()
-		expect($('.form-note').hidden).toBe(true)
+		expect(forms).toHaveLength(1)
+		expect(forms[0]!.frame.isConnected).toBe(true)
 	})
 
 	it('switches between the fields and the ask view with the head button', () => {
@@ -426,13 +424,15 @@ describe('mountSiteEditor', () => {
 		expect(ask.getAttribute('aria-pressed')).toBe('true')
 		expect($('.ask').hidden).toBe(false)
 		expect($('.fields').hidden).toBe(true)
-		expect(forms[0]!.frame.isConnected).toBe(false)
+		// The form stays mounted behind the ask view, so the switch back is
+		// instant and edits made before it are still there.
+		expect(forms[0]!.frame.isConnected).toBe(true)
 
 		ask.click()
 		expect(ask.getAttribute('aria-pressed')).toBe('false')
 		expect($('.fields').hidden).toBe(false)
-		expect(forms).toHaveLength(2)
-		expect(forms[1]!.frame.isConnected).toBe(true)
+		expect(forms).toHaveLength(1)
+		expect(forms[0]!.frame.isConnected).toBe(true)
 	})
 
 	it('steps back on Escape in the form too', () => {
