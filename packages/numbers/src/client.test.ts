@@ -8,6 +8,32 @@ import { isVisitorId } from './visitor'
 const IPHONE =
 	'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
 
+const vitals = vi.hoisted(() => ({
+	onLCP: undefined as ((metric: any) => void) | undefined,
+	onINP: undefined as ((metric: any) => void) | undefined,
+	onCLS: undefined as ((metric: any) => void) | undefined,
+	onFCP: undefined as ((metric: any) => void) | undefined,
+	onTTFB: undefined as ((metric: any) => void) | undefined,
+}))
+
+vi.mock('web-vitals/attribution', () => ({
+	onLCP: (handler: (metric: any) => void) => {
+		vitals.onLCP = handler
+	},
+	onINP: (handler: (metric: any) => void) => {
+		vitals.onINP = handler
+	},
+	onCLS: (handler: (metric: any) => void) => {
+		vitals.onCLS = handler
+	},
+	onFCP: (handler: (metric: any) => void) => {
+		vitals.onFCP = handler
+	},
+	onTTFB: (handler: (metric: any) => void) => {
+		vitals.onTTFB = handler
+	},
+}))
+
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>
 
 const sentBodies = () =>
@@ -764,6 +790,72 @@ describe('autoTrack', () => {
 		expect(sentBodies()).toMatchObject([
 			{ event: 'form_submit', scope: '/checkout' },
 			{ event: 'form_submit', scope: 'paid_order' },
+		])
+	})
+})
+
+describe('web vitals', () => {
+	it('sends each vital as a web_vital event, scoped to the metric', async () => {
+		const numbers = numbersFor()
+		numbers.autoTrack({ pageViews: false, clicks: false, webVitals: true })
+		await vi.waitFor(() => expect(vitals.onLCP).toBeDefined())
+
+		vitals.onLCP!({
+			name: 'LCP',
+			id: 'v1',
+			value: 2100,
+			rating: 'good',
+			navigationType: 'navigate',
+			attribution: { target: 'main>img' },
+		})
+		await settle()
+
+		expect(sentBodies()).toEqual([
+			expect.objectContaining({
+				event: 'web_vital',
+				scope: 'LCP',
+				value: 2100,
+				path: '/',
+				params: {
+					rating: 'good',
+					navigation: 'navigate',
+					element: 'main>img',
+				},
+			}),
+		])
+	})
+
+	it('sends nothing outside the sample, and says the release and rate', async () => {
+		sessionStorage.setItem('obelism_vitals_sampled', '0')
+		const outside = numbersFor()
+		expect(
+			await outside.webVitals({ sampleRate: 0.5, release: 'abc1234' }),
+		).toBeNull()
+
+		sessionStorage.setItem('obelism_vitals_sampled', '1')
+		const inside = numbersFor()
+		await inside.webVitals({ sampleRate: 0.5, release: 'abc1234' })
+		vitals.onFCP!({
+			name: 'FCP',
+			id: 'fcp',
+			value: 900,
+			rating: 'good',
+			navigationType: 'reload',
+			attribution: {},
+		})
+		await settle()
+
+		expect(sentBodies()).toEqual([
+			expect.objectContaining({
+				event: 'web_vital',
+				scope: 'FCP',
+				params: {
+					rating: 'good',
+					navigation: 'reload',
+					release: 'abc1234',
+					sample: '0.5',
+				},
+			}),
 		])
 	})
 })

@@ -24,6 +24,13 @@ import type {
 	TrackOptions,
 } from './types'
 import {
+	inSample,
+	safeSessionStorage,
+	startWebVitals as startVitals,
+	webVitalEvent,
+} from './webVitals'
+import type { WebVitalsOptions } from './webVitals'
+import {
 	loadVisitor,
 	moveVisitor,
 	type Visitor,
@@ -53,6 +60,13 @@ export type AutoTrackOptions = {
 	 * `data-numbers-id`, its `id`, or its action. Default off.
 	 */
 	forms?: boolean
+	/**
+	 * A `web_vital` event per Core Web Vital (LCP, INP, CLS, FCP and TTFB,
+	 * with their rating and element), as numbers' Web vitals report shows
+	 * them. Loads the `web-vitals` package, so install it next to this one.
+	 * Default off.
+	 */
+	webVitals?: boolean | WebVitalsOptions
 }
 
 /** What a send resolves to: the response, or nothing when it failed. */
@@ -94,6 +108,13 @@ export type NumbersClient = {
 	flush: () => Promise<void>
 	/** Starts automatic tracking; returns a function that stops it. */
 	autoTrack: (options?: AutoTrackOptions) => () => void
+	/**
+	 * Starts the `web_vital` events on their own, for a site whose page views
+	 * and clicks it tracks itself; `autoTrack({ webVitals })` calls this.
+	 * Resolves to a function that stops it, or to `null` when the visit is not
+	 * in the sample or `web-vitals` is not installed.
+	 */
+	webVitals: (options?: WebVitalsOptions) => Promise<(() => void) | null>
 }
 
 const SNAKE_CASE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/
@@ -241,6 +262,34 @@ export const createNumbers = ({
 		return Promise.all(chunks.map(post)).then(() => undefined)
 	}
 
+	const startWebVitals = async ({
+		sampleRate = 1,
+		release,
+		load,
+	}: WebVitalsOptions): Promise<(() => void) | null> => {
+		if (!isBrowser()) return null
+		if (!inSample(sampleRate, safeSessionStorage())) return null
+		const landingUrl = location.href
+		const stop = await startVitals(
+			{ ...(load && { load }) },
+			(metric, route) => {
+				const { event, value, options } = webVitalEvent(metric, {
+					sampleRate,
+					release,
+					landingUrl,
+					routeUrl: route,
+				})
+				track(event, metric.name, { ...options, value })
+			},
+		)
+		if (!stop)
+			warn(
+				'web-vitals',
+				'web vitals need the web-vitals attribution build. From a bundler it comes with this package; in the script tag, pass `load` (see numbers.webVitals).',
+			)
+		return stop
+	}
+
 	const send = (body: EventBeacon | ExposureBeacon, label: string): Sent => {
 		const json = JSON.stringify(body)
 		// The size is only checked to warn about it, and numbers refuses the
@@ -351,6 +400,7 @@ export const createNumbers = ({
 		outbound = false,
 		downloads = false,
 		forms = false,
+		webVitals = false,
 	}: AutoTrackOptions = {}) => {
 		if (!isBrowser()) return () => {}
 		// A second call replaces the first instead of stacking listeners, so a
@@ -418,6 +468,16 @@ export const createNumbers = ({
 			stops.push(() => document.removeEventListener('submit', onSubmit, true))
 		}
 
+		if (webVitals) {
+			const options =
+				typeof webVitals === 'object' ? webVitals : ({} as WebVitalsOptions)
+			void startWebVitals(options).then((stopVitals) => {
+				if (!stopVitals) return
+				if (stopAutoTrack === stop) stops.push(stopVitals)
+				else stopVitals()
+			})
+		}
+
 		const stop = () => {
 			for (const fn of stops) fn()
 			if (stopAutoTrack === stop) stopAutoTrack = null
@@ -449,5 +509,6 @@ export const createNumbers = ({
 		expose,
 		flush,
 		autoTrack,
+		webVitals: (options = {}) => startWebVitals(options),
 	}
 }
