@@ -103,7 +103,8 @@ type Observer = keyof Pick<
 export type WebVitalsOptions = {
 	/**
 	 * The part of the visits that report, 0 to 1. Decided once per tab, before
-	 * the first metric, and sent as `sample` so a report can scale the counts.
+	 * the first metric, and sent as `sample` so a report can tell what part of
+	 * the traffic it saw.
 	 * Default 1: every visit.
 	 */
 	sampleRate?: number | undefined

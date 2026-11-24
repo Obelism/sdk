@@ -117,7 +117,8 @@ site that leaves `webVitals` out never downloads it.
 - **`release`** is the site's deploy, e.g. the commit (`process.env.COMMIT_SHA`
   at build). With it the report names the release that made a metric slower.
 - **`sampleRate`** (0 to 1) is the part of the visits that report, decided once
-  per tab and sent as `sample`, so a report divides counts back up. LCP, FCP
+  per tab and sent as `sample`, so a report can tell what part of the traffic
+  it saw. Percentiles don't change with it. LCP, FCP
   and TTFB count on the page the visit landed on; INP and CLS, which keep
   growing until the visit ends, on the page open when they are reported, so a
   client-side router's routes report separately.
