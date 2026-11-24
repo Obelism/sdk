@@ -66,13 +66,16 @@ const formatPointer = (device: AudienceParamDevice) => {
 	return PRIMARY_TOUCH_DEVICES.includes(device) ? 'coarse' : 'fine'
 }
 
+const toOsKey = (name: string) => name.toLowerCase().replace(/\s+/g, '')
+
 const formatOs = (osName: string = ''): AudienceParamOs => {
 	if (!osName) return 'unix'
 
-	const os = osName.toLowerCase()
+	// ua-parser-js says "macOS", the audience value is "mac os"
+	const os = toOsKey(osName)
 
 	const osTypeMatch = AUDIENCE_PARAMS.os.find((osType) => {
-		return os.includes(osType)
+		return os.includes(toOsKey(osType))
 	})
 
 	if (osTypeMatch) return osTypeMatch
