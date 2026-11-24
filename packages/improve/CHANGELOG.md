@@ -1,5 +1,14 @@
 # @obelism/improve-sdk
 
+## 3.8.2
+
+### Patch Changes
+
+- e3e4f1e: Mac visitors are recognised as `mac os` instead of `unix`, so audiences
+  targeting macOS match them and their analytics carry the right OS.
+- Updated dependencies [f01f677]
+  - @obelism/numbers-sdk@0.8.0
+
 ## 3.8.1
 
 ### Patch Changes
