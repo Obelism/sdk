@@ -12,6 +12,10 @@ export default {
 		banner:
 			'/*! Obelism numbers (@obelism/numbers-sdk), MIT. https://numbers.obelism.studio */',
 	},
+	// The script is one file, so it can't load a chunk: `web-vitals` stays
+	// out of it, and a script-tag site passes its own `load` (a CDN's ES
+	// module) to `numbers.webVitals`.
+	external: ['web-vitals/attribution'],
 	plugins: [
 		nodeResolve({ extensions: ['.ts', '.js'] }),
 		swc({ jsc: { target: 'es2020' } }),

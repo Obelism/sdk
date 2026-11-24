@@ -3,8 +3,10 @@
 import { readFileSync } from 'node:fs'
 import { brotliCompressSync, constants } from 'node:zlib'
 
-const MINIFIED_BUDGET = 9.1 * 1024
-const BROTLI_BUDGET = 3.8 * 1024
+// `webVitals()` added about 1.9 kB minified (0.7 kB brotli) to every script
+// download, for the sites that turn it on; the feature earns it.
+const MINIFIED_BUDGET = 11.2 * 1024
+const BROTLI_BUDGET = 4.6 * 1024
 
 const file = new URL('../dist/script.global.js', import.meta.url)
 let source

@@ -73,6 +73,9 @@ numbers.track('view_item', 'list', { dedupeKey: 'sku_1' }) // once per key
 numbers.formSubmit(form, 'newsletter') // or autoTrack({ forms: true })
 numbers.pageView() // by hand, without autoTrack
 numbers.flush() // send what is queued now, instead of on the next microtask
+
+// LCP, INP, CLS, FCP and TTFB, as numbers' Web vitals report reads them
+await numbers.autoTrack({ webVitals: { release: commit, sampleRate: 0.5 } })
 ```
 
 Events made in the same task go to numbers together: a checkout that tracks
@@ -101,6 +104,40 @@ document.addEventListener('click', (event) => {
 
 isOutbound('https://elsewhere.example') // http(s) on another origin
 isDownload(anchor.href, anchor) // a file by extension, or a `download` link
+```
+
+### Web vitals
+
+`autoTrack({ webVitals: true })` sends a `web_vital` event per metric, which
+[numbers' Web vitals report](https://numbers.obelism.studio/docs) shows as the
+75th percentile against Google's thresholds, by route and by release, with the
+slowest elements. `web-vitals` comes with this package, in its own chunk: a
+site that leaves `webVitals` out never downloads it.
+
+- **`release`** is the site's deploy, e.g. the commit (`process.env.COMMIT_SHA`
+  at build). With it the report names the release that made a metric slower.
+- **`sampleRate`** (0 to 1) is the part of the visits that report, decided once
+  per tab and sent as `sample`, so a report divides counts back up. LCP, FCP
+  and TTFB count on the page the visit landed on; INP and CLS, which keep
+  growing until the visit ends, on the page open when they are reported, so a
+  client-side router's routes report separately.
+- **Element ids made from a record show as `#[id]`**, so a selector doesn't
+  leak one.
+- `numbers.webVitals({ … })` starts them alone, for a site that tracks its page
+  views itself.
+
+A script-tag site, without a bundler, passes its own `load` (web-vitals' ES
+module from a CDN), since the script is one file that can't carry a chunk:
+
+```html
+<script defer src="https://numbers.obelism.studio/script.js" …></script>
+<script type="module">
+	numbers.webVitals({
+		release: __COMMIT__,
+		sampleRate: 0.5,
+		load: () => import('https://esm.sh/web-vitals@6/attribution'),
+	})
+</script>
 ```
 
 The client is safe to create during server rendering: outside the browser

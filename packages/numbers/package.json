@@ -55,7 +55,8 @@
 		"rollup": "^4.68.8",
 		"rollup-plugin-swc3": "^0.12.2",
 		"typescript": "^7.0.2",
-		"vitest": "^5.1.1"
+		"vitest": "^5.1.1",
+		"web-vitals": "^6.2.3"
 	},
 	"engines": {
 		"node": ">=20"
