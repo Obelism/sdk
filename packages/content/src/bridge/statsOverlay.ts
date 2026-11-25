@@ -9,9 +9,11 @@ import { UID_ATTRIBUTE } from '../editable'
 // box, in a fixed layer that follows the blocks as the page scrolls, resizes
 // and re-renders.
 //
-// Sites tag a block's clickable element with `data-numbers-id={block._uid}`
-// and load Obelism Numbers' script; the CMS reads the rates from Numbers
-// (the CMS's content/docs/guides/canvas.mdx, "Click rates").
+// Sites tag a block's clickable element with `data-numbers-id={block._uid}`,
+// or each of its buttons with `{block._uid}:{part}` (a part of the block, like
+// its `ctaLink`), and load Obelism Numbers' script; the CMS reads the rates
+// from Numbers, a block's with its parts' (the CMS's
+// content/docs/guides/canvas.mdx, "Click rates").
 
 export type BlockStats = {
 	clicks: number
@@ -49,6 +51,11 @@ export const DEFAULT_STATS_LABELS: StatsLabels = {
 export const MIN_VIEWERS = 20
 
 export const TAG_ATTRIBUTE = 'data-numbers-id'
+
+// `{uid}:{part}`: a button of block `uid`.
+export const PART_SEPARATOR = ':'
+
+export const blockOfTag = (id: string) => id.split(PART_SEPARATOR, 1)[0] ?? id
 
 export type StatsStatus = 'none' | 'counting' | 'rate'
 
@@ -158,8 +165,8 @@ export const mountStatsOverlay = (
 		// A label is a way to select its block too.
 		onSelect: (uid: string) => void
 		// Whether the rates were asked for a tagged id, so no rate means no
-		// clicks. Default: the ids of the page's blocks, which the visual
-		// editor asks for.
+		// clicks. Default: the ids of the page's blocks and their parts, which
+		// the visual editor asks for.
 		checked?: ((id: string) => boolean) | undefined
 		// Which of the rates to draw, by the id and its element. Default: all.
 		shows?: ((id: string, element: Element) => boolean) | undefined
@@ -243,7 +250,7 @@ export const mountStatsOverlay = (
 		const blocks = new Set<string>()
 		for (const element of doc.querySelectorAll(`[${UID_ATTRIBUTE}]`))
 			blocks.add(element.getAttribute(UID_ATTRIBUTE) ?? '')
-		const isChecked = checked ?? ((id: string) => blocks.has(id))
+		const isChecked = checked ?? ((id: string) => blocks.has(blockOfTag(id)))
 		const tagged = new Set<string>()
 		for (const element of doc.querySelectorAll(`[${TAG_ATTRIBUTE}]`)) {
 			const id = element.getAttribute(TAG_ATTRIBUTE)
