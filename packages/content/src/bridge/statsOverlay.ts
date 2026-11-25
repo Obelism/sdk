@@ -12,8 +12,8 @@ import { UID_ATTRIBUTE } from '../editable'
 // Sites tag a block's clickable element with `data-numbers-id={block._uid}`,
 // or each of its buttons with `{block._uid}:{part}` (a part of the block, like
 // its `ctaLink`), and load Obelism Numbers' script; the CMS reads the rates
-// from Numbers, a block's with its parts' (the CMS's
-// content/docs/guides/canvas.mdx, "Click rates").
+// from Numbers, and answers a block's parts when asked for the block (the
+// CMS's content/docs/guides/canvas.mdx, "Click rates").
 
 export type BlockStats = {
 	clicks: number
@@ -52,10 +52,13 @@ export const MIN_VIEWERS = 20
 
 export const TAG_ATTRIBUTE = 'data-numbers-id'
 
-// `{uid}:{part}`: a button of block `uid`.
-export const PART_SEPARATOR = ':'
+// `{uid}:{part}`: a button of block `uid`. Content's uids hold no `:`.
+const PART_SEPARATOR = ':'
 
-export const blockOfTag = (id: string) => id.split(PART_SEPARATOR, 1)[0] ?? id
+const blockOfId = (id: string) => {
+	const end = id.indexOf(PART_SEPARATOR)
+	return end === -1 ? id : id.slice(0, end)
+}
 
 export type StatsStatus = 'none' | 'counting' | 'rate'
 
@@ -234,9 +237,10 @@ export const mountStatsOverlay = (
 		}
 		label.style.top = `${top}px`
 		label.style.left = `${left}px`
-		// Its id names a block by convention; else the block around it.
-		const uid = blocks.has(id)
-			? id
+		// Its id names a block, or a part of one, by convention; else the
+		// block around it.
+		const uid = blocks.has(blockOfId(id))
+			? blockOfId(id)
 			: element.closest(`[${UID_ATTRIBUTE}]`)?.getAttribute(UID_ATTRIBUTE)
 		if (uid) label.addEventListener('click', () => onSelect(uid))
 		layer.appendChild(label)
@@ -250,7 +254,7 @@ export const mountStatsOverlay = (
 		const blocks = new Set<string>()
 		for (const element of doc.querySelectorAll(`[${UID_ATTRIBUTE}]`))
 			blocks.add(element.getAttribute(UID_ATTRIBUTE) ?? '')
-		const isChecked = checked ?? ((id: string) => blocks.has(blockOfTag(id)))
+		const isChecked = checked ?? ((id: string) => blocks.has(blockOfId(id)))
 		const tagged = new Set<string>()
 		for (const element of doc.querySelectorAll(`[${TAG_ATTRIBUTE}]`)) {
 			const id = element.getAttribute(TAG_ATTRIBUTE)
@@ -259,9 +263,17 @@ export const mountStatsOverlay = (
 			if (shows && !shows(id, element)) continue
 			draw(id, element, blocks)
 		}
-		// Rates of blocks the site doesn't tag an element of.
+		// Rates of blocks the site doesn't tag an element of. A block whose
+		// buttons are tagged has their rates instead: its own counts clicks
+		// anywhere in it, from before they were.
+		const withParts = new Set(
+			[...doc.querySelectorAll(`[${TAG_ATTRIBUTE}]`)].flatMap((element) => {
+				const id = element.getAttribute(TAG_ATTRIBUTE) ?? ''
+				return id.includes(PART_SEPARATOR) ? [blockOfId(id)] : []
+			}),
+		)
 		for (const id of Object.keys(stats)) {
-			if (tagged.has(id) || !blocks.has(id)) continue
+			if (tagged.has(id) || !blocks.has(id) || withParts.has(id)) continue
 			const element = doc.querySelector(selector(id))
 			if (element && (!shows || shows(id, element))) draw(id, element, blocks)
 		}

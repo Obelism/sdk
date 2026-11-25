@@ -232,13 +232,14 @@ describe('mountStatsOverlay', () => {
 		overlay.destroy()
 	})
 
-	it('tags a block’s parts, `<uid>:<part>`, by default too, each selecting its block', () => {
+	it('tags a block’s parts, `<uid>:<part>`, by default too, each selecting its block, instead of the block’s own rate', () => {
 		document.body.innerHTML = `
 			<section data-cms-uid="b_1">
 				<a data-numbers-id="b_1:ctaLink">Shop</a>
 				<a data-numbers-id="b_1:secondaryCtaLink">Ask</a>
 			</section>
-			<a data-numbers-id="b_9:ctaLink">Elsewhere</a>`
+			<a data-numbers-id="b_9:ctaLink">Elsewhere</a>
+			<div data-portal><a data-numbers-id="b_1:sticky">Sticky</a></div>`
 		for (const element of document.querySelectorAll('[data-numbers-id]'))
 			element.getBoundingClientRect = () =>
 				({
@@ -254,9 +255,13 @@ describe('mountStatsOverlay', () => {
 			onSelect,
 		})
 		overlay.update(
-			{ 'b_1:ctaLink': { clicks: 30, clickers: 12, viewers: 40, rate: 0.3 } },
+			{
+				b_1: { clicks: 90, clickers: 30, viewers: 40, rate: 0.75 },
+				'b_1:ctaLink': { clicks: 30, clickers: 12, viewers: 40, rate: 0.3 },
+			},
 			true,
 		)
+		expect(badges()).toEqual([])
 		const tags = [
 			...document
 				.querySelector('[data-obelism-stats]')!
@@ -267,8 +272,12 @@ describe('mountStatsOverlay', () => {
 		).toEqual([
 			['b_1:ctaLink', 'rate', '30%'],
 			['b_1:secondaryCtaLink', 'none', ''],
+			['b_1:sticky', 'none', ''],
 		])
 		tags[1]!.click()
+		expect(onSelect).toHaveBeenCalledWith('b_1')
+		onSelect.mockClear()
+		tags[2]!.click()
 		expect(onSelect).toHaveBeenCalledWith('b_1')
 		overlay.destroy()
 	})

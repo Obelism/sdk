@@ -419,8 +419,9 @@ guide, "Click rates"):
 ```
 
 A block with several buttons tags each with `{uid}:{part}`, the part
-naming the field (or anything unique within the block), so each gets its
-own rate. A nested block, like a card in a list, takes its own uid.
+naming the field, or a listed item's path (`{uid}:/products/tee`), so
+each gets its own rate, in place of the block's. A nested block, like a card
+in a list, takes its own uid. Content's uids hold no `:`.
 
 ```tsx
 <a href={block.ctaLink} data-numbers-id={`${block._uid}:ctaLink`}>
