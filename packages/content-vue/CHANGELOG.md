@@ -1,5 +1,12 @@
 # @obelism/content-vue
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [c0c3f1f]
+  - @obelism/content@0.33.0
+
 ## 0.1.3
 
 ### Patch Changes
