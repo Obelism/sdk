@@ -418,6 +418,20 @@ guide, "Click rates"):
 </a>
 ```
 
+A block with several buttons tags each with `{uid}:{part}`, the part
+naming the field, or a listed item's path (`{uid}:/products/tee`), so
+each gets its own rate, in place of the block's. A nested block, like a card
+in a list, takes its own uid. Content's uids hold no `:`.
+
+```tsx
+<a href={block.ctaLink} data-numbers-id={`${block._uid}:ctaLink`}>
+	{block.ctaLabel}
+</a>
+```
+
+Tag the buttons and links, not the block's whole element: a click anywhere
+inside a tagged element counts, its text and empty space too.
+
 The bridge draws the labels itself; it needs nothing else from your site.
 For your own UI, the rates and the switch are in the bridge's state:
 

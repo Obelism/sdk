@@ -136,7 +136,8 @@ The SDK communicates with two endpoints (see `packages/improve/src/config/urls.t
     itself runs in the CMS (`src/server/content/promptEdit.ts`,
     docs/adr/0008 there). The click-rate labels (`bridge/statsOverlay.ts`,
     also plain DOM in a shadow root) show the editor's `stats` message —
-    rates from Obelism numbers per block uid, and its "Show click rates"
+    rates from Obelism numbers per block uid and per part of one
+    (`{uid}:{part}`, a block's buttons), and its "Show click rates"
     switch (`visible`) — and are in the state as `stats` / `statsVisible`
   - `./site`: `createSiteEditing` (the `/cms/*` handler: login, callback,
     logout and the bridge's `/cms/api/…`, forwarded with the site token in
